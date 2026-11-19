@@ -1,0 +1,37 @@
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1">
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        background-color: #000;
+      }
+    </style>
+    <script>
+const tag = document.createElement('script');
+tag.setAttribute('src', "https://www.youtube.com/iframe_api");
+document.head.appendChild(tag);
+
+function onYouTubeIframeAPIReady() {
+  window.player = new YT.Player('player', {
+    height:     '100%',
+    width:      '100%',
+    videoId:    '{{VIDEO_ID}}',
+    playerVars: {
+      'playsinline': 1,
+      'fs': 0,
+      'pageType': {{PAGE_TYPE}},
+      {{EXTRA}}
+    },
+    events: {
+      'onReady': (e) => e.target.playVideo(),
+    }
+  });
+}
+</script>
+  </head>
+  <body>
+    <div id="player"></div>
+  </body>
+</html>

@@ -1,0 +1,184 @@
+import { ChannelType } from './channelType'
+
+export interface PermissionOverwrite {
+    id: string
+    /** 0 for a role, 1 for a member. */
+    type: number
+    allow: string
+    deny: string
+}
+
+/** The guild fields permissions come from. The `guildsStore` guild has them. */
+interface Guild {
+    id: string
+    ownerId: string
+    roles: Record<string, { permissions: string }>
+    /** Role ids of the user, without @everyone. */
+    myRoles: string[]
+}
+
+/** The channel fields permissions come from. The `channelsStore` channel has them. */
+interface Channel {
+    type: number
+    permission_overwrites?: PermissionOverwrite[]
+    thread_metadata?: { locked?: boolean }
+}
+
+export const Permission = {
+    CREATE_INSTANT_INVITE: 1n << 0n,
+    KICK_MEMBERS: 1n << 1n,
+    BAN_MEMBERS: 1n << 2n,
+    ADMINISTRATOR: 1n << 3n,
+    MANAGE_CHANNELS: 1n << 4n,
+    MANAGE_ROLES: 1n << 28n,
+    VIEW_CHANNEL: 1n << 10n,
+    ADD_REACTIONS: 1n << 6n,
+    SEND_MESSAGES: 1n << 11n,
+    MANAGE_MESSAGES: 1n << 13n,
+    EMBED_LINKS: 1n << 14n,
+    ATTACH_FILES: 1n << 15n,
+    READ_MESSAGE_HISTORY: 1n << 16n,
+    MENTION_EVERYONE: 1n << 17n,
+    USE_EXTERNAL_EMOJIS: 1n << 18n,
+    MODERATE_MEMBERS: 1n << 40n,
+    MANAGE_EVENTS: 1n << 33n,
+    MANAGE_THREADS: 1n << 34n,
+    CREATE_PUBLIC_THREADS: 1n << 35n,
+    CREATE_PRIVATE_THREADS: 1n << 36n,
+    USE_EXTERNAL_STICKERS: 1n << 37n,
+    SEND_MESSAGES_IN_THREADS: 1n << 38n,
+    CREATE_EVENTS: 1n << 44n,
+    SEND_VOICE_MESSAGES: 1n << 46n,
+    PIN_MESSAGES: 1n << 51n,
+    BYPASS_SLOWMODE: 1n << 52n,
+} as const
+
+const ALL = ~0n
+
+/** The current user's permissions in a guild channel (or in its parent, for a thread's caller to pass). */
+export function computePermissions(
+    guild: Guild,
+    channel: Channel | undefined,
+    userId: string,
+): bigint {
+    if (guild.ownerId === userId) return ALL
+    let permissions = BigInt(guild.roles[guild.id]?.permissions ?? 0)
+    for (const roleId of guild.myRoles)
+        permissions |= BigInt(guild.roles[roleId]?.permissions ?? 0)
+    if (permissions & Permission.ADMINISTRATOR) return ALL
+
+    const overwrites = channel?.permission_overwrites
+    if (!overwrites?.length) return permissions
+    let allow = 0n
+    let deny = 0n
+    let member: { allow: string; deny: string } | undefined
+    for (const overwrite of overwrites) {
+        if (overwrite.id === guild.id) {
+            // @everyone is applied first, before the union of the role overwrites.
+            permissions =
+                (permissions & ~BigInt(overwrite.deny)) |
+                BigInt(overwrite.allow)
+        } else if (overwrite.id === userId) {
+            member = overwrite
+        } else if (guild.myRoles.includes(overwrite.id)) {
+            allow |= BigInt(overwrite.allow)
+            deny |= BigInt(overwrite.deny)
+        }
+    }
+    permissions = (permissions & ~deny) | allow
+    if (member)
+        permissions =
+            (permissions & ~BigInt(member.deny)) | BigInt(member.allow)
+    return permissions
+}
+
+/** PermissionUtils.canEveryone: the @everyone role holds `permission` and no overwrite denies it. */
+export function canEveryone(
+    guild: Guild,
+    channel: Channel,
+    permission: bigint,
+): boolean {
+    return (
+        (BigInt(guild.roles[guild.id]?.permissions ?? 0) & permission) !== 0n &&
+        !channel.permission_overwrites?.some(
+            overwrite => BigInt(overwrite.deny) & permission,
+        )
+    )
+}
+
+/** Whether another member, with these roles, may see a channel (the reference's PermissionUtils.can with `user`). */
+export function memberCanView(
+    guild: Guild,
+    channel: Channel | undefined,
+    userId: string,
+    roleIds: string[],
+): boolean {
+    return (
+        (computePermissions({ ...guild, myRoles: roleIds }, channel, userId) &
+            Permission.VIEW_CHANNEL) !==
+        0n
+    )
+}
+
+/**
+ * Whether the user may send messages in a channel, given their `channelPermissions` there. A thread needs
+ * SEND_MESSAGES_IN_THREADS, and a locked thread only allows moderators.
+ */
+export function canSendMessages(
+    channel: Channel | undefined,
+    permissions: bigint,
+): boolean {
+    if (!(permissions & Permission.VIEW_CHANNEL)) return false
+    if (channel?.thread_metadata !== undefined) {
+        if (
+            channel.thread_metadata.locked &&
+            !(permissions & Permission.MANAGE_THREADS)
+        )
+            return false
+        return (permissions & Permission.SEND_MESSAGES_IN_THREADS) !== 0n
+    }
+    return (permissions & Permission.SEND_MESSAGES) !== 0n
+}
+
+/**
+ * ThreadHooks.useCanStartPublicThread for a channel (no message). A thread starts in ChannelRecord's
+ * THREADED_CHANNEL_TYPES (GUILD_APP aside, which isocord does not have). A forum or media channel needs SEND_MESSAGES,
+ * any other CREATE_PUBLIC_THREADS and READ_MESSAGE_HISTORY.
+ */
+export function canStartPublicThread(
+    channel: Channel,
+    permissions: bigint,
+): boolean {
+    const forumLike =
+        channel.type === ChannelType.GUILD_FORUM ||
+        channel.type === ChannelType.GUILD_MEDIA
+    if (
+        !forumLike &&
+        channel.type !== ChannelType.GUILD_TEXT &&
+        channel.type !== ChannelType.GUILD_ANNOUNCEMENT
+    )
+        return false
+    const needed = forumLike
+        ? Permission.SEND_MESSAGES
+        : Permission.CREATE_PUBLIC_THREADS | Permission.READ_MESSAGE_HISTORY
+    return (permissions & needed) === needed
+}
+
+/** ThreadHooks.useCanStartPrivateThread: a text channel with CREATE_PRIVATE_THREADS. */
+export function canStartPrivateThread(
+    channel: Channel,
+    permissions: bigint,
+): boolean {
+    return (
+        channel.type === ChannelType.GUILD_TEXT &&
+        (permissions & Permission.CREATE_PRIVATE_THREADS) !== 0n
+    )
+}
+
+/** ThreadHooks.useCanStartThread for a channel (no message): a public or a private thread. */
+export function canStartThread(channel: Channel, permissions: bigint): boolean {
+    return (
+        canStartPublicThread(channel, permissions) ||
+        canStartPrivateThread(channel, permissions)
+    )
+}

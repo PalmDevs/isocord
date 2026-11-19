@@ -1,0 +1,51 @@
+import { useNavigation } from '@react-navigation/native'
+import { ScrollView, View } from 'react-native'
+import { StyleSheet, useUnistyles } from 'react-native-unistyles'
+import { useSession } from '../../core/react'
+import { Button } from '../../design/components/buttons/Button'
+import { t } from '../../i18n'
+import { profileBackground } from '../userProfile/profileColors'
+import { UserProfile } from '../userProfile/UserProfile'
+import { useProfileView } from '../userProfile/useProfileView'
+
+/** The current user's main profile, as the profile sheet draws it, with a way into settings. */
+export function YouTab() {
+    const session = useSession()
+    const navigation = useNavigation<{ navigate: (route: string) => void }>()
+    const { theme } = useUnistyles()
+    const themeColors = useProfileView(session.userId, undefined)?.themeColors
+    return (
+        // The gradient sits on a View, which draws it where a ScrollView does not.
+        <View
+            style={[
+                styles.container,
+                themeColors ? profileBackground(themeColors) : undefined,
+            ]}
+        >
+            <ScrollView>
+                <UserProfile
+                    userId={session.userId}
+                    guildId={undefined}
+                    background={theme.colors.BACKGROUND_BASE_LOWER}
+                    afterIdentity={
+                        // Temporary entry: the reference opens settings from the gear in the You tab's header.
+                        <Button
+                            text={t('settings.title')}
+                            variant="secondary"
+                            grow
+                            onPress={() => navigation.navigate('settings')}
+                        />
+                    }
+                />
+            </ScrollView>
+        </View>
+    )
+}
+
+const styles = StyleSheet.create((theme, runtime) => ({
+    container: {
+        flex: 1,
+        paddingTop: runtime.insets.top,
+        backgroundColor: theme.colors.BACKGROUND_BASE_LOWER,
+    },
+}))

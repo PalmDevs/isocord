@@ -1,0 +1,191 @@
+{
+  "about": "Opt-in channels: whether the guild shows only picked channels, and whether the channel or its parent is picked.",
+  "cases": [
+    {
+      "name": "guild without opt-in",
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "optInEnabled": false,
+        "channelOrParentOptedIn": false
+      }
+    },
+    {
+      "name": "opt-in guild, channel not picked",
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 16384,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "optInEnabled": true,
+        "channelOrParentOptedIn": false
+      }
+    },
+    {
+      "name": "opt-in guild, channel picked",
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 16384,
+        "channelFlags": {
+          "c": 4096
+        },
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "optInEnabled": true,
+        "channelOrParentOptedIn": true
+      }
+    },
+    {
+      "name": "opt-in guild, category picked",
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 16384,
+        "channelFlags": {
+          "cat": 4096
+        },
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": "cat"
+      },
+      "expect": {
+        "optInEnabled": true,
+        "channelOrParentOptedIn": true
+      }
+    },
+    {
+      "name": "opt-in guild, another channel picked",
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 16384,
+        "channelFlags": {
+          "x": 4096
+        },
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": "cat"
+      },
+      "expect": {
+        "optInEnabled": true,
+        "channelOrParentOptedIn": false
+      }
+    },
+    {
+      "name": "picked channel while the guild is not opt-in",
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {
+          "c": 4096
+        },
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "optInEnabled": false,
+        "channelOrParentOptedIn": true
+      }
+    },
+    {
+      "name": "other channel flags are not opt-in",
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 16384,
+        "channelFlags": {
+          "c": 3584
+        },
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "optInEnabled": true,
+        "channelOrParentOptedIn": false
+      }
+    },
+    {
+      "name": "other guild flags are not opt-in",
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 6144,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "optInEnabled": false,
+        "channelOrParentOptedIn": false
+      }
+    }
+  ]
+}

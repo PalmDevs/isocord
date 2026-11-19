@@ -1,0 +1,371 @@
+{
+  "about": "Mute with an end time. Times in ms. A null end mutes for good. Muted, guildMuted and channelMuted are asked of the Notify policy and the Unread policy alike. A missing expectation is not asked.",
+  "cases": [
+    {
+      "name": "no settings for the guild",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": null,
+      "expect": {
+        "muted": false,
+        "guildMuted": false,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "guild muted for good",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": {
+        "mute": {
+          "end": null
+        },
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": true,
+        "guildMuted": true,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "guild muted until later",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": {
+        "mute": {
+          "end": 2000
+        },
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": true,
+        "guildMuted": true,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "guild mute ended",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": {
+        "mute": {
+          "end": 999
+        },
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": false,
+        "guildMuted": false,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "guild mute ends exactly now",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": {
+        "mute": {
+          "end": 1000
+        },
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": true,
+        "guildMuted": true,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "channel muted for good",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {
+          "c": {
+            "end": null
+          }
+        },
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": true,
+        "guildMuted": false,
+        "channelMuted": true
+      }
+    },
+    {
+      "name": "channel muted until later",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {
+          "c": {
+            "end": 1001
+          }
+        },
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": true,
+        "guildMuted": false,
+        "channelMuted": true
+      }
+    },
+    {
+      "name": "channel mute ended",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {
+          "c": {
+            "end": 500
+          }
+        },
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": false,
+        "guildMuted": false,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "another channel muted",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {
+          "x": {
+            "end": null
+          }
+        },
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": false,
+        "guildMuted": false,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "category muted",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": "cat"
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {
+          "cat": {
+            "end": 5000
+          }
+        },
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": true,
+        "guildMuted": false,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "category mute ended",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": "cat"
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {
+          "cat": {
+            "end": 5
+          }
+        },
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": false,
+        "guildMuted": false,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "thread in a muted channel",
+      "now": 1000,
+      "channel": {
+        "id": "t",
+        "guildId": "g",
+        "parentId": "c"
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {
+          "c": {
+            "end": null
+          }
+        },
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": true,
+        "guildMuted": false,
+        "channelMuted": false
+      }
+    },
+    {
+      "name": "private channel muted",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": null,
+        "parentId": null
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {
+          "c": {
+            "end": null
+          }
+        },
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": true,
+        "channelMuted": true
+      }
+    },
+    {
+      "name": "private channel ignores the other mute",
+      "now": 1000,
+      "channel": {
+        "id": "c",
+        "guildId": null,
+        "parentId": null
+      },
+      "settings": {
+        "mute": {
+          "end": null
+        },
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "expect": {
+        "muted": false
+      }
+    }
+  ]
+}

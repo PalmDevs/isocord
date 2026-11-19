@@ -1,0 +1,284 @@
+{
+  "about": "Resolved message notification level: channel, then parent, then guild, then the guild default. A null guildDefault means the guild is unknown.",
+  "cases": [
+    {
+      "name": "no settings and no guild default",
+      "guildDefault": null,
+      "settings": null,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 0
+      }
+    },
+    {
+      "name": "no settings uses the guild default",
+      "guildDefault": 1,
+      "settings": null,
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 1
+      }
+    },
+    {
+      "name": "unset level uses the guild default",
+      "guildDefault": 1,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 1
+      }
+    },
+    {
+      "name": "NULL level uses the guild default",
+      "guildDefault": 2,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": 3,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 2
+      }
+    },
+    {
+      "name": "explicit all messages beats the default",
+      "guildDefault": 1,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": 0,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 0
+      }
+    },
+    {
+      "name": "explicit mentions beats the default",
+      "guildDefault": 0,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": 1,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 1
+      }
+    },
+    {
+      "name": "explicit nothing",
+      "guildDefault": 0,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": 2,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 2
+      }
+    },
+    {
+      "name": "channel override beats the guild",
+      "guildDefault": 0,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": 0,
+        "channelLevels": {
+          "c": 1
+        },
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 1
+      }
+    },
+    {
+      "name": "channel override of all messages beats the default",
+      "guildDefault": 1,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {
+          "c": 0
+        },
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 0
+      }
+    },
+    {
+      "name": "category override beats the guild",
+      "guildDefault": 0,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": 0,
+        "channelLevels": {
+          "cat": 2
+        },
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": "cat"
+      },
+      "expect": {
+        "level": 2
+      }
+    },
+    {
+      "name": "channel beats its category",
+      "guildDefault": 0,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {
+          "c": 1,
+          "cat": 2
+        },
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": "cat"
+      },
+      "expect": {
+        "level": 1
+      }
+    },
+    {
+      "name": "unrelated override is ignored",
+      "guildDefault": 1,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {
+          "x": 2
+        },
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": null
+      },
+      "expect": {
+        "level": 1
+      }
+    },
+    {
+      "name": "no override falls to the default",
+      "guildDefault": 1,
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": false
+      },
+      "channel": {
+        "id": "c",
+        "guildId": "g",
+        "parentId": "cat"
+      },
+      "expect": {
+        "level": 1
+      }
+    }
+  ]
+}

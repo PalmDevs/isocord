@@ -1,0 +1,40 @@
+diff --git a/android/src/main/java/com/zoontek/rnedgetoedge/EdgeToEdgeModuleImpl.kt b/android/src/main/java/com/zoontek/rnedgetoedge/EdgeToEdgeModuleImpl.kt
+index 408f137323dd0a87114698c2867554c46d7e2c47..43931a6b79472bd299ce1f82b4dbd83c6c7df405 100644
+--- a/android/src/main/java/com/zoontek/rnedgetoedge/EdgeToEdgeModuleImpl.kt
++++ b/android/src/main/java/com/zoontek/rnedgetoedge/EdgeToEdgeModuleImpl.kt
+@@ -30,6 +30,10 @@ object EdgeToEdgeModuleImpl {
+   private var statusBarHidden = false
+   private var navigationBarHidden = false
+ 
++  // Last styles from JS. JS skips unchanged styles, so a recreated activity gets them from here.
++  private var statusBarStyle: String? = null
++  private var navigationBarStyle: String? = null
++
+   private fun resolveBoolAttribute(activity: Activity, resId: Int): Boolean =
+     boolAttributes.getOrPut(resId) {
+       val value = TypedValue()
+@@ -114,12 +118,16 @@ object EdgeToEdgeModuleImpl {
+         }
+       }
+     }
++
++    statusBarStyle?.let { setStatusBarStyle(reactContext, it) }
++    navigationBarStyle?.let { setNavigationBarStyle(reactContext, it) }
+   }
+ 
+   fun setStatusBarStyle(reactContext: ReactApplicationContext?, style: String) {
+     val activity = reactContext?.currentActivity
+       ?: return FLog.w(ReactConstants.TAG, NO_ACTIVITY_ERROR)
+ 
++    statusBarStyle = style
+     activity.runOnUiThread {
+       initInsetsController(activity.window).run {
+         isAppearanceLightStatusBars = when (style) {
+@@ -135,6 +143,7 @@ object EdgeToEdgeModuleImpl {
+     val activity = reactContext?.currentActivity
+       ?: return FLog.w(ReactConstants.TAG, NO_ACTIVITY_ERROR)
+ 
++    navigationBarStyle = style
+     if (VERSION.SDK_INT >= VERSION_CODES.O_MR1 && isNavigationBarTransparent(activity)) {
+       activity.runOnUiThread {
+         initInsetsController(activity.window).run {

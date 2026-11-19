@@ -1,0 +1,494 @@
+import { strFromU8 } from 'fflate'
+import { Decompress } from 'fzstd'
+import { AppState } from 'react-native'
+import { gateway } from '../../native/NativeIsocordConstants'
+import {
+    API_VERSION,
+    DEFAULT_GATEWAY_URL,
+    GATEWAY_CAPABILITIES,
+    WEBSOCKET_ORIGIN,
+} from '../constants'
+import { Emitter } from '../events'
+import { logger } from '../log'
+import { CloseCode, Opcode } from './opcodes'
+import { buildQosToken } from './qos'
+import type { ClientIdentity } from '../api/identity'
+import type { GatewayEvents, RawDispatch } from './events'
+
+export type ConnectionState =
+    | 'disconnected'
+    | 'connecting'
+    | 'identifying'
+    | 'resuming'
+    | 'connected'
+
+/**
+ * What the client already holds, sent with IDENTIFY so the server can leave it out of READY.
+ * A plain `{ guild_versions: {} }` asks for everything.
+ */
+export interface ClientState {
+    /** Newest entity version held, by guild id. */
+    guild_versions: Record<string, number>
+    /** Highest last message id across the guild channels held. */
+    highest_last_message_id?: string
+    read_state_version?: number
+    user_guild_settings_version?: number
+}
+
+/**
+ * A dispatch frame, discriminated by its event name. Trusted: the server sends the payload its name
+ * promises. Events without a `GatewayEvents` entry arrive too, for the `raw` listeners.
+ */
+type DispatchFrame = {
+    [K in keyof GatewayEvents]: {
+        op: typeof Opcode.DISPATCH
+        s: number
+        t: K
+        d: GatewayEvents[K]
+    }
+}[keyof GatewayEvents]
+
+/** A frame the client receives, discriminated by its opcode. */
+type GatewayPayload =
+    | DispatchFrame
+    | {
+          op: typeof Opcode.HELLO
+          s: null
+          t: null
+          d: { heartbeat_interval: number }
+      }
+    /** `d` says whether the session can still be resumed. */
+    | { op: typeof Opcode.INVALID_SESSION; s: null; t: null; d: boolean }
+    | {
+          op:
+              | typeof Opcode.HEARTBEAT
+              | typeof Opcode.HEARTBEAT_ACK
+              | typeof Opcode.RECONNECT
+          s: null
+          t: null
+          d: unknown
+      }
+
+interface SocketEvents {
+    state: ConnectionState
+    /** The token was rejected. The socket stops reconnecting. */
+    authenticationFailed: undefined
+    raw: RawDispatch
+}
+
+const {
+    minBackoffMs: MIN_BACKOFF_MS,
+    maxBackoffMs: MAX_BACKOFF_MS,
+    qosVersion: QOS_VERSION,
+} = gateway
+/** GatewaySocket `expeditedHeartbeat`: how long the ack to a heartbeat sent out of turn may take before reconnecting. */
+const EXPEDITED_ACK_MS = 5_000
+
+/**
+ * SessionHeartbeatScheduler: the session is active while the app is in the foreground ("foregrounded"). The
+ * reference also counts a voice call, which Isocord does not have.
+ */
+const qosPayload = () => {
+    const active = AppState.currentState === 'active'
+    return { ver: QOS_VERSION, active, reasons: active ? ['foregrounded'] : [] }
+}
+
+/** Joins chunks before decoding so multi-byte characters split across them survive. */
+function concat(chunks: Uint8Array[]): Uint8Array {
+    if (chunks.length === 1) return chunks[0]!
+    const joined = new Uint8Array(
+        chunks.reduce((total, chunk) => total + chunk.length, 0),
+    )
+    let offset = 0
+    for (const chunk of chunks) {
+        joined.set(chunk, offset)
+        offset += chunk.length
+    }
+    return joined
+}
+
+/** The reference's GatewaySocket logger. Payload sizes, timings and codes only, never contents. */
+const log = logger('GatewaySocket')
+
+/** How big READY was and how many guilds the server sent in full, partially or not at all. */
+function logReadySize(
+    ready: { guilds?: Array<{ data_mode?: string; unavailable?: boolean }> },
+    chars: number,
+    compressed: number,
+): void {
+    const counts = { full: 0, partial: 0, unavailable: 0 }
+    for (const guild of ready.guilds ?? []) {
+        if (guild.data_mode === 'partial') counts.partial++
+        else if (guild.data_mode === 'unavailable' || guild.unavailable)
+            counts.unavailable++
+        else counts.full++
+    }
+    log.info(
+        `READY payload: ${chars} chars (${Math.round(chars / 1024)} KB), ` +
+            `${compressed} bytes compressed, guilds full ${counts.full}, ` +
+            `partial ${counts.partial}, unavailable ${counts.unavailable}`,
+    )
+}
+
+/**
+ * RequestGatewaySocket `describeConnectionReasons`: in the foreground the app container holds the socket
+ * open ("AppContainer:" + its app entry key); in the background nothing does.
+ */
+const connectionReasons = () =>
+    AppState.currentState === 'active' ? 'AppContainer:main' : 'NO_REASONS'
+
+/**
+ * One gateway connection for one account: JSON over zstd-stream, with
+ * heartbeating, resume and reconnect backoff.
+ */
+export class GatewaySocket {
+    /** Typed dispatch events (`MESSAGE_CREATE`, ...). */
+    readonly dispatch = new Emitter<GatewayEvents>()
+    /** Connection lifecycle and untyped dispatches. */
+    readonly events = new Emitter<SocketEvents>()
+
+    state: ConnectionState = 'disconnected'
+
+    private ws: WebSocket | null = null
+    private decompress: Decompress | null = null
+    private chunks: Uint8Array[] = []
+    private seq = 0
+    private sessionId: string | null = null
+    private resumeUrl: string | null = null
+    private heartbeatTimer: ReturnType<typeof setTimeout> | null = null
+    private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    private expeditedTimer: ReturnType<typeof setTimeout> | null = null
+    private heartbeatInterval = 0
+    private heartbeatAcked = true
+    private appState: { remove(): void } | null = null
+    private backoffMs = MIN_BACKOFF_MS
+    private closed = true
+    /** In the background with `pauseInBackground` on: closed, the session kept to resume. */
+    private paused = false
+    /**
+     * Close the socket in the background, keeping the session to resume when the app returns. Set while system
+     * notifications are on, as their own session (GatewayService.kt) takes over then, so only one connection is open.
+     */
+    pauseInBackground = false
+
+    /** `getClientState` is asked for the cache state at every IDENTIFY, so it always describes the stores as they are then. */
+    constructor(
+        private readonly token: string,
+        private readonly identity: ClientIdentity,
+        private readonly getClientState: () => ClientState,
+        /** READY's last `qos_token` for this account (DerivedQosDataStore). */
+        private readonly getDerivedQos: () => string | undefined,
+    ) {}
+
+    /** READY's session id (AuthenticationStore.getSessionId), sent with interactions. Null before READY. */
+    get currentSessionId(): string | null {
+        return this.sessionId
+    }
+
+    connect(): void {
+        this.closed = false
+        this.appState ??= AppState.addEventListener('change', state => {
+            if (state === 'active') this.becameActive()
+            else if (state === 'background') this.becameInactive()
+        })
+        this.open()
+    }
+
+    /** Closes for good and ends the session on Discord's side. */
+    close(): void {
+        this.closed = true
+        this.appState?.remove()
+        this.appState = null
+        this.teardown(1000)
+        this.sessionId = null
+        this.setState('disconnected')
+    }
+
+    /** Returns false when the socket is not open and the payload was dropped. */
+    send(op: number, d: unknown): boolean {
+        if (this.ws?.readyState !== WebSocket.OPEN) return false
+        this.ws.send(JSON.stringify({ op, d }))
+        return true
+    }
+
+    private setState(state: ConnectionState): void {
+        if (this.state === state) return
+        this.state = state
+        log.info(`State: ${state}`)
+        this.events.emit('state', state)
+    }
+
+    private open(): void {
+        const base = (this.sessionId && this.resumeUrl) || DEFAULT_GATEWAY_URL
+        // React Native's WebSocket takes an options argument its typings don't declare.
+        const NativeWebSocket = WebSocket as unknown as new (
+            url: string,
+            protocols: null,
+            options: { headers: Record<string, string> },
+        ) => WebSocket
+        const ws = new NativeWebSocket(
+            // The official client asks for zstd whenever its native decompressor supports it, which on Android it does.
+            // The background session uses zlib-stream (COMPRESSION in NotificationGateway.kt).
+            `${base}/?encoding=json&v=${API_VERSION}&compress=zstd-stream`,
+            null,
+            {
+                // The gateway rejects the handshake (403) unless the origin is Discord's own,
+                // and React Native would otherwise send the gateway host as the origin.
+                headers: { Origin: WEBSOCKET_ORIGIN },
+            },
+        )
+        // Supported by React Native but missing from its typings.
+        ;(ws as WebSocket & { binaryType: string }).binaryType = 'arraybuffer'
+        this.ws = ws
+        this.setState('connecting')
+
+        // One zstd context per connection. The server flushes the stream at the end of every message.
+        this.chunks = []
+        this.decompress = new Decompress(chunk => this.chunks.push(chunk))
+
+        let inflateMs = 0
+        let compressedBytes = 0
+        ws.onmessage = event => {
+            const frame = new Uint8Array(event.data as ArrayBuffer)
+            compressedBytes += frame.length
+            const started = performance.now()
+            this.decompress?.push(frame)
+            inflateMs += performance.now() - started
+            if (this.chunks.length === 0) return
+
+            const chunks = this.chunks
+            this.chunks = []
+            // Where a large payload (READY) spends its time on the JS thread.
+            const t0 = performance.now()
+            const text = strFromU8(concat(chunks))
+            const t1 = performance.now()
+            const payload: GatewayPayload = JSON.parse(text)
+            const t2 = performance.now()
+            this.handlePayload(payload)
+            const t3 = performance.now()
+            if (text.length > 100_000) {
+                const ms = (value: number) => Math.round(value)
+                log.info(
+                    `${payload.t}: ${ms(text.length / 1024)} KB, inflate ${ms(inflateMs)} ms, ` +
+                        `decode ${ms(t1 - t0)} ms, parse ${ms(t2 - t1)} ms, handlers ${ms(t3 - t2)} ms`,
+                )
+            }
+            if (payload.t === 'READY')
+                logReadySize(payload.d, text.length, compressedBytes)
+            inflateMs = 0
+            compressedBytes = 0
+        }
+        ws.onclose = event => {
+            log.warn(
+                `Closed: ${event.code}${event.reason ? ` ${event.reason}` : ''}`,
+            )
+            if (this.ws === ws) this.handleClose(event.code ?? 1006)
+        }
+        // onclose always follows an error, so reconnecting is handled there.
+        ws.onerror = event => {
+            log.warn(`Error: ${(event as { message?: string }).message}`)
+        }
+    }
+
+    private handlePayload(payload: GatewayPayload): void {
+        switch (payload.op) {
+            case Opcode.HELLO:
+                this.startHeartbeat(payload.d.heartbeat_interval)
+                if (this.sessionId) this.resume()
+                else this.identify()
+                break
+            case Opcode.DISPATCH:
+                this.seq = payload.s
+                this.handleDispatch(payload)
+                break
+            case Opcode.HEARTBEAT:
+                this.sendHeartbeat()
+                break
+            case Opcode.HEARTBEAT_ACK:
+                this.heartbeatAcked = true
+                break
+            case Opcode.RECONNECT:
+                log.info('Server asked to reconnect')
+                this.reconnect()
+                break
+            case Opcode.INVALID_SESSION:
+                log.warn(`Invalid session, resumable: ${payload.d}`)
+                if (!payload.d) this.sessionId = null
+                this.reconnect()
+                break
+        }
+    }
+
+    private handleDispatch(frame: DispatchFrame): void {
+        if (frame.t === 'READY') {
+            this.sessionId = frame.d.session_id
+            this.resumeUrl = frame.d.resume_gateway_url
+        }
+        if (frame.t === 'READY' || frame.t === 'RESUMED') {
+            this.backoffMs = MIN_BACKOFF_MS
+            this.setState('connected')
+        }
+        this.dispatch.emit(frame.t, frame.d)
+        this.events.emit('raw', { type: frame.t, data: frame.d })
+    }
+
+    private identify(): void {
+        this.seq = 0
+        this.setState('identifying')
+        const clientState = this.getClientState()
+        log.debug(
+            `client_state: ${Object.keys(clientState.guild_versions).length} guild versions, ` +
+                `read_state ${clientState.read_state_version !== undefined}, ` +
+                `highest_last_message_id ${clientState.highest_last_message_id !== undefined}, ` +
+                `user_guild_settings ${clientState.user_guild_settings_version !== undefined}`,
+        )
+        // GatewaySocketSingleton `handleIdentify` and GatewaySocket's IDENTIFY, in their key order. The
+        // installation id is left out: the reference sends it only with analytics consent.
+        const active = AppState.currentState === 'active'
+        this.send(Opcode.IDENTIFY, {
+            token: this.token,
+            capabilities: GATEWAY_CAPABILITIES,
+            properties: {
+                ...this.identity.superProperties(),
+                is_fast_connect: false,
+                gateway_connect_reasons: connectionReasons(),
+            },
+            presence: {
+                status: 'unknown',
+                since: 0,
+                activities: [],
+                // The background session sends true (IDENTIFY_AFK in NotificationGateway.kt).
+                afk: false,
+            },
+            compress: false,
+            client_state: clientState,
+            qos_token: buildQosToken(this.getDerivedQos(), active),
+        })
+    }
+
+    private resume(): void {
+        this.setState('resuming')
+        this.send(Opcode.RESUME, {
+            token: this.token,
+            session_id: this.sessionId,
+            seq: this.seq,
+        })
+    }
+
+    private startHeartbeat(intervalMs: number): void {
+        this.heartbeatInterval = intervalMs
+        this.heartbeatAcked = true
+        this.scheduleHeartbeat(intervalMs * Math.random())
+    }
+
+    private scheduleHeartbeat(delay: number): void {
+        if (this.heartbeatTimer) clearTimeout(this.heartbeatTimer)
+        this.heartbeatTimer = setTimeout(() => {
+            // A missed ack means the connection is dead even if the socket is open.
+            if (!this.heartbeatAcked) {
+                log.warn('Heartbeat not acknowledged, reconnecting')
+                return this.reconnect()
+            }
+            this.sendHeartbeat()
+            this.scheduleHeartbeat(this.heartbeatInterval)
+        }, delay)
+    }
+
+    /** GatewaySocket `_sendHeartbeat`: every heartbeat is a QoS heartbeat, telling the server whether the app is in use. */
+    private sendHeartbeat(): void {
+        this.heartbeatAcked = false
+        this.send(Opcode.QOS_HEARTBEAT, {
+            seq: this.seq || null,
+            qos: qosPayload(),
+        })
+    }
+
+    /**
+     * Handles the app returning to the foreground.
+     * GatewayConnectionStore `APP_STATE_UPDATE` calls `resetBackoff`, so a waiting reconnect happens now.
+     * SessionHeartbeatScheduler's `handleActiveStateChange` sends a heartbeat at once.
+     * Unlike the reference, that heartbeat is expedited (`expeditedHeartbeat`, kept for notification taps).
+     * JS timers stop in the background, so a dead socket would go unnoticed for a whole interval.
+     */
+    private becameActive(): void {
+        if (this.closed) return
+        this.backoffMs = MIN_BACKOFF_MS
+        if (this.paused) {
+            this.paused = false
+            this.open()
+            return
+        }
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer)
+            this.reconnectTimer = null
+            this.open()
+            return
+        }
+        if (this.state !== 'connected' && this.state !== 'resuming') return
+        this.sendHeartbeat()
+        this.scheduleHeartbeat(this.heartbeatInterval)
+        if (this.expeditedTimer) clearTimeout(this.expeditedTimer)
+        this.expeditedTimer = setTimeout(() => {
+            this.expeditedTimer = null
+            if (this.heartbeatAcked) return
+            log.warn('Expedited heartbeat not acknowledged, reconnecting')
+            this.reconnect()
+        }, EXPEDITED_ACK_MS)
+    }
+
+    /** Pauses for the background session, which resumes its own session when told the app has left (AppVisibility). */
+    private becameInactive(): void {
+        if (this.closed || !this.pauseInBackground || this.paused) return
+        this.paused = true
+        this.teardown(CloseCode.RESUMABLE)
+        this.setState('disconnected')
+    }
+
+    private handleClose(code: number): void {
+        this.teardown()
+        if (this.closed) return
+
+        if (code === CloseCode.AUTHENTICATION_FAILED) {
+            log.error('Token rejected, logging out')
+            this.closed = true
+            this.setState('disconnected')
+            this.events.emit('authenticationFailed', undefined)
+            return
+        }
+        if (
+            code === CloseCode.INVALID_SEQ ||
+            code === CloseCode.SESSION_TIMED_OUT
+        )
+            this.sessionId = null
+
+        this.setState('disconnected')
+        const delay = this.backoffMs * (0.5 + Math.random() / 2)
+        this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS)
+        log.info(`Reconnecting in ${Math.round(delay)} ms`)
+        // Cleared when it fires, or becameActive would take it as still waiting and open a second socket.
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null
+            this.open()
+        }, delay)
+    }
+
+    /** Drops the connection without ending the session, then reconnects. */
+    private reconnect(): void {
+        this.teardown(CloseCode.RESUMABLE)
+        if (!this.closed) this.open()
+    }
+
+    private teardown(closeCode?: number): void {
+        if (this.heartbeatTimer) clearTimeout(this.heartbeatTimer)
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
+        if (this.expeditedTimer) clearTimeout(this.expeditedTimer)
+        this.heartbeatTimer = this.reconnectTimer = this.expeditedTimer = null
+        const ws = this.ws
+        this.ws = null
+        this.decompress = null
+        if (ws && closeCode !== undefined) {
+            ws.onmessage = ws.onclose = ws.onerror = null
+            ws.close(closeCode)
+        }
+    }
+}

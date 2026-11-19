@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "forge_extension": {
+      "url": "http://localhost:10871/mcp"
+    },
+    "rdx": {
+      "args": ["mcp"],
+      "command": "/var/home/palm/Desktop/rdx-v0.2.1-linux-x86_64/rdx"
+    },
+    "revenge_devtools": {
+      "url": "http://localhost:7864/mcp",
+      "type": "http"
+    }
+  }
+}

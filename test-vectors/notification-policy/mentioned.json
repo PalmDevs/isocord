@@ -1,0 +1,242 @@
+{
+  "about": "Whether a message mentions the user: the user, @everyone or one of their roles, with the guild suppressing the last two.",
+  "cases": [
+    {
+      "name": "nothing mentioned",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": false,
+        "mentionRoles": []
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": null,
+      "expect": {
+        "mentioned": false
+      }
+    },
+    {
+      "name": "the user",
+      "message": {
+        "mentions": ["me"],
+        "mentionEveryone": false,
+        "mentionRoles": []
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": null,
+      "expect": {
+        "mentioned": true
+      }
+    },
+    {
+      "name": "another user",
+      "message": {
+        "mentions": ["other"],
+        "mentionEveryone": false,
+        "mentionRoles": []
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": null,
+      "expect": {
+        "mentioned": false
+      }
+    },
+    {
+      "name": "@everyone",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": true,
+        "mentionRoles": []
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": null,
+      "expect": {
+        "mentioned": true
+      }
+    },
+    {
+      "name": "@everyone suppressed",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": true,
+        "mentionRoles": []
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": true,
+        "suppressRoles": false
+      },
+      "expect": {
+        "mentioned": false
+      }
+    },
+    {
+      "name": "user mention beats suppressed @everyone",
+      "message": {
+        "mentions": ["me"],
+        "mentionEveryone": true,
+        "mentionRoles": []
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": true,
+        "suppressRoles": false
+      },
+      "expect": {
+        "mentioned": true
+      }
+    },
+    {
+      "name": "own role",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": false,
+        "mentionRoles": ["r1"]
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": null,
+      "expect": {
+        "mentioned": true
+      }
+    },
+    {
+      "name": "own role suppressed",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": false,
+        "mentionRoles": ["r1"]
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": true
+      },
+      "expect": {
+        "mentioned": false
+      }
+    },
+    {
+      "name": "another role",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": false,
+        "mentionRoles": ["r2"]
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": null,
+      "expect": {
+        "mentioned": false
+      }
+    },
+    {
+      "name": "one own role among others",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": false,
+        "mentionRoles": ["r2", "r1"]
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": null,
+      "expect": {
+        "mentioned": true
+      }
+    },
+    {
+      "name": "suppressed roles keep @everyone",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": true,
+        "mentionRoles": ["r1"]
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": false,
+        "suppressRoles": true
+      },
+      "expect": {
+        "mentioned": true
+      }
+    },
+    {
+      "name": "suppressed @everyone keeps roles",
+      "message": {
+        "mentions": [],
+        "mentionEveryone": true,
+        "mentionRoles": ["r1"]
+      },
+      "me": {
+        "id": "me",
+        "roles": ["r1"]
+      },
+      "settings": {
+        "mute": null,
+        "channelMutes": {},
+        "level": null,
+        "channelLevels": {},
+        "flags": 0,
+        "channelFlags": {},
+        "suppressEveryone": true,
+        "suppressRoles": false
+      },
+      "expect": {
+        "mentioned": true
+      }
+    }
+  ]
+}

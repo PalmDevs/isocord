@@ -1,0 +1,26 @@
+export const Opcode = {
+    DISPATCH: 0,
+    HEARTBEAT: 1,
+    IDENTIFY: 2,
+    PRESENCE_UPDATE: 3,
+    VOICE_STATE_UPDATE: 4,
+    RESUME: 6,
+    RECONNECT: 7,
+    REQUEST_GUILD_MEMBERS: 8,
+    INVALID_SESSION: 9,
+    HELLO: 10,
+    HEARTBEAT_ACK: 11,
+    CALL_CONNECT: 13,
+    GUILD_SUBSCRIPTIONS: 14,
+    GET_DELETED_ENTITY_IDS_NOT_MATCHING_HASH: 30,
+    GUILD_SUBSCRIPTIONS_BULK: 37,
+    QOS_HEARTBEAT: 40,
+} as const
+
+export const CloseCode = {
+    /** Our own close of a connection that will be resumed. */
+    RESUMABLE: 4000,
+    AUTHENTICATION_FAILED: 4004,
+    INVALID_SEQ: 4007,
+    SESSION_TIMED_OUT: 4009,
+} as const
