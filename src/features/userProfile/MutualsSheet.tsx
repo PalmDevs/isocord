@@ -21,9 +21,9 @@ import { TableRow } from '../../design/components/table/TableRow'
 import { t } from '../../i18n'
 import { guildsStore } from '../../stores/guilds'
 import { presencesStore } from '../../stores/presences'
-import { useUserProfile } from '../../stores/userProfiles'
 import { displayName } from '../../stores/users'
 import { openProfileSheet } from './openProfileSheet'
+import { useProfileMutuals } from './useProfileMutuals'
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import type { MessageKey } from '../../i18n'
 import type { MutualGuild } from '../../stores/userProfiles'
@@ -69,11 +69,9 @@ function MutualsSheet({
     guildId: string | undefined
     initialTab: MutualsTab
 }) {
-    const profile = useUserProfile(userId, guildId)
+    const { friends, guilds } = useProfileMutuals(userId, guildId)
     const { height } = useWindowDimensions()
     const atTop = useSharedValue(true)
-    const friends = profile?.mutual_friends ?? []
-    const guilds = profile?.mutual_guilds ?? []
     const listProps = {
         contentContainerStyle: styles.list,
         onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) =>

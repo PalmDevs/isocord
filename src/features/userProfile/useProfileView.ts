@@ -50,8 +50,9 @@ export function useProfileView(
         profile,
         guildId,
         name: displayName(user, guildMember?.nick),
-        pronouns: server?.pronouns ?? main?.pronouns,
-        bio: server?.bio ?? main?.bio ?? profile?.user.bio,
+        // DisplayProfile.isUsingGuildMemberBio: an empty server value means none.
+        pronouns: server?.pronouns || main?.pronouns,
+        bio: server?.bio || main?.bio || profile?.user.bio,
         themeColors: server?.theme_colors ?? main?.theme_colors,
         guildAvatar,
         avatarUrl: size => authorAvatarUrl(user, guildMember, guildId, size),

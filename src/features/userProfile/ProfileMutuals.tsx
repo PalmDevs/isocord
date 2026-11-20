@@ -8,8 +8,7 @@ import { Text } from '../../design/components/Text'
 import { t } from '../../i18n'
 import { guildsStore } from '../../stores/guilds'
 import { openMutualsSheet } from './MutualsSheet'
-import type { MutualGuild } from '../../stores/userProfiles'
-import type { User } from '../../stores/users'
+import { useProfileMutuals } from './useProfileMutuals'
 
 const PILE_SIZE = 16
 const PILE_GUILDS = 3
@@ -23,14 +22,11 @@ const BULLET = '•'
 export function ProfileMutuals({
     userId,
     guildId,
-    friends,
-    guilds,
 }: {
     userId: string
     guildId: string | undefined
-    friends: User[]
-    guilds: MutualGuild[]
 }) {
+    const { friends, guilds } = useProfileMutuals(userId, guildId)
     const known = useSessionStore(guildsStore, state => state.guilds)
     const shownGuilds = guilds.flatMap(({ id }) => known[id] ?? [])
     return (
