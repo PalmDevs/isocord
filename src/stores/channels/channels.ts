@@ -486,22 +486,21 @@ export const channelsStore = defineStore(
             const { byGuild, versions } = store.getState()
             const expressions = session.get(expressionsStore).getState()
             const guild_versions: Record<string, number> = {}
+            // GuildVersions.computeLatestVersion: the newest version of anything held for the guild.
+            // READY gives only the guild itself a version, so channels and expressions just need to be held.
             for (const [id, guild] of Object.entries(guilds)) {
-                // Every store must hold the guild at a version; the lower is covered by each.
-                // Emojis and stickers are only a constraint when held with versions.
                 const emojiStickers = expressionsVersion(expressions, id)
-                const held = Math.min(
-                    guild.version,
-                    versions[id] ?? 0,
-                    emojiStickers ?? 0,
-                )
                 if (
-                    held > 0 &&
-                    emojiStickers !== undefined &&
+                    guild.version > 0 &&
                     byGuild[id] &&
+                    emojiStickers !== undefined &&
                     !guild.pendingDeleteSync
                 )
-                    guild_versions[id] = held
+                    guild_versions[id] = Math.max(
+                        guild.version,
+                        versions[id] ?? 0,
+                        emojiStickers,
+                    )
             }
             return { guild_versions }
         })
@@ -527,8 +526,13 @@ export const channelsStore = defineStore(
  */
 export function holdThread(session: Session, thread: Channel): void {
     const store = session.get(channelsStore)
-    if (store.getState().channels[thread.id]) return
+    const held = store.getState().channels[thread.id]
+    // A held copy without the membership the forum search found takes it.
+    if (held && (held.member || !thread.member)) return
     store.setState(state => ({
-        channels: { ...state.channels, [thread.id]: thread },
+        channels: {
+            ...state.channels,
+            [thread.id]: held ? { ...held, member: thread.member } : thread,
+        },
     }))
 }

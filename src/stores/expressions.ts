@@ -243,21 +243,12 @@ export const expressionsStore = defineStore(
     { cache: ['guilds', 'premiumType'] },
 )
 
-/**
- * The version of a guild's emojis and stickers for IDENTIFY, or undefined when they are not held
- * with versions (then the guild's version must not be sent). Infinity when both lists are held and
- * empty: they constrain nothing.
- */
+/** Returns the newest version of a guild's emojis and stickers, 0 when they carry none, undefined when not held. */
 export function expressionsVersion(
     state: ExpressionsState,
     guildId: string,
 ): number | undefined {
     const held = state.guilds[guildId]
     if (!held) return undefined
-    const { emojiVersion, stickerVersion } = held
-    if (emojiVersion === 0 || stickerVersion === 0) return undefined
-    return Math.min(
-        emojiVersion ?? Number.POSITIVE_INFINITY,
-        stickerVersion ?? Number.POSITIVE_INFINITY,
-    )
+    return Math.max(held.emojiVersion ?? 0, held.stickerVersion ?? 0)
 }
