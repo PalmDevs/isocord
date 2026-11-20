@@ -64,8 +64,10 @@ interface UserProfilesState {
     profiles: Record<string, UserProfile>
 }
 
+const PROFILE_KEY_SEPARATOR = ':'
+
 const profileKey = (userId: string, guildId?: string) =>
-    guildId ? `${userId}:${guildId}` : userId
+    guildId ? `${userId}${PROFILE_KEY_SEPARATOR}${guildId}` : userId
 
 /** The most recently opened profiles kept in the cache. */
 const MAX_CACHED_PROFILES = 50
@@ -76,7 +78,19 @@ const MAX_CACHED_PROFILES = 50
  */
 export const userProfilesStore = defineStore(
     'userProfiles',
-    () => createStore<UserProfilesState>(() => ({ profiles: {} })),
+    session => {
+        const store = createStore<UserProfilesState>(() => ({ profiles: {} }))
+        // UserProfileStore.handleUserUpdate resets the fetch. Refetching keeps an open profile current.
+        session.gateway.dispatch.on('USER_UPDATE', user => {
+            for (const key of Object.keys(store.getState().profiles)) {
+                const [userId, guildId] = key.split(PROFILE_KEY_SEPARATOR)
+                // fetchUserProfile logs its own failure.
+                if (userId === user.id)
+                    fetchUserProfile(session, userId, guildId).catch(() => {})
+            }
+        })
+        return store
+    },
     {
         cache: state => ({
             profiles: Object.fromEntries(
