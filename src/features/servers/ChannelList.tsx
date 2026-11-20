@@ -168,7 +168,7 @@ function ChannelItem({ guildId, id, joinedAck, thread }: ChannelRowProps) {
     // Reference: Cozy layout paddingThread/marginThread; the spine and unread badge sit beside the pressable, not inside it.
     return (
         <View style={styles.row}>
-            {unread && !muted && !selected && (
+            {unread && !muted && (
                 <View
                     style={[
                         styles.unreadPill,
