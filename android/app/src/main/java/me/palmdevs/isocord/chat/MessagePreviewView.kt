@@ -142,7 +142,7 @@ class MessagePreviewView(context: Context) : FrameLayout(context) {
   private fun emit(name: String, fill: WritableMap.() -> Unit = {}) {
     val reactContext = context as? ReactContext ?: return
     val data = Arguments.createMap().apply(fill)
-    UIManagerHelper.getEventDispatcherForReactTag(reactContext, id)
+    UIManagerHelper.getEventDispatcher(reactContext)
       ?.dispatchEvent(PreviewEvent(UIManagerHelper.getSurfaceId(this), id, name, data))
   }
 

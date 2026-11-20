@@ -30,6 +30,7 @@ import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.OnReceiveContentListener
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.TextViewCompat
 import coil3.SingletonImageLoader
@@ -372,7 +373,8 @@ class ChatInputView(context: Context) : FrameLayout(context) {
 
   private fun showKeyboard() {
     editText.post {
-      val controller = ViewCompat.getWindowInsetsController(editText)
+      val window = (context as? ReactContext)?.currentActivity?.window
+      val controller = window?.let { WindowCompat.getInsetsController(it, editText) }
       if (controller != null) controller.show(WindowInsetsCompat.Type.ime())
       else (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(editText, 0)
     }
@@ -611,7 +613,7 @@ class ChatInputView(context: Context) : FrameLayout(context) {
   private fun emit(name: String, fill: WritableMap.() -> Unit = {}) {
     val reactContext = context as? ReactContext ?: return
     val data = Arguments.createMap().apply(fill)
-    UIManagerHelper.getEventDispatcherForReactTag(reactContext, id)
+    UIManagerHelper.getEventDispatcher(reactContext)
       ?.dispatchEvent(InputEvent(UIManagerHelper.getSurfaceId(this), id, name, data))
   }
 

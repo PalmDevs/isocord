@@ -9,7 +9,7 @@ import me.palmdevs.isocord.chat.search.SearchResultsViewManager
 import me.palmdevs.isocord.chat.viewer.MediaViewerViewManager
 
 class ChatPackage : ReactPackage {
-  override fun createViewManagers(context: ReactApplicationContext): List<ViewManager<*, *>> =
+  override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
     listOf(
       ChatViewManager(),
       SearchResultsViewManager(),

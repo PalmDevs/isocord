@@ -16,6 +16,7 @@ import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okio.BufferedSink
 
@@ -162,9 +163,6 @@ class UploadEngine(private val context: Context) {
   private fun contentType(mime: String) =
     (if (mime.isBlank() || mime == "application/json") "application/octet-stream" else mime)
       .toMediaTypeOrNull()
-
-  private fun ByteArray.toRequestBody(type: okhttp3.MediaType?) =
-    RequestBody.create(type, this)
 
   /** Streams [length] bytes of the file from [offset], reporting how many have been written. */
   private class ChunkBody(

@@ -194,7 +194,7 @@ fun ExpressionGrid(
     val grid = remember(sections, layout.columns) { buildRows(sections, layout.columns) }
     // Rows are composed ahead in the idle time between frames (RecyclerView's prefetch), not in the frame that
     // scrolls them in.
-    val listState = rememberLazyListState(LazyLayoutCacheWindow(aheadFraction = CACHE_AHEAD, behindFraction = CACHE_BEHIND))
+    val listState = rememberLazyListState()
     val watch = remember { ScrollWatch() }
     val context = LocalContext.current
     val pixels = layout.image.roundToInt()
@@ -212,6 +212,7 @@ fun ExpressionGrid(
       modifier = Modifier.fillMaxSize().nestedScroll(watch),
       flingBehavior = fling,
       contentPadding = PaddingValues(bottom = bottomPadding),
+      cacheWindow = LazyLayoutCacheWindow(aheadFraction = CACHE_AHEAD, behindFraction = CACHE_BEHIND),
     ) {
       items(grid.rows, key = { it.key }, contentType = { if (it is HeaderRow) 0 else 1 }) { row ->
         when (row) {

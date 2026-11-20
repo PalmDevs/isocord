@@ -1,5 +1,6 @@
 package me.palmdevs.isocord.chat.viewer
 
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -118,7 +119,7 @@ internal fun ViewerPage(
   val zoomed = (zoomState.zoomFraction ?: 0f) > 0.01f
   LaunchedEffect(zoomed) { onZoomedChange(zoomed) }
   // A page left behind is shown unzoomed when it comes back.
-  LaunchedEffect(active) { if (!active) zoomState.resetZoom(withAnimation = false) }
+  LaunchedEffect(active) { if (!active) zoomState.resetZoom(snap()) }
   val zoomable = !isVideo && !hidden && progress() >= 1f
 
   BoxWithConstraints(

@@ -17,8 +17,8 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -122,7 +122,6 @@ class GifvPool(private val context: Context) {
 }
 
 /** The pool for one chat list, released when the list leaves the screen. */
-@OptIn(UnstableApi::class)
 @Composable
 fun rememberGifvPool(): GifvPool {
   val context = LocalContext.current
