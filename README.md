@@ -1,8 +1,7 @@
 # Isocord
 
-An unofficial Discord client for Android, written from scratch in React Native
-and built to stay faithful to the official mobile app. See [NOTICE.md](NOTICE.md)
-before using or redistributing it.
+A non-faithful recreation of the React Native Discord mobile client focused on improving UI/UX and performance.
+See [NOTICE.md](NOTICE.md) before using or redistributing it.
 
 ## Development
 
@@ -31,10 +30,8 @@ src/
 scripts/      extraction of tokens, icons and fonts from the reference material
 ```
 
-Everything belonging to a logged-in account lives in a `Session`
-(`src/core/session.ts`). Switching accounts disposes the session and creates a
-new one. Features (`src/core/feature.ts`) contribute stores, gateway handlers,
-screens and overlays; built-in features and future plugins use the same API.
+Everything belonging to a logged-in account lives in a `Session` (`src/core/session.ts`). Switching accounts disposes the session and creates a new one.
+Features (`src/core/feature.ts`) contribute stores, gateway handlers, screens and overlays; built-in features and future plugins use the same API.
 
 ## Regenerating extracted assets
 
@@ -46,5 +43,4 @@ scripts/extract-fonts.sh <base.apk>
 bun run twemoji                                                    # re-fetch Twemoji after a version bump
 ```
 
-Twemoji isn't committed. Everything extracted from Discord is, so a clone
-builds without the reference material.
+Twemoji isn't committed. Everything extracted from Discord is, so a clone builds without the reference material.
