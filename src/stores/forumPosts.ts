@@ -11,8 +11,15 @@ import {
 import { logger } from '../core/log'
 import { defineStore } from '../core/session'
 import { channelsStore } from './channels/channels'
+import { reactionChangeOf } from './messages/messages'
+import {
+    sameEmoji,
+    withReactionAdded,
+    withReactionRemoved,
+} from './messages/reactionEdits'
 import { usersStore } from './users'
 import type { TagSetting, ThreadSortBy } from '../core/discord/forum'
+import type { ThreadMember } from '../core/discord/threadMember'
 import type { Session } from '../core/session'
 import type { Channel } from './channels/channels'
 import type { Message } from './readStates'
@@ -53,6 +60,8 @@ interface ForumPostsState {
 
 interface ThreadSearchResponse {
     threads?: Channel[]
+    /** The user's membership of the returned posts it has joined. */
+    members?: (ThreadMember & { id: string })[]
     first_messages?: Message[]
     most_recent_messages?: Message[]
     has_more?: boolean
@@ -127,17 +136,52 @@ export const forumPostsStore = defineStore('forumPosts', session => {
             return { posts, feeds }
         }),
     )
-    dispatch.on('MESSAGE_UPDATE', update => {
-        const held = store.getState().firstMessages[update.channel_id]
-        // A post's first message has the post's id.
-        if (held?.id !== update.id) return
+    /** Applies `edit` to a post's held first message (it has the post's id). */
+    const editFirst = (
+        channelId: string,
+        messageId: string,
+        edit: (message: Message) => Message,
+    ) => {
+        const held = store.getState().firstMessages[channelId]
+        if (held?.id !== messageId) return
         store.setState(state => ({
-            firstMessages: {
-                ...state.firstMessages,
-                [update.channel_id]: { ...held, ...update },
-            },
+            firstMessages: { ...state.firstMessages, [channelId]: edit(held) },
         }))
-    })
+    }
+    dispatch.on('MESSAGE_UPDATE', update =>
+        editFirst(update.channel_id, update.id, held => ({
+            ...held,
+            ...update,
+        })),
+    )
+    // ForumPostMessagesStore keeps the cards' reactions live.
+    dispatch.on('MESSAGE_REACTION_ADD', event =>
+        editFirst(event.channel_id, event.message_id, message =>
+            withReactionAdded(message, reactionChangeOf(event, session.userId)),
+        ),
+    )
+    dispatch.on('MESSAGE_REACTION_REMOVE', event =>
+        editFirst(event.channel_id, event.message_id, message =>
+            withReactionRemoved(
+                message,
+                reactionChangeOf(event, session.userId),
+            ),
+        ),
+    )
+    dispatch.on('MESSAGE_REACTION_REMOVE_ALL', event =>
+        editFirst(event.channel_id, event.message_id, message => ({
+            ...message,
+            reactions: [],
+        })),
+    )
+    dispatch.on('MESSAGE_REACTION_REMOVE_EMOJI', event =>
+        editFirst(event.channel_id, event.message_id, message => ({
+            ...message,
+            reactions: (message.reactions ?? []).filter(
+                reaction => !sameEmoji(reaction.emoji, event.emoji),
+            ),
+        })),
+    )
     return store
 })
 
@@ -225,10 +269,15 @@ export async function loadForumPage(
             .upsert(messages.map(message => message.author))
         store.setState(state => {
             const posts = { ...state.posts }
+            // LOAD_THREADS_SUCCESS: the search's members are the user's joined posts (JoinedThreadsStore).
+            const members = new Map(
+                (body.members ?? []).map(({ id, ...member }) => [id, member]),
+            )
             for (const thread of threads)
                 posts[thread.id] = {
                     ...thread,
                     guild_id: thread.guild_id ?? guildId,
+                    member: members.get(thread.id) ?? thread.member,
                 }
             const firstMessages = { ...state.firstMessages }
             for (const message of body.first_messages ?? [])

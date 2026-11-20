@@ -1,3 +1,4 @@
+import { reactionCounts } from '../../stores/messages/reactionEdits'
 import type { DefaultReaction } from '../../core/discord/forum'
 import type { Reaction } from '../../stores/messages/messageTypes'
 
@@ -9,12 +10,21 @@ export interface ForumPostReactionList {
     firstHidden: Reaction | undefined
 }
 
-const burstOf = (reaction: Reaction) => reaction.count_details?.burst ?? 0
+/** Returns a reaction's normal part alone: posts leave super reactions out of their picks. */
+function normalPart(reaction: Reaction): Reaction {
+    const { normal } = reactionCounts(reaction)
+    return {
+        ...reaction,
+        count: normal,
+        count_details: { normal, burst: 0 },
+        me_burst: false,
+    }
+}
 
 /**
- * Returns a post's first `count` reactions (useSomeForumPostReactions). `sorted` orders them by users, then
- * super reactions. A post without reactions shows the forum's default reaction at 0 (useDefaultReactionEmoji).
- * `count` here holds normal and super reactions together, the reference's `count + burst_count`.
+ * Returns a post's first `count` reactions (useSomeForumPostReactions). `sorted` orders them by users.
+ * A post without reactions shows the forum's default reaction at 0 (useDefaultReactionEmoji).
+ * Super reactions are left out, unlike the reference's `count + burst_count`.
  */
 export function forumPostReactions(
     reactions: Reaction[] | undefined,
@@ -22,9 +32,12 @@ export function forumPostReactions(
     count: number,
     sorted: boolean,
 ): ForumPostReactionList {
+    const normal = (reactions ?? [])
+        .map(normalPart)
+        .filter(reaction => reaction.count > 0)
     const all =
-        reactions && reactions.length > 0
-            ? reactions
+        normal.length > 0
+            ? normal
             : defaultEmoji?.emoji_name || defaultEmoji?.emoji_id
               ? [
                     {
@@ -38,9 +51,7 @@ export function forumPostReactions(
                     },
                 ]
               : []
-    const ordered = sorted
-        ? [...all].sort((a, b) => b.count - a.count || burstOf(b) - burstOf(a))
-        : all
+    const ordered = sorted ? [...all].sort((a, b) => b.count - a.count) : all
     const shown = ordered.slice(0, count)
     const hidden = ordered.slice(count)
     const more = hidden.reduce((sum, reaction) => sum + reaction.count, 0)

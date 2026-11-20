@@ -11,8 +11,9 @@ import type { Session } from '../../core/session'
 import type { Message } from '../readStates'
 import type { User } from '../users'
 import type { MessagesState, Reaction } from './messageTypes'
+import type { ReactionChange } from './reactionEdits'
 
-type ReactionEvent = {
+export type ReactionEvent = {
     channel_id: string
     message_id: string
     user_id: string
@@ -27,6 +28,18 @@ type ReactionEvent = {
     member?: { nick?: string | null; user?: User }
     message_author_id?: string
 }
+
+/** Returns what a reaction event changes, `mine` when `userId` made it. */
+export const reactionChangeOf = (
+    event: ReactionEvent,
+    userId: string,
+): ReactionChange => ({
+    emoji: event.emoji,
+    burst: event.burst === true,
+    burstColors: event.burst_colors,
+    index: event.restore_index,
+    mine: event.user_id === userId,
+})
 
 /** MESSAGE_POLL_VOTE_ADD and _REMOVE. */
 type PollVoteEvent = {
@@ -214,15 +227,8 @@ export const messagesStore = defineStore(
                     message => !ids.includes(message.id),
                 )
                 return next.length === messages.length ? messages : next
-            }),
-        )
-        const reactionChange = (event: ReactionEvent) => ({
-            emoji: event.emoji,
-            burst: event.burst === true,
-            burstColors: event.burst_colors,
-            index: event.restore_index,
-            mine: event.user_id === session.userId,
-        })
+        const reactionChange = (event: ReactionEvent) =>
+            reactionChangeOf(event, session.userId)
         dispatch.on('MESSAGE_REACTION_ADD', event =>
             editOne(event.channel_id, event.message_id, message =>
                 withReactionAdded(message, reactionChange(event)),
