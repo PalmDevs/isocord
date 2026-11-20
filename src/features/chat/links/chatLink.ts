@@ -33,6 +33,7 @@ const jsKind = {
     dismiss: 'dismiss',
     component: 'component',
     post: 'post',
+    reveal: 'reveal',
 } as const
 
 /** What a forum post's action bar link does (ForumPostActionBar). */
@@ -90,6 +91,7 @@ export type ChatLink =
       }
     /** "Dismiss message" under an ephemeral message (bindDismissMessage). */
     | { kind: 'dismiss'; messageId: string }
+    | { kind: 'reveal'; groupId: string }
     /** A button or select of a message, by its component id (handleTapButtonActionComponent, handleTapSelectActionComponent). */
     | { kind: 'component'; messageId: string; componentId: string }
     /** A button of a forum post's action bar: Follow, Unfollow or Copy Link. */
@@ -198,6 +200,8 @@ export const chatLink = {
         `${linkScheme}${jsKind.poll}/${messageId}/${action}${answerId === undefined ? '' : `/${answerId}`}`,
     dismiss: (messageId: string) =>
         `${linkScheme}${jsKind.dismiss}/${messageId}`,
+    /** A blocked or ignored messages group, by its oldest message. */
+    reveal: (groupId: string) => `${linkScheme}${jsKind.reveal}/${groupId}`,
     /** A message's button or select, by its component id (`childPath`). */
     component: (messageId: string, componentId: string) =>
         `${linkScheme}${jsKind.component}/${messageId}/${encodeURIComponent(componentId)}`,
@@ -404,6 +408,8 @@ export function parseChatLink(url: string): ChatLink | undefined {
                 : undefined
         case jsKind.dismiss:
             return first ? { kind: 'dismiss', messageId: first } : undefined
+        case jsKind.reveal:
+            return first ? { kind: 'reveal', groupId: first } : undefined
         case jsKind.component:
             // <messageId>/<component id>
             return first && second

@@ -134,6 +134,17 @@ private fun segment(spans: List<Span>): List<Segment> {
   return segments
 }
 
+/** Returns the newlines of the segment at [index] if it only separates two list items, else 0. */
+private fun blankLinesBetweenLists(segments: List<Segment>, index: Int): Int {
+  val segment = segments[index] as? Segment.Text ?: return 0
+  if (segment.list > 0 || segment.quote || segment.heading > 0 || segment.subtext) return 0
+  if (!segments.getOrNull(index - 1).isListItem() || !segments.getOrNull(index + 1).isListItem()) return 0
+  if (!segment.spans.all { it.text.all { c -> c == '\n' } }) return 0
+  return segment.spans.sumOf { it.text.length }
+}
+
+private fun Segment?.isListItem() = this is Segment.Text && list > 0
+
 /** Font size and line height of heading levels 1 to 3: heading-xl, heading-lg and heading-md. */
 private val HEADING_SIZES = mapOf(1 to (24.sp to 32.sp), 2 to (20.sp to 24.sp), 3 to (16.sp to 20.sp))
 
@@ -189,7 +200,12 @@ fun MessageText(
       if (gap > 0.dp) SpacerLine(gap, base)
       when (segment) {
         is Segment.Code -> CodeBlock(segment.spans, base)
-        is Segment.Text -> TextSegment(segment, base, jumbo, edited.takeIf { index == segments.lastIndex }, maxLines)
+        is Segment.Text -> {
+          val blank = blankLinesBetweenLists(segments, index)
+          // Each newline here is an empty line: the list before it already ended its own.
+          if (blank > 0) repeat(blank) { BasicText("", style = base) }
+          else TextSegment(segment, base, jumbo, edited.takeIf { index == segments.lastIndex }, maxLines)
+        }
       }
       trailing = if (heading != null) HEADING_SPACE_AFTER else 0.dp
     }

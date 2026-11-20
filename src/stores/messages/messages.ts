@@ -215,18 +215,44 @@ export const messagesStore = defineStore(
                 ...update,
             })),
         )
-        dispatch.on('MESSAGE_DELETE', ({ id, channel_id }) =>
+        // MessageStore MESSAGE_DELETE: a deleted revealed message hands the reveal to the next newer one.
+        const passReveal = (channelId: string, ids: string[]) =>
+            store.setState(state => {
+                const channel = state.channels[channelId]
+                const revealed = channel?.revealedId
+                if (!channel || !revealed || !ids.includes(revealed))
+                    return state
+                const index = channel.messages.findIndex(
+                    message => message.id === revealed,
+                )
+                // Newest first: the newer messages come before it.
+                const newer = channel.messages
+                    .slice(0, Math.max(index, 0))
+                    .reverse()
+                    .find(message => !ids.includes(message.id))
+                return {
+                    channels: {
+                        ...state.channels,
+                        [channelId]: { ...channel, revealedId: newer?.id },
+                    },
+                }
+            })
+        dispatch.on('MESSAGE_DELETE', ({ id, channel_id }) => {
+            passReveal(channel_id, [id])
             edit(channel_id, messages => {
                 const next = messages.filter(message => message.id !== id)
                 return next.length === messages.length ? messages : next
-            }),
-        )
-        dispatch.on('MESSAGE_DELETE_BULK', ({ ids, channel_id }) =>
+            })
+        })
+        dispatch.on('MESSAGE_DELETE_BULK', ({ ids, channel_id }) => {
+            passReveal(channel_id, ids)
             edit(channel_id, messages => {
                 const next = messages.filter(
                     message => !ids.includes(message.id),
                 )
                 return next.length === messages.length ? messages : next
+            })
+        })
         const reactionChange = (event: ReactionEvent) =>
             reactionChangeOf(event, session.userId)
         dispatch.on('MESSAGE_REACTION_ADD', event =>
@@ -318,6 +344,45 @@ function editChannel(
             channels: {
                 ...state.channels,
                 [channelId]: { ...channel, messages },
+            },
+        }
+    })
+}
+
+/** MessageActionCreators.revealMessage: opens a blocked or ignored messages group, or closes it when open. */
+export function toggleRevealed(
+    session: Session,
+    channelId: string,
+    groupId: string,
+): void {
+    setRevealed(session, channelId, id =>
+        id === groupId ? undefined : groupId,
+    )
+}
+
+/** MessageStore MESSAGE_REVEAL: opens the blocked or ignored messages group that holds a message, for a jump. */
+export function revealMessage(
+    session: Session,
+    channelId: string,
+    messageId: string,
+): void {
+    setRevealed(session, channelId, () => messageId)
+}
+
+function setRevealed(
+    session: Session,
+    channelId: string,
+    next: (revealedId: string | undefined) => string | undefined,
+): void {
+    session.get(messagesStore).setState(state => {
+        const channel = state.channels[channelId]
+        if (!channel) return state
+        const revealedId = next(channel.revealedId)
+        if (revealedId === channel.revealedId) return state
+        return {
+            channels: {
+                ...state.channels,
+                [channelId]: { ...channel, revealedId },
             },
         }
     })

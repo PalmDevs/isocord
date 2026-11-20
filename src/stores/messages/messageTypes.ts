@@ -127,6 +127,8 @@ export interface ChannelMessages {
      * reach the present. Live messages are not added to it, and `loadNewerMessages` / `jumpToPresent` extend it.
      */
     hasMoreAfter?: boolean
+    /** The blocked or ignored messages group shown open, by its oldest message (revealedMessageId). One at a time. */
+    revealedId?: string
 }
 
 export interface MessagesState {

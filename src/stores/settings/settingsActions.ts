@@ -119,6 +119,12 @@ export const setSwipeRightToLeftMode = (session: Session, mode: number) =>
 export const setTheme = (session: Session, theme: ThemeId) =>
     saveSetting(session, USER_SETTINGS.theme, theme)
 
+/** IgnoreProfileSpeedbumpDisabled: "Don't show this again" on an ignored user's speed bump. */
+export const setIgnoreProfileSpeedbumpDisabled = (
+    session: Session,
+    value: boolean,
+) => saveSetting(session, USER_SETTINGS.ignoreProfileSpeedbumpDisabled, value)
+
 /** UserSettings.AnimateEmoji. */
 export const setAnimateEmoji = (session: Session, value: boolean) =>
     saveSetting(session, TEXT_AND_IMAGES.animateEmoji, value)

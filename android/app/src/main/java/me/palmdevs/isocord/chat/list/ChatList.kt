@@ -64,6 +64,7 @@ import me.palmdevs.isocord.chat.media.rememberChatScrolling
 import me.palmdevs.isocord.chat.media.rememberGifvPool
 import me.palmdevs.isocord.chat.rows.ChatRow
 import me.palmdevs.isocord.chat.rows.ChatTheme
+import me.palmdevs.isocord.chat.rows.HiddenGroupRow
 import me.palmdevs.isocord.chat.rows.MessageRow
 import me.palmdevs.isocord.chat.rows.PostActionsBar
 import me.palmdevs.isocord.chat.rows.PostActionsRow
@@ -277,6 +278,7 @@ private fun LazyItemScope.AnimatedRow(row: ChatRow, changes: ChatRowChanges, arr
 private fun LazyItemScope.RowContent(row: ChatRow) {
   when (row) {
     is ChatRow.Message -> MessageRow(row)
+    is ChatRow.HiddenGroup -> HiddenGroupRow(row)
     is ChatRow.System -> SystemRow(row)
     is ChatRow.Separator -> SeparatorRow(row)
     is ChatRow.Welcome -> WelcomeRow(row)

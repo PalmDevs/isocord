@@ -3,9 +3,12 @@ import { compareSnowflakes } from '../../../core/discord/snowflake'
 import { useSession } from '../../../core/react'
 import { showToast } from '../../../design/components/overlays/toastStore'
 import { t } from '../../../i18n'
-import { messagesStore } from '../../../stores/messages/messages'
+import { messagesStore, revealMessage } from '../../../stores/messages/messages'
 import { jumpToMessage } from '../../../stores/messages/messageWindows'
 import { readStatesStore } from '../../../stores/readStates'
+import { relationshipsStore } from '../../../stores/relationships'
+import { hiddenReasonOf } from '../rows/buildRows'
+import type { Session } from '../../../core/session'
 
 type JumpResult = Awaited<ReturnType<typeof jumpToMessage>>
 
@@ -23,6 +26,24 @@ function toastJumpFailure(result: Exclude<JumpResult, 'loaded'>) {
     })
 }
 
+/** Opens the blocked or ignored messages group a jump lands in. The reference leaves it folded. */
+function revealIfHidden(
+    session: Session,
+    channelId: string,
+    messageId: string,
+) {
+    const message = session
+        .get(messagesStore)
+        .getState()
+        .channels[channelId]?.messages.find(item => item.id === messageId)
+    if (!message) return
+    const relationship = session.get(relationshipsStore).getState().byId[
+        message.author.id
+    ]
+    if (hiddenReasonOf(relationship))
+        revealMessage(session, channelId, messageId)
+}
+
 /**
  * Scroll requests for the native list. One for another chat is ignored there, and a new chat drops the old one.
  * `jump` is a message to scroll to once the chat is open.
@@ -38,26 +59,28 @@ export function useChatScroll(channelId: string, jump?: { messageId: string }) {
     // biome-ignore lint/correctness/useExhaustiveDependencies: reset on every channel change
     useEffect(() => setScrollTarget(undefined), [channelId])
     /** Scrolls to a message, `null` meaning the bottom. */
-    const scrollTo = (messageId: string | null, flash = false) =>
+    const scrollTo = (messageId: string | null, flash = false) => {
+        if (messageId) revealIfHidden(session, channelId, messageId)
         setScrollTarget({
             scrollKey: channelId,
             messageId: messageId ?? undefined,
             nonce: ++scrollNonce,
             flash,
         })
+    }
     // Keeps its identity: the jump effect below depends on it.
     /** Scrolls to a message, loading the window around it first when it is not loaded; a toast when it is gone. */
     const scrollToMessage = useCallback(
         async (messageId: string) => {
             const result = await jumpToMessage(session, channelId, messageId)
-            if (result === 'loaded')
-                setScrollTarget({
-                    scrollKey: channelId,
-                    messageId,
-                    nonce: ++scrollNonce,
-                    flash: true,
-                })
-            else toastJumpFailure(result)
+            if (result !== 'loaded') return toastJumpFailure(result)
+            revealIfHidden(session, channelId, messageId)
+            setScrollTarget({
+                scrollKey: channelId,
+                messageId,
+                nonce: ++scrollNonce,
+                flash: true,
+            })
         },
         [session, channelId],
     )

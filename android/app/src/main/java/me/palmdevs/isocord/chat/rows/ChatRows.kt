@@ -296,6 +296,19 @@ sealed interface ChatRow {
     val rich: Rich? = richOf(this)
   }
 
+  /** BlockedMessageGroupView: messages of blocked or ignored users behind a label. Tapping it reports [url]. */
+  @Immutable
+  @Serializable
+  @SerialName("hiddenGroup")
+  data class HiddenGroup(
+    override val key: String,
+    val text: String = "",
+    val revealed: Boolean = false,
+    val url: String = "",
+    /** Newest first, as the list. Sent while folded too, so revealing them animates. */
+    val messages: List<ChatRow> = emptyList(),
+  ) : ChatRow
+
   @Immutable
   @Serializable
   @SerialName("separator")

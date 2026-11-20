@@ -5,6 +5,7 @@ import {
     MessageFlag,
     MessageType,
 } from '../../../core/discord/messages'
+import { RelationshipType } from '../../../core/discord/relationships'
 import {
     compareSnowflakes,
     snowflakeTimestamp,
@@ -56,6 +57,7 @@ import type {
     Reaction,
 } from '../../../stores/messages/messageTypes'
 import type { Message } from '../../../stores/readStates'
+import type { Relationship } from '../../../stores/relationships'
 import type { User } from '../../../stores/users'
 import type { EmbedSpans } from '../media'
 import type { ComponentInteractions } from '../messageComponents/interactionStore'
@@ -66,10 +68,12 @@ import type { MarkdownNode, MentionResolver } from './markdown'
 import type { RichMessage } from './rich'
 import type {
     ChatRow,
+    HiddenGroupRow,
     MessageRow,
     PostActionsRow,
     ReplyRow,
     Span,
+    SystemRow,
 } from './rows'
 import type { ThreadEmbedSources } from './threadEmbed'
 
@@ -103,6 +107,19 @@ export interface RowContext {
     interactions?: ComponentInteractions
     /** A forum post's first message from the post list's fetch, for its action bar while history lacks it. */
     forumPostStarter?: Message
+    /** Why a user's messages fold into a group (message.blocked, message.ignored). Absent where nothing folds. */
+    hiddenReason?: (userId: string) => HiddenReason | undefined
+}
+
+export type HiddenReason = 'blocked' | 'ignored'
+
+/** Returns why a user's messages are hidden: blocked first, then ignored (createChannelStream). */
+export function hiddenReasonOf(
+    relationship: Relationship | undefined,
+): HiddenReason | undefined {
+    if (relationship?.type === RelationshipType.BLOCKED) return 'blocked'
+    if (relationship?.user_ignored) return 'ignored'
+    return undefined
 }
 
 /** EmojiConstants MAX_REACTIONS: distinct reactions a message holds. */
@@ -449,6 +466,10 @@ function replyRow(message: Message, env: RowEnv): ReplyRow | undefined {
             url: reference === null ? undefined : url,
         }
     }
+    // createMessageContent: isBlockedForMessage, then isIgnoredForMessage, as a note.
+    const hidden = env.context.hiddenReason?.(reference.author.id)
+    if (hidden)
+        return { state: 'note', text: t(HIDDEN_REPLY_TEXT[hidden]), url }
     const author = env.userOf(reference.author)
     const member = members?.[author.id]
     const style = authorStyle(guild, member)
@@ -847,6 +868,68 @@ function postActionsRow(
     }
 }
 
+const HIDDEN_TEXT = {
+    blocked: {
+        one: 'chat.hidden.blocked.one',
+        other: 'chat.hidden.blocked.other',
+    },
+    ignored: {
+        one: 'chat.hidden.ignored.one',
+        other: 'chat.hidden.ignored.other',
+    },
+} as const
+
+/** A group of hidden messages being filled, and why they are hidden. */
+/** The reply preview's note for a hidden author. */
+const HIDDEN_REPLY_TEXT = {
+    blocked: 'chat.reply.blocked',
+    ignored: 'chat.reply.ignored',
+} as const satisfies Record<HiddenReason, string>
+
+interface HiddenRun {
+    row: HiddenGroupRow
+    reason: HiddenReason
+}
+
+/**
+ * createChannelStream's BLOCKED_GROUP and IGNORED_GROUP: adds a message to the group right above the last row, or
+ * starts one. A divider or another row in between starts a new group. Keyed by the oldest message.
+ */
+function addHidden(
+    rows: ChatRow[],
+    run: HiddenRun | undefined,
+    built: MessageRow | SystemRow,
+    reason: HiddenReason,
+    revealedId: string | undefined,
+): HiddenRun {
+    const current =
+        run && run.reason === reason && rows.at(-1) === run.row
+            ? run
+            : undefined
+    const row: HiddenGroupRow = current?.row ?? {
+        type: 'hiddenGroup',
+        key: '',
+        text: '',
+        revealed: false,
+        url: '',
+        messages: [],
+    }
+    if (!current) rows.push(row)
+    row.messages.push(built)
+    row.key = `hidden-${built.id}`
+    // Stays open when older history adds to the group and moves its key.
+    row.revealed ||= built.id === revealedId
+    // An open group toggles by the id it was opened with, so the tap closes it.
+    row.url = chatLink.reveal(
+        row.revealed && revealedId ? revealedId : built.id,
+    )
+    const count = row.messages.length
+    row.text = t(HIDDEN_TEXT[reason][count === 1 ? 'one' : 'other'], {
+        count,
+    })
+    return { row, reason }
+}
+
 /** Turns a channel's loaded messages into renderer rows, newest first. */
 export function buildRows(
     state: ChannelMessages | undefined,
@@ -859,35 +942,41 @@ export function buildRows(
     const addDividers = dividerAdder(rows, state, context.ackedId)
     const post = forumPostOf(context)
     let postActionsPlaced = false
-    state.messages.forEach((message, index) => {
-        // The post's action bar sits under its first message.
-        if (post && message.id === post.id) {
-            rows.push(postActionsRow(post, message, context, false))
+    let hidden: HiddenRun | undefined
+    state.messages.forEach((held, index) => {
+        let message = held
+        // The post's action bar sits under its first message and shows its reactions instead.
+        if (post && held.id === post.id) {
+            rows.push(postActionsRow(post, held, context, false))
             postActionsPlaced = true
+            message = { ...held, reactions: undefined }
         }
         const older = state.messages[index + 1]
         // The id encodes the send time, which avoids parsing the API's microsecond timestamps.
         const date = new Date(snowflakeTimestamp(message.id))
         const olderDate = older && new Date(snowflakeTimestamp(older.id))
-        rows.push(
+        const built =
             threadStarterRow(message, env) ??
-                systemRow(message, env.system, {
-                    timestamp: calendarTimestamp(date),
-                    reactions: reactionRows(message.reactions),
-                    addReaction: canAddReaction(message, context),
-                    thread: threadEmbedRow(
-                        message,
-                        context.guild?.id,
-                        env.threadSources,
-                    ),
-                }) ??
-                messageRow(
+            systemRow(message, env.system, {
+                timestamp: calendarTimestamp(date),
+                reactions: reactionRows(message.reactions),
+                addReaction: canAddReaction(message, context),
+                thread: threadEmbedRow(
                     message,
-                    date,
-                    isGrouped(message, date, older, olderDate),
-                    env,
+                    context.guild?.id,
+                    env.threadSources,
                 ),
-        )
+            }) ??
+            messageRow(
+                message,
+                date,
+                isGrouped(message, date, older, olderDate),
+                env,
+            )
+        const reason = context.hiddenReason?.(message.author.id)
+        if (reason)
+            hidden = addHidden(rows, hidden, built, reason, state.revealedId)
+        else rows.push(built)
         addDividers(message, date, older, olderDate)
     })
     if (post && !postActionsPlaced)

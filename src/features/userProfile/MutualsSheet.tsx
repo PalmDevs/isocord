@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list'
 import { useWindowDimensions, View } from 'react-native'
 import { useSharedValue } from 'react-native-reanimated'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
-import { useSessionStore } from '../../core/react'
+import { useSession, useSessionStore } from '../../core/react'
 import { flattenColor } from '../../design/components/avatars/flattenColor'
 import { GuildIcon } from '../../design/components/avatars/GuildIcon'
 import { StatusAvatar } from '../../design/components/avatars/StatusAvatar'
@@ -154,6 +154,7 @@ interface RowEnds {
 /** MutualFriendRow: avatar with status, name, and the custom status or presence. */
 function FriendRow({ friend, start, end }: { friend: User } & RowEnds) {
     const { theme } = useUnistyles()
+    const session = useSession()
     const presence = useSessionStore(
         presencesStore,
         state => state.presences[friend.id],
@@ -184,7 +185,7 @@ function FriendRow({ friend, start, end }: { friend: User } & RowEnds) {
             end={end}
             onPress={() => {
                 hideActionSheet(MUTUALS_SHEET_KEY)
-                openProfileSheet(friend.id)
+                openProfileSheet(session, friend.id)
             }}
         />
     )
@@ -197,6 +198,7 @@ function ServerRow({
     start,
     end,
 }: { userId: string; mutual: MutualGuild } & RowEnds) {
+    const session = useSession()
     const guild = useSessionStore(guildsStore, state => state.guilds[mutual.id])
     if (!guild) return null
     return (
@@ -207,7 +209,7 @@ function ServerRow({
             arrow
             onPress={() => {
                 hideActionSheet(MUTUALS_SHEET_KEY)
-                openProfileSheet(userId, guild.id)
+                openProfileSheet(session, userId, guild.id)
             }}
             start={start}
             end={end}

@@ -113,6 +113,11 @@ internal class ChatArrivals {
   fun settle() = entering.clear()
 }
 
+/** Returns the index of the row showing a message: the message itself, or the folded group that holds it. */
+internal fun List<ChatRow>.indexOfMessage(id: String): Int = indexOfFirst { row ->
+  row.key == id || (row is ChatRow.HiddenGroup && row.messages.any { it.key == id })
+}
+
 /** Which way [jumpTarget] lies while off screen (1 above, among older rows; -1 below), else 0. */
 @Composable
 internal fun jumpTargetSide(state: LazyListState, rows: List<ChatRow>, changes: ChatRowChanges, jumpTarget: String?): Int {
@@ -122,10 +127,10 @@ internal fun jumpTargetSide(state: LazyListState, rows: List<ChatRow>, changes: 
       // Without a target nothing is read, so scrolling does not re-run this on every frame.
       if (jumpTarget == null) return@derivedStateOf 0
       val visible = state.layoutInfo.visibleItemsInfo
-      if (visible.isEmpty() || visible.any { it.key == changes.lazyKey(jumpTarget) }) return@derivedStateOf 0
-      val index = jumpRows.indexOfFirst { it.key == jumpTarget }
+      val index = jumpRows.indexOfMessage(jumpTarget)
+      val key = jumpRows.getOrNull(index)?.key?.let(changes::lazyKey)
       when {
-        index < 0 -> 0
+        visible.isEmpty() || key == null || visible.any { it.key == key } -> 0
         index > visible.last().index -> 1
         else -> -1
       }

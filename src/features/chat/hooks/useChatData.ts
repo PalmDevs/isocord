@@ -8,6 +8,7 @@ import { subscribeToGuild } from '../../../stores/memberList'
 import { membersStore, requestMembers } from '../../../stores/members'
 import { messagesStore } from '../../../stores/messages/messages'
 import { loadMessages } from '../../../stores/messages/messageWindows'
+import { relationshipsStore } from '../../../stores/relationships'
 import { usersStore } from '../../../stores/users'
 import { useForumFirstMessage } from '../../forum/useForumPost'
 import { canReact, messageSwipeActions } from '../longPress/actions'
@@ -17,7 +18,7 @@ import {
 } from '../messageComponents/interactionStore'
 import { pollStateStore, refreshPollsAt } from '../polls/pollState'
 import { nextPollChange } from '../polls/pollTime'
-import { buildRows } from '../rows/buildRows'
+import { buildRows, hiddenReasonOf } from '../rows/buildRows'
 import { encodeRows } from '../rows/rowEncoder'
 
 /** Loads and watches a channel's history, and what its guild needs to show it. */
@@ -95,6 +96,11 @@ export function useChatRows({
     const pollClock = useSessionStore(pollStateStore, state => state.clock)
     // A forum post's first message from the post list, for its action bar before history reaches it.
     const forumPostStarter = useForumFirstMessage(channel?.id ?? '')
+    // Messages of blocked and ignored users fold into groups.
+    const relationships = useSessionStore(
+        relationshipsStore,
+        state => state.byId,
+    )
     // Buttons and selects waiting on their interaction, failed ones, and select picks.
     const interactions = useSessionStore(
         componentInteractionsStore,
@@ -125,6 +131,7 @@ export function useChatRows({
                 polls,
                 interactions,
                 forumPostStarter,
+                hiddenReason: userId => hiddenReasonOf(relationships[userId]),
             }),
         )
         if (__DEV__)
@@ -157,6 +164,7 @@ export function useChatRows({
         pollClock,
         interactions,
         forumPostStarter,
+        relationships,
     ])
     useEffect(() => {
         if (Number.isFinite(pollChange)) refreshPollsAt(session, pollChange)

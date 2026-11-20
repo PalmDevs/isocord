@@ -8,6 +8,7 @@ const HELP_LOCALE = 'en-us'
 export const HelpdeskArticle = {
     PRIVATE_CHANNEL_INTEGRATIONS: '15104189280151',
     ANNOUNCEMENT_CHANNELS: '360032008192',
+    STEALTH_REMEDIATION_FEATURE_GUIDE: '28084948873623',
 } as const
 
 /** Returns a help center article's link (HelpdeskUtils.getArticleURL). */

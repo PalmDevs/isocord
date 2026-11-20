@@ -39,7 +39,8 @@ private const val LOAD_NEWER_THRESHOLD = 12
 @Composable
 internal fun NewestRowsEffect(state: LazyListState, rows: List<ChatRow>, changes: ChatRowChanges, scrollKey: String): Boolean {
   // When the rows were replaced wholesale (another window), follow the new ones; arrivals are handled above.
-  val newestKey = rows.firstOrNull { it !is ChatRow.Loading }?.key
+  // By list item key, so a folded group whose key moved is still the same newest row.
+  val newestKey = rows.firstOrNull { it !is ChatRow.Loading }?.key?.let(changes::lazyKey)
   val previousNewest = remember { arrayOfNulls<String>(1) }
   // Positions are only recorded once the first rows have been placed, so the initial (0, 0) can't erase one.
   var positioned by remember { mutableStateOf(false) }
@@ -54,7 +55,7 @@ internal fun NewestRowsEffect(state: LazyListState, rows: List<ChatRow>, changes
       if (saved != null && index >= 0) return@LaunchedEffect state.scrollToItem(index, saved.offset)
     }
     // A deletion of the newest message is not another window: the list stays where the user is.
-    val replaced = previous != null && rows.none { it.key == previous } && !changes.deletedOnly
+    val replaced = previous != null && rows.none { changes.lazyKey(it.key) == previous } && !changes.deletedOnly
     if ((previous == null || replaced) && newestKey != null) state.scrollToItem(0)
   }
   return positioned
@@ -112,13 +113,13 @@ internal fun ScrollRequestEffect(
   val handledNonce = remember { IntArray(1) }
   val latestRows by rememberUpdatedState(rows)
   val target = scrollTarget?.takeIf { it.scrollKey == scrollKey }
-  val targetLoaded = remember(rows, target) { target != null && (target.messageId == null || rows.any { it.key == target.messageId }) }
+  val targetLoaded = remember(rows, target) { target != null && (target.messageId == null || rows.indexOfMessage(target.messageId) >= 0) }
   LaunchedEffect(target?.nonce, targetLoaded) {
     if (target == null || !targetLoaded || target.nonce == handledNonce[0]) return@LaunchedEffect
     handledNonce[0] = target.nonce
     // Lets a replaced window (see the newest key effect above) settle first.
     withFrameNanos {}
-    val index = if (target.messageId == null) 0 else latestRows.indexOfFirst { it.key == target.messageId }
+    val index = if (target.messageId == null) 0 else latestRows.indexOfMessage(target.messageId)
     if (index < 0) return@LaunchedEffect
     state.scrollToRow(index, center = target.messageId != null, margin = scrollMargin)
     // Not tied to this effect: a recomposition that restarts it must not cut the flash short.

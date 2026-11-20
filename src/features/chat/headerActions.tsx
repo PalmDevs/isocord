@@ -56,7 +56,7 @@ export function handleHeaderPress(
             composer.focus()
             return
         case 'avatar':
-            openProfileSheet(user.id, guildId)
+            openProfileSheet(session, user.id, guildId)
             return
         case 'guild-tag':
             openGuildTagSheet(session, user)
@@ -102,7 +102,7 @@ export function openUserProfile(
         })
         return
     }
-    openProfileSheet(userId, guildId)
+    openProfileSheet(session, userId, guildId)
 }
 
 /** Opens the server of a user's server tag (GuildTag press). Nothing for a user without one. */

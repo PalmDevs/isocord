@@ -55,6 +55,9 @@ data class ChatTheme(
   /** ThreadEmbedView's card and its thread name. */
   val threadEmbedBackground: Color = Color.DarkGray,
   val headingPrimary: Color = Color.White,
+  /** BlockedMessageGroupView: the label, and the fill behind an open group. */
+  val hiddenGroupText: Color = Color.Gray,
+  val hiddenGroupBackground: Color = Color.Transparent,
   val placeholder: Color = Color.DarkGray,
   val jumpBackground: Color = Color.DarkGray,
   val jumpBorder: Color = Color.Transparent,

@@ -47,7 +47,7 @@ internal val AVATAR_GAP = 12.dp
 
 private val END_SPACING = 12.dp
 
-private val GROUP_SPACING = 16.dp
+internal val GROUP_SPACING = 16.dp
 
 /** How long a message takes to resize when its reactions change. Material standard, as a row's entry. Reaction chips scale in and out over the same time. */
 internal const val REACTIONS_RESIZE_MS = 200

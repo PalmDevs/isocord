@@ -10,7 +10,11 @@ import {
     leaveThread,
 } from '../../../stores/channels/threadMemberActions'
 import { guildsStore } from '../../../stores/guilds'
-import { findMessage, messagesStore } from '../../../stores/messages/messages'
+import {
+    findMessage,
+    messagesStore,
+    toggleRevealed,
+} from '../../../stores/messages/messages'
 import { chatGesturesStore } from '../../../stores/settings/chatGestures'
 import { openMediaViewer } from '../../mediaViewer/store'
 import { retryMessage } from '../composer/outbox/outbox'
@@ -122,6 +126,9 @@ export function handleChatLink(url: string, context: LinkContext): void {
                     id: link.messageId,
                     channel_id: channelId,
                 })
+            return
+        case 'reveal':
+            if (channelId) toggleRevealed(session, channelId, link.groupId)
             return
         case 'component':
             if (channelId)

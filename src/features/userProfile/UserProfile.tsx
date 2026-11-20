@@ -24,6 +24,7 @@ import { ProfileNote } from './ProfileNote'
 import { ProfileRoles } from './ProfileRoles'
 import { ProfileSection } from './ProfileSection'
 import { ProfileThemeScope } from './profileTheme'
+import { RemediatedNotice } from './safety/RemediatedNotice'
 import { useProfileView } from './useProfileView'
 import type { ReactNode } from 'react'
 import type { ProfileView } from './useProfileView'
@@ -100,15 +101,11 @@ function ProfileContent({
                 <ProfileIdentity view={view} />
                 {/* Nothing is mutual with yourself. */}
                 {user.id !== session.userId && (
-                    <ProfileMutuals
-                        userId={user.id}
-                        guildId={guildId}
-                        friends={profile?.mutual_friends ?? []}
-                        guilds={profile?.mutual_guilds ?? []}
-                    />
+                    <ProfileMutuals userId={user.id} guildId={guildId} />
                 )}
             </View>
             {afterIdentity}
+            <RemediatedNotice userId={user.id} />
             <ProfileActions user={user} />
             <ProfileActivity userId={user.id} />
             {loading && <BioSkeleton />}

@@ -41,7 +41,8 @@ private const val EXIT_FADE_MS = 150f
 
 /**
  * Rows deleted on screen, kept until they fade and collapse.
- * Pending messages the server confirmed under a new id keep their list item and enter animation.
+ * Pending messages the server confirmed under a new id keep their list item and enter animation, as do folded groups
+ * whose key moved.
  * Window swaps, paging and channel switches animate nothing.
  */
 internal class ChatRowChanges {
@@ -97,6 +98,16 @@ internal class ChatRowChanges {
         } ?: continue
         aliases[sent.key] = lazyKey(row.key)
         confirmed += sent.key
+        confirmed += row.key
+      }
+      // A folded group keyed by its oldest message gets a new key when that one goes or older history joins it.
+      for (row in removed) {
+        if (row !is ChatRow.HiddenGroup) continue
+        val held = row.messages.mapTo(HashSet()) { it.key }
+        val moved = added.firstOrNull { it is ChatRow.HiddenGroup && it.key !in confirmed && it.messages.any { m -> m.key in held } }
+          ?: continue
+        aliases[moved.key] = lazyKey(row.key)
+        confirmed += moved.key
         confirmed += row.key
       }
       // Arrivals come before the newest row that stays; anything else new but a divider means another window.

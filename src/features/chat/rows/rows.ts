@@ -571,8 +571,25 @@ export interface PostActionsRow {
     pinnedOnly?: boolean
 }
 
+/**
+ * BlockedMessageGroupView: a run of messages from users you blocked or ignored, folded behind "N blocked messages".
+ * The messages are sent while folded too, so revealing them animates.
+ */
+export interface HiddenGroupRow {
+    type: 'hiddenGroup'
+    key: string
+    /** "{count} blocked messages" or "{count} ignored messages". */
+    text: string
+    revealed: boolean
+    /** isocord://reveal/<id>: shows or hides the messages (handleReveal). */
+    url: string
+    /** Newest first, as the list. */
+    messages: Array<MessageRow | SystemRow>
+}
+
 export type ChatRow =
     | MessageRow
+    | HiddenGroupRow
     | SeparatorRow
     | SystemRow
     | LoadingRow

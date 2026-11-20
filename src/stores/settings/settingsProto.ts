@@ -135,6 +135,8 @@ export interface UserSettings {
     locale?: string
     /** StatusSettings.status: the chosen status, empty or "unknown" for online. */
     status?: string
+    /** SafetySettings: an ignored user's profile opens without the "Show Profile?" sheet. */
+    ignoreProfileSpeedbumpDisabled?: boolean
 }
 
 /** UserSettings definitions in the reference's user_settings module. */
@@ -153,6 +155,12 @@ export const USER_SETTINGS: Descriptors<UserSettings> = {
     locale: { path: [12, 1], codec: stringValueCodec },
     // `status` (11) `status` (1), read by SelfPresenceStore for the presence update.
     status: { path: [11, 1], codec: stringValueCodec },
+    // `safety_settings` (21) `ignore_profile_speedbump_disabled` (2).
+    ignoreProfileSpeedbumpDisabled: {
+        path: [21, 2],
+        codec: boolCodec,
+        default: false,
+    },
 }
 
 /** `text_and_images` (6). A partial update keeps the fields it lacks. */

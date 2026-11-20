@@ -73,6 +73,13 @@ export function chatTheme({
         // ThreadEmbedView: the card, and its thread name.
         threadEmbedBackground: argb(colors.MOBILE_THREAD_EMBED_BACKGROUND),
         headingPrimary: argb(colors.MOBILE_TEXT_HEADING_PRIMARY),
+        // BlockedGroup.tsx: the label (GREY1 is ROLE_DEFAULT), and the fill behind an open group (#FAFAFA in light).
+        hiddenGroupText: argb(
+            isDark ? `${rawColors.PRIMARY_300}99` : rawColors.ROLE_DEFAULT,
+        ),
+        hiddenGroupBackground: argb(
+            isDark ? rawColors.PRIMARY_630 : rawColors.PRIMARY_100,
+        ),
         placeholder: argb(colors.BACKGROUND_MOD_MUTED),
         jumpBackground: argb(colors.MOBILE_FLOATINGBAR_BACKGROUND),
         jumpBorder: argb(colors.BORDER_MUTED),

@@ -5,22 +5,22 @@ import { showConfirmModal } from '../../design/components/modals/showAlert'
 import { showToast } from '../../design/components/overlays/toastStore'
 import { t } from '../../i18n'
 import {
-    blockUser,
-    ignoreUser,
     removeFriend,
     unblockUser,
     unignoreUser,
     useIsIgnored,
     useRelationshipType,
 } from '../../stores/relationships'
+import { openRestrictionConfirmation } from './safety/RestrictionConfirmationSheet'
 import type { ContextMenuItemDef } from '../../design/components/overlays/ContextMenu'
 import type { ProfileView } from './useProfileView'
 
 const CONFIRM_KEY = 'user-profile-confirm'
 
 /**
- * UserProfileActionSheet's more menu: the server profile switch, copy actions, ignore, block, and Remove Friend for
- * a friend. Block and Remove Friend confirm first. Invite to Server and Apps do nothing yet.
+ * UserProfileOverflowMenu: the server profile switch, copy actions, Remove Friend for a friend, then ignore and block.
+ * Remove Friend confirms in an alert, Ignore and Block in a sheet over the profile. Invite to Server and Apps do
+ * nothing yet.
  */
 export function useProfileMenu(
     view: ProfileView,
@@ -41,6 +41,14 @@ export function useProfileMenu(
             }),
         )
     }
+    // showUnblockSuccessToast.
+    const unblock = () =>
+        unblockUser(session, id).then(() =>
+            showToast({
+                content: t('userProfile.unblocked', { username: view.name }),
+                variant: 'success',
+            }),
+        )
     const confirm = (
         title: string,
         content: string,
@@ -53,8 +61,6 @@ export function useProfileMenu(
             content,
             confirmText,
             onConfirm,
-            // Over the profile sheet, which stays open.
-            layer: 'aboveSheets',
         })
 
     const items: ContextMenuItemDef[] = []
@@ -93,29 +99,26 @@ export function useProfileMenu(
                     () => removeFriend(session, id),
                 ),
         })
-    items.push(
-        {
+    // A blocked user can be neither ignored nor unignored here.
+    if (!blocked)
+        items.push({
             label: ignored
                 ? t('userProfile.unignore')
                 : t('userProfile.ignore'),
             icon: 'EyeSlashIcon',
             action: () =>
-                ignored ? unignoreUser(session, id) : ignoreUser(session, id),
-        },
-        {
-            label: blocked ? t('userProfile.unblock') : t('userProfile.block'),
-            icon: 'DenyIcon',
-            variant: 'destructive',
-            action: () =>
-                blocked
-                    ? unblockUser(session, id)
-                    : confirm(
-                          t('userProfile.blockTitle', { name: view.name }),
-                          t('userProfile.blockBody', { name: view.name }),
-                          t('userProfile.block'),
-                          () => blockUser(session, id),
-                      ),
-        },
-    )
+                ignored
+                    ? unignoreUser(session, id)
+                    : openRestrictionConfirmation('ignore', id, view.name),
+        })
+    items.push({
+        label: blocked ? t('userProfile.unblock') : t('userProfile.block'),
+        icon: 'DenyIcon',
+        variant: 'destructive',
+        action: () =>
+            blocked
+                ? unblock()
+                : openRestrictionConfirmation('block', id, view.name),
+    })
     return items
 }
