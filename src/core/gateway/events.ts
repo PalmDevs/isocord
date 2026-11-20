@@ -16,6 +16,8 @@ export interface ReadyPayload {
     resume_gateway_url: string
     /** Base64 DerivedQosData, echoed back inside IDENTIFY's `qos_token`. */
     qos_token?: string | null
+    /** Echoed back in IDENTIFY's `client_state` (NonGuildVersions). */
+    api_code_version?: number
     user: {
         id: string
         username: string

@@ -33,6 +33,8 @@ export interface ClientState {
     highest_last_message_id?: string
     read_state_version?: number
     user_guild_settings_version?: number
+    /** READY's `api_code_version` from the session the cache came from. */
+    api_code_version?: number
 }
 
 /**
@@ -340,7 +342,8 @@ export class GatewaySocket {
             `client_state: ${Object.keys(clientState.guild_versions).length} guild versions, ` +
                 `read_state ${clientState.read_state_version !== undefined}, ` +
                 `highest_last_message_id ${clientState.highest_last_message_id !== undefined}, ` +
-                `user_guild_settings ${clientState.user_guild_settings_version !== undefined}`,
+                `user_guild_settings ${clientState.user_guild_settings_version !== undefined}, ` +
+                `api_code_version ${clientState.api_code_version ?? 'none'}`,
         )
         // GatewaySocketSingleton `handleIdentify` and GatewaySocket's IDENTIFY, in their key order. The
         // installation id is left out: the reference sends it only with analytics consent.

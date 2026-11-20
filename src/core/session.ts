@@ -69,6 +69,8 @@ const CACHE_VERSION = 7
 const RESTORING_KEY = 'cache.restoring'
 /** READY's `qos_token`, kept for the next IDENTIFY. */
 const QOS_KEY = 'qosToken'
+/** READY's `api_code_version`, kept for the next IDENTIFY's `client_state` (NonGuildVersions). */
+const API_CODE_VERSION_KEY = 'apiCodeVersion'
 /** How long the restored state must survive before the startup crash guard is lifted. */
 const RESTORE_SETTLE_MS = 3000
 /** Saving waits for the burst of events after READY (previews, member chunks) to settle. */
@@ -169,6 +171,11 @@ export class Session {
                 // DerivedQosDataStore: the server's half of the next IDENTIFY's qos_token.
                 if (ready.qos_token) this.storage.set(QOS_KEY, ready.qos_token)
                 else this.storage.remove(QOS_KEY)
+                if (ready.api_code_version !== undefined)
+                    this.storage.set(
+                        API_CODE_VERSION_KEY,
+                        ready.api_code_version,
+                    )
                 log.info(
                     `READY ${Math.round(performance.now() - started)} ms after starting`,
                 )
@@ -204,6 +211,7 @@ export class Session {
     private clientState(): ClientState {
         const state: ClientState = { guild_versions: {} }
         if (this.restoredStores === 0 && !this.ready) return state
+        state.api_code_version = this.storage.getNumber(API_CODE_VERSION_KEY)
         for (const provider of this.clientStateProviders) {
             try {
                 Object.assign(state, provider())
