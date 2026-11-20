@@ -5,6 +5,7 @@ import { Icon } from '../../../../design/icons/Icon'
 import { channelsStore } from '../../../../stores/channels/channels'
 import { guildsStore } from '../../../../stores/guilds'
 import { usersStore } from '../../../../stores/users'
+import { useSteadyRows } from '../../../chat/composer/suggestions/useSteadyRows'
 import { channelIcon } from '../../../servers/channelIcon'
 import { useGuildChannelResults } from '../../channels/useGuildChannelResults'
 import { usePrivateChannelEntries } from '../../global/dms'
@@ -16,6 +17,8 @@ import type { PickerProps } from './FilterPicker'
 import type { PickerRow } from './PickerList'
 
 const AVATAR_SIZE = 32
+/** Rows of the user list on screen before scrolling, the slots new rows may fill without moving the others. */
+const USER_VISIBLE_ROWS = 6
 
 /** A row for a pasted id, known or not, or a user filter's `@me`: picks it as it is. */
 function useIdRows({ kind, context, query, onPick }: PickerProps): PickerRow[] {
@@ -58,7 +61,16 @@ export function UserPicker({
         }
     })
     const idRows = useIdRows({ kind, context, query, onPick, submitRef })
-    return <PickerList rows={[...idRows, ...rows]} submitRef={submitRef} />
+    // Members arriving from the gateway for the same text join the list without moving the rows on screen.
+    const steady = useSteadyRows([...idRows, ...rows], query, USER_VISIBLE_ROWS)
+    return (
+        <PickerList
+            rows={steady.shown ?? []}
+            submitRef={submitRef}
+            onPressIn={steady.onPressIn}
+            tapAllowed={steady.tapAllowed}
+        />
+    )
 }
 
 /**

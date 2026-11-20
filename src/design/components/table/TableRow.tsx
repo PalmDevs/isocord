@@ -35,6 +35,8 @@ export interface TableRowProps
     arrow?: boolean
     /** Makes the row pressable. Omit for a static row. */
     onPress?: () => void
+    /** Runs when a press of a pressable row starts. */
+    onPressIn?: () => void
     /** Runs on a long press of a pressable row. */
     onLongPress?: () => void
     /** Dims the row to 50% and blocks presses. */
@@ -152,6 +154,7 @@ export function TableRow({
     trailing,
     arrow,
     onPress,
+    onPressIn,
     onLongPress,
     disabled = false,
     start,
@@ -193,6 +196,7 @@ export function TableRow({
                     {...accessibility}
                     disabled={disabled}
                     onPress={onPress}
+                    onPressIn={onPressIn}
                     onLongPress={onLongPress}
                     style={cardStyle}
                 >
