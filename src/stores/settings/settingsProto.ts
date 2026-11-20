@@ -133,6 +133,8 @@ export interface UserSettings {
     theme?: ThemeId
     /** The account's chosen language. Unset means the system's. */
     locale?: string
+    /** StatusSettings.status: the chosen status, empty or "unknown" for online. */
+    status?: string
 }
 
 /** UserSettings definitions in the reference's user_settings module. */
@@ -149,6 +151,8 @@ export const USER_SETTINGS: Descriptors<UserSettings> = {
     },
     // LocaleStore sends it as X-Discord-Locale.
     locale: { path: [12, 1], codec: stringValueCodec },
+    // `status` (11) `status` (1), read by SelfPresenceStore for the presence update.
+    status: { path: [11, 1], codec: stringValueCodec },
 }
 
 /** `text_and_images` (6). A partial update keeps the fields it lacks. */
@@ -160,28 +164,85 @@ export const TEXT_AND_IMAGES: Descriptors<TextAndImagesSettings> = {
     expressionSuggestionsEnabled: { path: [6, 22], codec: boolValueCodec },
 }
 
-/** A custom status: its text and emoji. */
+/** A custom status: its text, emoji and when it clears. */
 export interface CustomStatus {
     text: string
-    emoji?: { id?: string | null; name: string }
+    emoji?: { id?: string | null; name: string; animated?: boolean }
+    /** Epoch milliseconds as a decimal string. Absent or "0" never clears (ClearAfterValues.DONT_CLEAR). */
+    expiresAtMs?: string
+}
+
+/** CustomStatus field numbers. */
+const CustomStatusField = {
+    TEXT: 1,
+    EMOJI_ID: 2,
+    EMOJI_NAME: 3,
+    EXPIRES_AT_MS: 4,
+    CREATED_AT_MS: 5,
+} as const
+
+/** The "0" fixed64 the reference writes for an unset emoji id, or an expiry that never clears. */
+export const UNSET_FIXED64 = '0'
+
+/** Returns a fixed64 field as a decimal string. */
+const fixed64Of = (raw: ProtoValue | undefined) =>
+    raw instanceof Uint8Array ? readFixed64s(raw)[0] : undefined
+
+/** Returns a string field. */
+const stringOf = (raw: ProtoValue | undefined) =>
+    raw instanceof Uint8Array ? strFromU8(raw) : ''
+
+/** Decodes a CustomStatus message. */
+function readCustomStatus(raw: ProtoValue): CustomStatus | undefined {
+    if (!(raw instanceof Uint8Array)) return undefined
+    const emojiId = fixed64Of(fieldOf(raw, CustomStatusField.EMOJI_ID))
+    const emojiName = stringOf(fieldOf(raw, CustomStatusField.EMOJI_NAME))
+    return {
+        text: stringOf(fieldOf(raw, CustomStatusField.TEXT)),
+        emoji: emojiName
+            ? {
+                  id: emojiId && emojiId !== UNSET_FIXED64 ? emojiId : null,
+                  name: emojiName,
+              }
+            : undefined,
+        expiresAtMs: fixed64Of(fieldOf(raw, CustomStatusField.EXPIRES_AT_MS)),
+    }
 }
 
 /**
  * CustomStatus { string text = 1; fixed64 emoji_id = 2; string emoji_name = 3; fixed64 expires_at_ms = 4;
- * fixed64 created_at_ms = 5; }. Null clears it. Never expires (ClearAfterValues.DONT_CLEAR). Only written.
+ * fixed64 created_at_ms = 5; }. Null clears it.
  */
 const customStatusCodec: Codec<CustomStatus | null> = {
-    read: () => undefined,
+    read: readCustomStatus,
     write: (field, value) => {
         if (!value) return EMPTY
-        const { text, emoji } = value
+        const { text, emoji, expiresAtMs } = value
         return writeBytesField(
             field,
             concatBytes([
-                text ? writeBytesField(1, strToU8(text)) : EMPTY,
-                emoji?.id ? writeFixed64Field(2, emoji.id) : EMPTY,
-                emoji ? writeBytesField(3, strToU8(emoji.name)) : EMPTY,
-                writeFixed64Field(5, String(Date.now())),
+                text
+                    ? writeBytesField(CustomStatusField.TEXT, strToU8(text))
+                    : EMPTY,
+                emoji?.id
+                    ? writeFixed64Field(CustomStatusField.EMOJI_ID, emoji.id)
+                    : EMPTY,
+                emoji
+                    ? writeBytesField(
+                          CustomStatusField.EMOJI_NAME,
+                          strToU8(emoji.name),
+                      )
+                    : EMPTY,
+                expiresAtMs && expiresAtMs !== UNSET_FIXED64
+                    ? writeFixed64Field(
+                          CustomStatusField.EXPIRES_AT_MS,
+                          expiresAtMs,
+                      )
+                    : EMPTY,
+                writeFixed64Field(
+                    CustomStatusField.CREATED_AT_MS,
+                    String(Date.now()),
+                ),
             ]),
         )
     },
@@ -191,6 +252,17 @@ const customStatusCodec: Codec<CustomStatus | null> = {
 export const CUSTOM_STATUS: SettingDescriptor<CustomStatus | null> = {
     path: [11, 2],
     codec: customStatusCodec,
+}
+
+/** Returns the saved custom status from the encoded categories (CustomStatusSetting.getSetting). */
+export function savedCustomStatus(
+    categories: Record<number, string> | undefined,
+): CustomStatus | undefined {
+    const [category, field] = CUSTOM_STATUS.path
+    const encoded = categories?.[category]
+    if (!encoded) return undefined
+    const raw = fieldOf(base64ToBytes(encoded), field)
+    return raw === undefined ? undefined : readCustomStatus(raw)
 }
 
 /**

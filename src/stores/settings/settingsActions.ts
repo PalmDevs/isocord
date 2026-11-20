@@ -11,6 +11,7 @@ import {
     withoutField,
     writeBytesField,
 } from '../../core/protobuf'
+import { emitPresenceUpdate } from '../selfPresence'
 import { isOptInEnabled } from '../unreadPolicy'
 import {
     CUSTOM_STATUS,
@@ -123,19 +124,21 @@ export const setAnimateEmoji = (session: Session, value: boolean) =>
     saveSetting(session, TEXT_AND_IMAGES.animateEmoji, value)
 
 /**
- * setCustomStatus: trims the text, and clears the status when neither text nor emoji is left. It never expires.
+ * setCustomStatus: trims the text, and clears the status when neither text nor emoji is left.
+ * `expiresAtMs` absent or "0" never clears it.
+ * Then sends the presence, as SelfPresenceStore does when the setting changes.
  */
 export function setCustomStatus(
     session: Session,
     text: string,
     emoji: CustomStatus['emoji'],
+    expiresAtMs?: string,
 ): void {
     const trimmed = text.trim()
-    saveSetting(
-        session,
-        CUSTOM_STATUS,
-        trimmed || emoji ? { text: trimmed, emoji } : null,
-    )
+    const status =
+        trimmed || emoji ? { text: trimmed, emoji, expiresAtMs } : null
+    saveSetting(session, CUSTOM_STATUS, status)
+    emitPresenceUpdate(session, status)
 }
 
 /** UserSettings.ShowInAppNotifications. */

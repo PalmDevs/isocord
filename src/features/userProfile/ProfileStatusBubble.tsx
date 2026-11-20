@@ -6,8 +6,8 @@ import { Text } from '../../design/components/Text'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
 import { presencesStore } from '../../stores/presences'
-import { openCustomStatusAlert } from './CustomStatusAlert'
 import { AVATAR_SIZE, BANNER_HEIGHT } from './constants'
+import { openCustomStatusAlert } from './customStatus/CustomStatusAlert'
 import { StatusEmoji } from './StatusEmoji'
 
 /** UserProfileCustomStatusBubble: the custom status wraps to two lines at most. */

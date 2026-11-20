@@ -1,4 +1,5 @@
 import { createStore } from 'zustand/vanilla'
+import { ActivityType } from '../core/discord/activity'
 import { defineStore } from '../core/session'
 import type { Status } from '../core/discord/status'
 import type { Session as AppSession } from '../core/session'
@@ -76,9 +77,6 @@ declare module '../core/gateway/events' {
     }
 }
 
-const STREAMING = 1
-const CUSTOM_STATUS = 4
-
 function toPresence(
     update: {
         status: Status
@@ -87,16 +85,21 @@ function toPresence(
     mobile = false,
 ): Presence {
     const custom = update.activities?.find(
-        activity => activity.type === CUSTOM_STATUS,
+        activity => activity.type === ActivityType.CUSTOM_STATUS,
     )
     const presence: Presence = { status: update.status }
     if (custom?.state) presence.customStatus = custom.state
     if (custom?.emoji) presence.customEmoji = custom.emoji
     if (mobile) presence.mobile = true
-    if (update.activities?.some(activity => activity.type === STREAMING))
+    if (
+        update.activities?.some(
+            activity => activity.type === ActivityType.STREAMING,
+        )
+    )
         presence.streaming = true
     const activity = update.activities?.find(
-        activity => activity.type !== CUSTOM_STATUS && activity.name,
+        activity =>
+            activity.type !== ActivityType.CUSTOM_STATUS && activity.name,
     )
     if (activity?.name)
         presence.activity = {

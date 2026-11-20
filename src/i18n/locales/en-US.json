@@ -28,6 +28,7 @@
   "error.generic": "Something went wrong. Try again.",
   "common.cancel": "Cancel",
   "common.done": "Done",
+  "common.ok": "OK",
   "common.edit": "Edit",
   "accounts.manage": "Manage Accounts",
   "accounts.active": "Active account",
@@ -997,5 +998,15 @@
   "userProfile.editCustomStatus": "Edit custom status",
   "userProfile.setCustomStatus": "Set a custom status",
   "userProfile.selectEmoji": "Select an emoji",
+  "userProfile.clearCustomStatus": "Clear custom status",
+  "userProfile.clearAt": "Clear at",
+  "userProfile.clearAfter.title": "Clear after",
+  "userProfile.clearAfter.duration": "Duration",
+  "userProfile.clearAfter.hour": "{hours} hour",
+  "userProfile.clearAfter.hours": "{hours} hours",
+  "userProfile.clearAfter.minutes": "{minutes} minutes",
+  "userProfile.clearAfter.tomorrowAt": "tomorrow at {time}",
+  "userProfile.clearAfter.tomorrowAtTitle": "Tomorrow at {time}",
+  "userProfile.clearAfter.dontClear": "Don't clear",
   "userProfile.save": "Save"
 }
