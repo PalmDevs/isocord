@@ -249,13 +249,13 @@ export function ForumPostCard({
                                 <View style={styles.pin}>
                                     <Icon
                                         name="PinIcon"
-                                        size="xs"
-                                        color="ICON_STRONG"
+                                        size="sm"
+                                        color="WHITE"
                                     />
                                 </View>
                             )}
                             <Text
-                                variant="text-md/semibold"
+                                variant="text-lg/medium"
                                 color="MOBILE_TEXT_HEADING_PRIMARY"
                                 lineClamp={2}
                                 style={styles.shrink}
@@ -292,19 +292,19 @@ const styles = StyleSheet.create(theme => ({
     titleRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         gap: theme.space.PX_8,
     },
     titleGroup: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         flexShrink: 1,
         // The card's own horizontal padding.
         gap: theme.space.PX_12,
     },
     shrink: { flexShrink: 1 },
     pin: {
-        padding: theme.space.PX_4,
+        padding: theme.space.PX_6,
         borderRadius: theme.radii.round,
         backgroundColor: theme.colors.BACKGROUND_BRAND,
     },
