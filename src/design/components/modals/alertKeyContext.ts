@@ -1,4 +1,4 @@
 import { createContext } from 'react'
 
-/** Key of the alert being rendered; provided by AlertHost so buttons know which alert to close. */
+/** Key of the alert being rendered; provided by AlertPile so buttons know which alert to close. */
 export const AlertKeyContext = createContext('')

@@ -49,8 +49,6 @@ export function ProfileModeration({
             content,
             confirmText,
             onConfirm,
-            // Over the profile sheet, which stays open.
-            layer: 'aboveSheets',
         })
     return (
         <ProfileSection title={t('userProfile.moderatorActions')}>

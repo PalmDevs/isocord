@@ -1,9 +1,12 @@
+import { createElement } from 'react'
 import { createStore } from 'zustand/vanilla'
 import { defineStore } from '../../core/session'
 import { dismissKeyboard } from '../../design/components/keyboard'
+import { openActionSheet } from '../../design/components/sheets/sheetStore'
 import { parseChatLink } from '../chat/links/chatLink'
 import { componentSources } from './componentSources'
 import { messageSources, searchSources } from './sources'
+import type { ComponentType } from 'react'
 import type { Session } from '../../core/session'
 import type { Message } from '../../stores/readStates'
 import type { MediaItem } from '../search/messages/extract'
@@ -42,6 +45,15 @@ export const mediaViewerStore = defineStore('mediaViewer', () =>
     createStore<MediaViewerState>(() => ({ opened: 0 })),
 )
 
+const MEDIA_VIEWER_SHEET_KEY = 'media-viewer'
+
+/** The viewer component, set by the feature. It opens chat links, which open the viewer, so importing it here would cycle. */
+let ViewerSheet: ComponentType | undefined
+
+export function registerViewerSheet(component: ComponentType): void {
+    ViewerSheet = component
+}
+
 /** What was tapped among a message's own media: an attachment, an embed's media, or an embed's corner thumbnail. */
 type MessageSelection =
     | { attachment: number }
@@ -56,10 +68,16 @@ export type MediaSelection =
 function show(session: Session, viewer: Omit<OpenMediaViewer, 'key'>): boolean {
     if (viewer.initialIndex < 0) return false
     dismissKeyboard()
+    if (!ViewerSheet) throw new Error('The media viewer is not registered')
     session.get(mediaViewerStore).setState(({ opened }) => ({
         opened: opened + 1,
         open: { key: opened + 1, ...viewer },
     }))
+    // openMediaModal's openAs "action-sheet": over the sheet it was opened from, under the sheets it opens.
+    openActionSheet(MEDIA_VIEWER_SHEET_KEY, createElement(ViewerSheet), {
+        stackingBehavior: 'stack',
+        replaceable: false,
+    })
     return true
 }
 
@@ -176,6 +194,7 @@ export function openSearchMediaViewer(
     return show(session, { ...searchSources(items, selected), origin, jump })
 }
 
+/** Takes the viewer away at once. Its sheet then removes itself. */
 export function closeMediaViewer(session: Session): void {
     session.get(mediaViewerStore).setState({ open: undefined })
 }

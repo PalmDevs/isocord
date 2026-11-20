@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect } from 'react'
 import {
-    BackHandler,
     StyleSheet as NativeStyleSheet,
     useWindowDimensions,
     View,
@@ -17,10 +16,10 @@ import { MODAL_SPRING } from '../../tokens/motion'
 import { dismissKeyboard } from '../keyboard'
 import { Backdrop } from '../overlays/Backdrop'
 import { AlertKeyContext } from './alertKeyContext'
-import { dismissTopAlert, isInLayer, useAlertStore } from './alertStore'
+import { dismissAlert } from './alertStore'
 import { Dialog } from './Dialog'
 import type { SharedValue } from 'react-native-reanimated'
-import type { AlertEntry, AlertLayer } from './alertStore'
+import type { AlertEntry } from './alertStore'
 
 /** At most this many alerts are drawn, as a pile; the rest wait behind. */
 const MAX_VISIBLE = 3
@@ -61,40 +60,36 @@ const EXITING = () => {
 }
 
 /**
- * Renders the alerts of one layer opened with `openAlert`: a fading backdrop and a pile of up to
- * three cards. Mount one per layer, above the navigator (see alertsFeature). Android back closes the
- * front alert.
+ * Draws a run of alerts with nothing between them (front-most first): a fading backdrop and a pile
+ * of up to three cards. Rendered by ModalStack. Only the front pile takes touches.
  */
-export function AlertHost({ layer }: { layer: AlertLayer }) {
-    const alerts = useAlertStore(state => state.alerts).filter(alert =>
-        isInLayer(alert, layer),
-    )
+export function AlertPile({
+    alerts,
+    front,
+}: {
+    alerts: [AlertEntry, ...AlertEntry[]]
+    front: boolean
+}) {
     const topHeight = useSharedValue(0)
     const visible = alerts.slice(0, MAX_VISIBLE)
     const top = alerts[0]
-    const open = top !== undefined
-    const dismissTop = () => dismissTopAlert(layer)
+    const dismissTop = () => {
+        if (top.dismissable !== false) dismissAlert(top.key)
+    }
 
-    useEffect(() => {
-        if (!open) return
-        dismissKeyboard()
-        const subscription = BackHandler.addEventListener(
-            'hardwareBackPress',
-            () => dismissTopAlert(layer),
-        )
-        return () => subscription.remove()
-    }, [open, layer])
+    useEffect(dismissKeyboard, [])
 
     return (
-        <View pointerEvents="box-none" style={NativeStyleSheet.absoluteFill}>
-            {open && (
-                <Backdrop
-                    animated
-                    onDismiss={
-                        top.dismissable === false ? undefined : dismissTop
-                    }
-                />
-            )}
+        <View
+            pointerEvents={front ? 'box-none' : 'none'}
+            importantForAccessibility={front ? 'auto' : 'no-hide-descendants'}
+            // Open order, so the pile stays above older sheets while it animates out.
+            style={[NativeStyleSheet.absoluteFill, { zIndex: top.order }]}
+        >
+            <Backdrop
+                animated
+                onDismiss={top.dismissable === false ? undefined : dismissTop}
+            />
             <Dialog onDismiss={dismissTop}>
                 {visible.map((alert, index) => (
                     <AlertCard

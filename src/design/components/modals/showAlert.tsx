@@ -3,7 +3,6 @@ import { AlertActionButton, AlertActions, AlertModal } from './AlertModal'
 import { openAlert } from './alertStore'
 import type { ReactNode } from 'react'
 import type { ButtonProps } from '../buttons/Button'
-import type { AlertLayer } from './alertStore'
 
 export interface ConfirmModalOptions {
     key: string
@@ -18,7 +17,6 @@ export interface ConfirmModalOptions {
     onCancel?: () => void
     onCloseCallback?: () => void
     dismissable?: boolean
-    layer?: AlertLayer
 }
 
 /** Opens a confirm/cancel alert. The confirm button is destructive unless `variant` says otherwise. */
@@ -34,7 +32,6 @@ export function showConfirmModal({
     onCancel,
     onCloseCallback,
     dismissable,
-    layer,
 }: ConfirmModalOptions): void {
     openAlert(
         key,
@@ -58,7 +55,7 @@ export function showConfirmModal({
             }
         />,
         onCloseCallback,
-        { dismissable, layer },
+        { dismissable },
     )
 }
 
@@ -70,7 +67,6 @@ export interface InfoAlertOptions {
     confirmText?: string
     onCloseCallback?: () => void
     dismissable?: boolean
-    layer?: AlertLayer
 }
 
 /** Opens an alert with a single primary button, for errors and notices. */
@@ -81,7 +77,6 @@ export function showAlert({
     confirmText = t('common.done'),
     onCloseCallback,
     dismissable,
-    layer,
 }: InfoAlertOptions): void {
     openAlert(
         key,
@@ -95,6 +90,6 @@ export function showAlert({
             }
         />,
         onCloseCallback,
-        { dismissable, layer },
+        { dismissable },
     )
 }

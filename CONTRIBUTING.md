@@ -365,7 +365,7 @@ folder for 1 or 2.
 
 ```
 design/components/
-  sheets/    Sheet, SheetDrag, SheetHost, sheetStore, SimpleActionSheet
+  sheets/    Sheet, SheetDrag, SheetLayer, sheetStore, SimpleActionSheet
   inputs/    Input, TextInput, TextField, SearchField, CodeInput
   buttons/   Button, ButtonGroup, IconButton
   Text.tsx, Card.tsx, Badge.tsx   (leaf components stay at the top)

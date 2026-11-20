@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { create } from 'zustand'
 import { dismissKeyboard } from '../keyboard'
+import { nextModalOrder } from '../overlays/modalOrder'
 import type { ComponentType, ReactNode } from 'react'
 
 /** How a new sheet relates to the ones already open (ActionSheetStore in the reference client). */
@@ -9,34 +10,57 @@ export type SheetStackingBehavior = 'replaceTopSheet' | 'stack' | 'replaceAll'
 export interface SheetEntry {
     key: string
     node: ReactNode
+    /** Place among open alerts and sheets, from `nextModalOrder`. */
+    order: number
     /** True while the sheet animates out. It is removed once the sheet reports it has finished. */
     closing: boolean
+    /** False when a sheet opened over this one stacks instead of replacing it. */
+    replaceable: boolean
 }
 
-/** Open sheets, back-most first. Rendered by SheetHost. */
+/** Open sheets, back-most first. Rendered by ModalStack. */
 export const useSheetStore = create<{ sheets: SheetEntry[] }>(() => ({
     sheets: [],
 }))
 
 /**
  * Shows `node` (normally an ActionSheet or BottomSheet) above the app. Opening a key that is already
- * open replaces it in place; otherwise `stackingBehavior` decides: replace the top sheet (default),
- * stack on top of it, or replace every open sheet.
+ * open replaces it and brings it to the front. Otherwise `stackingBehavior` decides: replace the top sheet (default),
+ * stack on top of it, or replace every open sheet. `replaceable: false` keeps the sheet under the
+ * ones opened over it, such as the media viewer.
  */
 export function openActionSheet(
     key: string,
     node: ReactNode,
-    options?: { stackingBehavior?: SheetStackingBehavior },
+    options?: {
+        stackingBehavior?: SheetStackingBehavior
+        replaceable?: boolean
+    },
 ): void {
-    const entry: SheetEntry = { key, node, closing: false }
     dismissKeyboard()
     useSheetStore.setState(({ sheets }) => {
-        if (sheets.some(sheet => sheet.key === key)) {
-            return {
-                sheets: sheets.map(sheet =>
-                    sheet.key === key ? entry : sheet,
-                ),
+        const existing = sheets.find(sheet => sheet.key === key)
+        if (existing) {
+            // Brought to the front, so a sheet opened over it doesn't hide it.
+            const replaced = {
+                ...existing,
+                node,
+                closing: false,
+                order: nextModalOrder(),
             }
+            return {
+                sheets: [
+                    ...sheets.filter(sheet => sheet !== existing),
+                    replaced,
+                ],
+            }
+        }
+        const entry: SheetEntry = {
+            key,
+            node,
+            order: nextModalOrder(),
+            closing: false,
+            replaceable: options?.replaceable ?? true,
         }
         switch (options?.stackingBehavior ?? 'replaceTopSheet') {
             case 'stack':
@@ -45,6 +69,7 @@ export function openActionSheet(
                 return { sheets: [entry] }
             case 'replaceTopSheet': {
                 const top = sheets.filter(sheet => !sheet.closing).at(-1)
+                if (!top?.replaceable) return { sheets: [...sheets, entry] }
                 return {
                     sheets: [...sheets.filter(sheet => sheet !== top), entry],
                 }

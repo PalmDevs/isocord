@@ -21,7 +21,7 @@ export interface AlertModalProps {
 
 /**
  * Body of an alert: heading, message and actions. The card around it (background, border, shadow,
- * enter and exit animation) is supplied by AlertHost.
+ * enter and exit animation) is supplied by AlertPile.
  */
 export function AlertModal({
     title,

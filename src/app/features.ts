@@ -1,6 +1,6 @@
 import { registerFeature } from '../core/feature'
 import { accountsFeature } from '../features/accounts'
-import { alertsAboveSheetsFeature, alertsFeature } from '../features/alerts'
+import { alertsFeature } from '../features/alerts'
 import { captchaFeature } from '../features/captcha'
 import { channelBrowserFeature } from '../features/channelBrowser'
 import { channelSettingsFeature } from '../features/channelSettings'
@@ -44,8 +44,6 @@ registerFeature(shareFeature)
 registerFeature(mediaViewerFeature)
 registerFeature(alertsFeature)
 registerFeature(sheetsFeature)
-// After sheets, for alerts opened with `layer: 'aboveSheets'`.
-registerFeature(alertsAboveSheetsFeature)
 registerFeature(inAppNotificationsFeature)
 registerFeature(systemNotificationsFeature)
 // Last, so toasts draw above alerts, sheets and in-app notifications.

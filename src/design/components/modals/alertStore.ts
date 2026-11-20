@@ -1,27 +1,22 @@
 import { create } from 'zustand'
+import { nextModalOrder } from '../overlays/modalOrder'
 import type { ReactNode } from 'react'
-
-/**
- * Overlay an alert draws in. Sheets draw over `belowSheets` alerts, so a sheet opened from an alert
- * stays visible. `aboveSheets` alerts draw over open sheets.
- */
-export type AlertLayer = 'belowSheets' | 'aboveSheets'
 
 export interface AlertOptions {
     /** False pins the alert: backdrop taps, and back presses leave it open. */
     dismissable?: boolean
-    /** Defaults to `belowSheets`. */
-    layer?: AlertLayer
 }
 
 export interface AlertEntry extends AlertOptions {
     key: string
     node: ReactNode
+    /** Place among open alerts and sheets, from `nextModalOrder`. */
+    order: number
     /** Runs once the alert has been removed, however it was closed. */
     onDismiss?: () => void
 }
 
-/** Open alerts, front-most first. Rendered by AlertHost. */
+/** Open alerts, front-most first. Rendered by ModalStack. */
 export const useAlertStore = create<{ alerts: AlertEntry[] }>(() => ({
     alerts: [],
 }))
@@ -36,12 +31,18 @@ export function openAlert(
     onDismiss?: () => void,
     options?: AlertOptions,
 ): void {
-    const entry: AlertEntry = { key, node, onDismiss, ...options }
     useAlertStore.setState(({ alerts }) => {
-        const index = alerts.findIndex(alert => alert.key === key)
-        if (index === -1) return { alerts: [entry, ...alerts] }
+        const existing = alerts.find(alert => alert.key === key)
+        const entry: AlertEntry = {
+            key,
+            node,
+            onDismiss,
+            order: existing?.order ?? nextModalOrder(),
+            ...options,
+        }
+        if (!existing) return { alerts: [entry, ...alerts] }
         return {
-            alerts: alerts.map((alert, i) => (i === index ? entry : alert)),
+            alerts: alerts.map(alert => (alert === existing ? entry : alert)),
         }
     })
 }
@@ -58,19 +59,9 @@ export function dismissAlert(key: string): void {
     found.onDismiss?.()
 }
 
-/** Returns whether the alert draws in `layer`. */
-export function isInLayer(alert: AlertEntry, layer: AlertLayer): boolean {
-    return (alert.layer ?? 'belowSheets') === layer
-}
-
-/**
- * Closes the front-most alert of `layer` unless it is pinned. Returns whether there was an alert to
- * handle.
- */
-export function dismissTopAlert(layer: AlertLayer): boolean {
-    const top = useAlertStore
-        .getState()
-        .alerts.find(alert => isInLayer(alert, layer))
+/** Closes the front-most alert unless it is pinned. Returns whether there was an alert to handle. */
+export function dismissTopAlert(): boolean {
+    const top = useAlertStore.getState().alerts[0]
     if (!top) return false
     if (top.dismissable !== false) dismissAlert(top.key)
     return true

@@ -12,7 +12,7 @@ export interface SheetContextValue {
 
 export const NOOP = () => {}
 
-/** Provided by SheetHost around every open sheet. Outside a host a sheet cannot be closed. */
+/** Provided by SheetLayer around every open sheet. Outside one a sheet cannot be closed. */
 export const SheetContext = createContext<SheetContextValue>({
     closing: false,
     close: NOOP,

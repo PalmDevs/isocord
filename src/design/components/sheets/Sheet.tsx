@@ -151,7 +151,7 @@ export interface BottomSheetProps {
 
 /**
  * Sheet that slides up from the bottom edge: scrim, drag handle, draggable and snapping, lifted by
- * the keyboard. Render it inside SheetHost (see `openActionSheet`).
+ * the keyboard. Render it through `openActionSheet`, which ModalStack draws.
  */
 export function BottomSheet({
     ref,

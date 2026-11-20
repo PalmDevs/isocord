@@ -1,4 +1,3 @@
-import { SheetHost } from '../../design/components/sheets/SheetHost'
 import type { Feature } from '../../core/feature'
 
 export {
@@ -10,8 +9,5 @@ export {
 } from '../../design/components/sheets/sheetStore'
 export { showSimpleActionSheet } from '../../design/components/sheets/showSimpleActionSheet'
 
-/** Mounts the host that renders sheets opened with `openActionSheet` / `showSimpleActionSheet`. */
-export const sheetsFeature: Feature = {
-    name: 'sheets',
-    overlays: { sheets: SheetHost },
-}
+/** Sheet actions. alertsFeature's ModalStack draws the sheets. */
+export const sheetsFeature: Feature = { name: 'sheets' }

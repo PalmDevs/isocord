@@ -1,10 +1,5 @@
-import { useEffect, useState } from 'react'
-import {
-    BackHandler,
-    StyleSheet as NativeStyleSheet,
-    Share,
-    View,
-} from 'react-native'
+import { useContext, useEffect, useState } from 'react'
+import { StyleSheet as NativeStyleSheet, Share, View } from 'react-native'
 import { SystemBars } from 'react-native-edge-to-edge'
 import Animated, {
     Easing,
@@ -20,6 +15,7 @@ import { IconButton } from '../../design/components/buttons/IconButton'
 import { NAV_BAR_HEIGHT } from '../../design/components/layout/navBarHeight'
 import { ContextMenu } from '../../design/components/overlays/ContextMenu'
 import { BottomSheet } from '../../design/components/sheets/Sheet'
+import { SheetContext } from '../../design/components/sheets/sheetContext'
 import { Text } from '../../design/components/Text'
 import { STANDARD_EASING } from '../../design/tokens/motion'
 import { t } from '../../i18n'
@@ -41,9 +37,13 @@ import type { SimpleActionSheetOption } from '../../design/components/sheets/Sim
 import type { ViewerSource } from './sources'
 import type { OpenMediaViewer } from './store'
 
-/** Mounts the media viewer opened with `openMediaViewer`, above the navigator and below sheets and alerts. */
+/** The sheet `openMediaViewer` opens. Drops itself once the viewer is closed or the account switched. */
 export function MediaViewerHost() {
     const open = useSessionStore(mediaViewerStore, state => state.open)
+    const { onClosed } = useContext(SheetContext)
+    useEffect(() => {
+        if (!open) onClosed()
+    }, [open, onClosed])
     return open ? <MediaViewer key={open.key} open={open} /> : null
 }
 
@@ -125,7 +125,8 @@ function showAltText(description: string) {
 function MediaViewer({ open }: { open: OpenMediaViewer }) {
     const session = useSession()
     const insets = useSafeAreaInsets()
-    const [closeRequested, setCloseRequested] = useState(false)
+    // Back and the close button close the sheet. The native side then animates out.
+    const { closing: closeRequested, close } = useContext(SheetContext)
     const [headerShown, setHeaderShown] = useState(true)
     const [index, setIndex] = useState(open.initialIndex)
     const opened = open.messages[index] ?? open.messages[0]
@@ -184,17 +185,6 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
             },
         ],
     }))
-
-    useEffect(() => {
-        const subscription = BackHandler.addEventListener(
-            'hardwareBackPress',
-            () => {
-                setCloseRequested(true)
-                return true
-            },
-        )
-        return () => subscription.remove()
-    }, [])
 
     return (
         <View style={NativeStyleSheet.absoluteFill}>
@@ -259,7 +249,7 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
                     size="lg"
                     icon="XSmallIcon"
                     accessibilityLabel={t('common.close')}
-                    onPress={() => setCloseRequested(true)}
+                    onPress={close}
                 />
                 <ContextMenu
                     triggerOnLongPress={false}
