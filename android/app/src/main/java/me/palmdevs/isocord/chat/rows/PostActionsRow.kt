@@ -46,7 +46,7 @@ private val BUTTON_PADDING = 12.dp
 private val BUTTON_GAP = 6.dp
 
 /** ForumPostActionBarView's footer_divider: 8dp of BACKGROUND_SURFACE_HIGH under the bar. */
-private val FOOTER_DIVIDER = 8.dp
+private val FOOTER_DIVIDER = 1.dp
 
 /** ForumPostActionBarView's header_divider: a 1dp BORDER_SUBTLE line, 8dp under the first message. */
 private val HEADER_DIVIDER = 1.dp

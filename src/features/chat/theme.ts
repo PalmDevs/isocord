@@ -150,7 +150,7 @@ export function chatTheme({
         textSubtle: argb(colors.TEXT_SUBTLE),
         feedbackCritical: argb(colors.ICON_FEEDBACK_CRITICAL),
         // ForumPostActionBarView's footer divider.
-        postActionsDivider: argb(colors.BACKGROUND_SURFACE_HIGH),
+        postActionsDivider: argb(colors.BORDER_SUBTLE),
     }
 }
 
