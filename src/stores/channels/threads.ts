@@ -46,7 +46,12 @@ export const threadsStore = defineStore('threads', session => {
         const active = { ...state.active }
         for (const thread of threads)
             if (isThread(thread) && !thread.thread_metadata?.archived)
-                active[thread.id] = { ...thread, guild_id: guildId }
+                active[thread.id] = {
+                    ...active[thread.id],
+                    ...thread,
+                    guild_id: guildId,
+                    member: thread.member ?? active[thread.id]?.member,
+                }
         return { ...state, active }
     }
 
@@ -69,6 +74,11 @@ export const threadsStore = defineStore('threads', session => {
     dispatch.on('THREAD_LIST_SYNC', sync =>
         store.setState(state => {
             const parents = sync.channel_ids && new Set(sync.channel_ids)
+            const members = new Map(sync.members?.map(m => [m.id, m]))
+            const threads = sync.threads.map(thread => ({
+                ...thread,
+                member: members.get(thread.id) ?? thread.member,
+            }))
             const next = withThreads(
                 without(
                     state,
@@ -76,7 +86,7 @@ export const threadsStore = defineStore('threads', session => {
                         thread.guild_id === sync.guild_id &&
                         (!parents || parents.has(thread.parent_id ?? '')),
                 ),
-                sync.threads,
+                threads,
                 sync.guild_id,
             )
             for (const message of sync.most_recent_messages ?? [])
@@ -88,6 +98,55 @@ export const threadsStore = defineStore('threads', session => {
             return next
         }),
     )
+    dispatch.on('THREAD_MEMBER_UPDATE', update => {
+        if (update.user_id && update.user_id !== session.userId) return
+        const held = store.getState().active[update.id]
+        if (!held) return
+        store.setState(state => ({
+            active: {
+                ...state.active,
+                [update.id]: {
+                    ...held,
+                    member: {
+                        flags: update.flags,
+                        join_timestamp: update.join_timestamp,
+                        muted: update.muted,
+                        mute_config: update.mute_config,
+                    },
+                },
+            },
+        }))
+    })
+    dispatch.on('THREAD_MEMBERS_UPDATE', update => {
+        const held = store.getState().active[update.id]
+        if (!held) return
+        if (update.removed_member_ids?.includes(session.userId)) {
+            const { member: _old, ...rest } = held
+            store.setState(state => ({
+                active: { ...state.active, [update.id]: rest },
+            }))
+            return
+        }
+        const mine = update.added_members?.find(
+            added => added.user_id === session.userId,
+        )
+        if (mine) {
+            store.setState(state => ({
+                active: {
+                    ...state.active,
+                    [update.id]: {
+                        ...held,
+                        member: {
+                            flags: mine.flags ?? 0,
+                            join_timestamp: mine.join_timestamp ?? '',
+                            muted: mine.muted,
+                            mute_config: mine.mute_config,
+                        },
+                    },
+                },
+            }))
+        }
+    })
     const putThread = (thread: Channel) =>
         store.setState(state =>
             thread.thread_metadata?.archived

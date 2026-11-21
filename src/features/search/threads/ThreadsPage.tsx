@@ -26,6 +26,7 @@ import {
     openThreadCreation,
 } from '../../chat/links/openChannel'
 import { ThreadRow } from './ThreadRow'
+import type { ThreadMember } from '../../../core/discord/threadMember'
 import type { Channel } from '../../../stores/channels/channels'
 import type { User } from '../../../stores/users'
 import type { SearchTabPageProps } from '../types'
@@ -66,6 +67,7 @@ function useArchivedThreads(channel: Channel | undefined, canRead: boolean) {
         try {
             const body = await session.rest.get<{
                 threads?: Channel[]
+                members?: Array<ThreadMember & { id: string }>
                 has_more?: boolean
                 owners?: Array<{ user?: User }>
             }>(Endpoint.channelThreadsSearch(channel.id), {
@@ -83,9 +85,11 @@ function useArchivedThreads(channel: Channel | undefined, canRead: boolean) {
                 .get(usersStore)
                 .getState()
                 .upsert((body.owners ?? []).map(owner => owner.user))
+            const members = new Map((body.members ?? []).map(m => [m.id, m]))
             const loaded = (body.threads ?? []).map(thread => ({
                 ...thread,
                 guild_id: channel.guild_id,
+                member: members.get(thread.id) ?? thread.member,
             }))
             setState(previous => ({
                 threads: [

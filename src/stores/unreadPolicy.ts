@@ -129,11 +129,12 @@ export function resolvedMessageNotifications(
 ): number {
     const settings = state.guildSettings[channel.guild_id ?? '']
     const own = settings?.channelMessageNotifications?.[channel.id]
-    if (own !== undefined) return own
+    if (own !== undefined && own !== UserNotificationSettings.NULL) return own
     if (channel.parent_id) {
         const parent =
             settings?.channelMessageNotifications?.[channel.parent_id]
-        if (parent !== undefined) return parent
+        if (parent !== undefined && parent !== UserNotificationSettings.NULL)
+            return parent
     }
     const guild = settings?.messageNotifications
     return guild === undefined || guild === UserNotificationSettings.NULL
@@ -238,8 +239,9 @@ export function isChannelOrParentOptedIn(
 }
 
 /**
- * computeThreadNotificationSetting: the ThreadMemberFlags level a thread notifies at. NO_MESSAGES when not joined,
- * else the level in its flags, else what the parent channel resolves to.
+ * computeThreadNotificationSetting: the ThreadMemberFlags level a thread notifies at.
+ * When the thread has an explicit level in its flags, that level applies.
+ * Otherwise, it inherits what the parent channel resolves to (or NO_MESSAGES if muted).
  */
 export function threadNotificationSetting(
     state: PolicyState,
@@ -248,11 +250,14 @@ export function threadNotificationSetting(
     guildDefault: number | undefined,
 ): number {
     const flags = thread.member?.flags
-    if (flags === undefined) return ThreadMemberFlags.NO_MESSAGES
-    for (const level of THREAD_NOTIFICATION_LEVELS)
-        if (hasFlag(flags, level)) return level
-    if (!parent || isMuted(state, parent)) return ThreadMemberFlags.NO_MESSAGES
-    const resolved = resolvedMessageNotifications(state, parent, guildDefault)
+    if (flags !== undefined) {
+        for (const level of THREAD_NOTIFICATION_LEVELS)
+            if (hasFlag(flags, level)) return level
+    }
+    if (parent && isMuted(state, parent)) return ThreadMemberFlags.NO_MESSAGES
+    const resolved = parent
+        ? resolvedMessageNotifications(state, parent, guildDefault)
+        : (guildDefault ?? UserNotificationSettings.ALL_MESSAGES)
     if (resolved === UserNotificationSettings.NO_MESSAGES)
         return ThreadMemberFlags.NO_MESSAGES
     return resolved === UserNotificationSettings.ONLY_MENTIONS

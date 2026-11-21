@@ -90,7 +90,7 @@ declare module '../../core/gateway/events' {
         THREAD_MEMBER_UPDATE: ThreadMember & {
             id: string
             guild_id: string
-            user_id: string
+            user_id?: string
         }
     }
 }
@@ -170,24 +170,34 @@ export const channelsStore = defineStore(
 
         const put = (raw: Channel) =>
             store.setState(state => {
-                const channel = normalize({ ...state.channels[raw.id], ...raw })
+                const prev = state.channels[raw.id]
+                const channel = normalize({
+                    ...prev,
+                    ...raw,
+                    member: raw.member ?? prev?.member,
+                })
                 const channels = { ...state.channels, [channel.id]: channel }
                 const versions =
                     channel.guild_id && !isThread(channel)
                         ? bumped(state.versions, channel.guild_id, raw.version)
                         : state.versions
-                if (state.channels[raw.id]) return { channels, versions }
-                if (channel.guild_id) {
-                    const ids = state.byGuild[channel.guild_id] ?? []
-                    return {
-                        channels,
-                        versions,
-                        byGuild: {
-                            ...state.byGuild,
-                            [channel.guild_id]: [...ids, channel.id],
-                        },
-                    }
+                const shouldList =
+                    channel.guild_id &&
+                    (!isThread(channel) || channel.member !== undefined)
+                if (shouldList) {
+                    const ids = state.byGuild[channel.guild_id!] ?? []
+                    if (!ids.includes(channel.id))
+                        return {
+                            channels,
+                            versions,
+                            byGuild: {
+                                ...state.byGuild,
+                                [channel.guild_id!]: [...ids, channel.id],
+                            },
+                        }
                 }
+                if (prev) return { channels, versions }
+                if (channel.guild_id) return { channels, versions }
                 return {
                     channels,
                     privateIds: [...state.privateIds, channel.id],
@@ -263,7 +273,11 @@ export const channelsStore = defineStore(
                 // Held threads are replaced by the joined ones sent now, never carried over.
                 for (const id of oldIds) {
                     const channel = previous.channels[id]
-                    if (channel && !isThread(channel) && !deleted.has(id)) {
+                    if (
+                        channel &&
+                        (!isThread(channel) || channel.member !== undefined) &&
+                        !deleted.has(id)
+                    ) {
                         state.channels[id] = channel
                         ids.push(id)
                     }
@@ -468,7 +482,7 @@ export const channelsStore = defineStore(
             mute_config,
         })
         dispatch.on('THREAD_MEMBER_UPDATE', update => {
-            if (update.user_id === session.userId)
+            if (!update.user_id || update.user_id === session.userId)
                 setMember(update.id, memberOf(update))
         })
         dispatch.on('THREAD_MEMBERS_UPDATE', update => {
@@ -477,8 +491,7 @@ export const channelsStore = defineStore(
             const mine = update.added_members?.find(
                 added => added.user_id === session.userId,
             )
-            if (mine?.join_timestamp !== undefined)
-                setMember(update.id, memberOf(mine as ThreadMember))
+            if (mine) setMember(update.id, memberOf(mine as ThreadMember))
         })
 
         session.registerClientState(() => {

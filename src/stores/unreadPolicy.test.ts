@@ -4,7 +4,11 @@ import levelVectors from '../../test-vectors/notification-policy/level.json'
 import mentionedVectors from '../../test-vectors/notification-policy/mentioned.json'
 import muteVectors from '../../test-vectors/notification-policy/mute.json'
 import optInVectors from '../../test-vectors/notification-policy/optin.json'
-import { UnreadSetting } from '../core/discord/notificationSettings'
+import {
+    UnreadSetting,
+    UserNotificationSettings,
+} from '../core/discord/notificationSettings'
+import { ThreadMemberFlags } from '../core/discord/threadMember'
 import {
     isChannelMuted,
     isChannelOrParentOptedIn,
@@ -14,7 +18,9 @@ import {
     isOptInEnabled,
     resolvedMessageNotifications,
     resolveUnreadSetting,
+    threadNotificationSetting,
 } from './unreadPolicy'
+import type { ThreadMember } from '../core/discord/threadMember'
 import type { GuildSettings, Mute } from './settings/userGuildSettings'
 
 // Runs the vectors shared with the Notify policy (NotificationPolicyVectorsTest.kt) against the Unread policy.
@@ -168,5 +174,104 @@ test('unread setting follows the guild default level', () => {
     )
     expect(resolveUnreadSetting(state, channel, 0)).toBe(
         UnreadSetting.ALL_MESSAGES,
+    )
+})
+
+const makeSettings = (
+    settings: Partial<GuildSettings> = {},
+): GuildSettings => ({
+    muted: false,
+    suppressEveryone: false,
+    suppressRoles: false,
+    mutedChannels: {},
+    collapsedCategories: {},
+    ...settings,
+})
+
+const makeState = (guildId: string, settings: Partial<GuildSettings> = {}) => ({
+    guildSettings: { [guildId]: makeSettings(settings) },
+    newNotifications: true,
+})
+
+const threadMember = (flags: number): ThreadMember => ({
+    flags,
+    join_timestamp: '',
+})
+
+test('threadNotificationSetting: inherits parent resolved level when flags are unset or 0', () => {
+    const state = makeState('g', {
+        messageNotifications: UserNotificationSettings.ALL_MESSAGES,
+    })
+    const parent = { id: 'p', guild_id: 'g', parent_id: null }
+    const threadWithoutMember = { id: 't', guild_id: 'g', parent_id: 'p' }
+    const threadWithZeroFlags = {
+        id: 't',
+        guild_id: 'g',
+        parent_id: 'p',
+        member: threadMember(0),
+    }
+    const threadWithInteracted = {
+        id: 't',
+        guild_id: 'g',
+        parent_id: 'p',
+        member: threadMember(1),
+    }
+
+    expect(
+        threadNotificationSetting(state, threadWithoutMember, parent, 0),
+    ).toBe(ThreadMemberFlags.ALL_MESSAGES)
+    expect(
+        threadNotificationSetting(state, threadWithZeroFlags, parent, 0),
+    ).toBe(ThreadMemberFlags.ALL_MESSAGES)
+    expect(
+        threadNotificationSetting(state, threadWithInteracted, parent, 0),
+    ).toBe(ThreadMemberFlags.ALL_MESSAGES)
+})
+
+test('threadNotificationSetting: respects explicit member flags', () => {
+    const state = makeState('g', {
+        messageNotifications: UserNotificationSettings.ALL_MESSAGES,
+    })
+    const parent = { id: 'p', guild_id: 'g', parent_id: null }
+    const threadMentions = {
+        id: 't',
+        guild_id: 'g',
+        parent_id: 'p',
+        member: threadMember(ThreadMemberFlags.ONLY_MENTIONS),
+    }
+    const threadNothing = {
+        id: 't',
+        guild_id: 'g',
+        parent_id: 'p',
+        member: threadMember(ThreadMemberFlags.NO_MESSAGES),
+    }
+    const threadAll = {
+        id: 't',
+        guild_id: 'g',
+        parent_id: 'p',
+        member: threadMember(ThreadMemberFlags.ALL_MESSAGES),
+    }
+
+    expect(threadNotificationSetting(state, threadMentions, parent, 0)).toBe(
+        ThreadMemberFlags.ONLY_MENTIONS,
+    )
+    expect(threadNotificationSetting(state, threadNothing, parent, 0)).toBe(
+        ThreadMemberFlags.NO_MESSAGES,
+    )
+    expect(threadNotificationSetting(state, threadAll, parent, 0)).toBe(
+        ThreadMemberFlags.ALL_MESSAGES,
+    )
+})
+
+test('threadNotificationSetting: inherits NO_MESSAGES when parent is muted', () => {
+    const state = makeState('g', {
+        messageNotifications: UserNotificationSettings.ALL_MESSAGES,
+        mutedChannels: { p: true },
+    })
+    const parent = { id: 'p', guild_id: 'g', parent_id: null }
+    const thread = { id: 't', guild_id: 'g', parent_id: 'p' }
+
+    expect(threadNotificationSetting(state, thread, parent, 0)).toBe(
+        ThreadMemberFlags.NO_MESSAGES,
     )
 })
