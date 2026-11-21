@@ -1,10 +1,14 @@
-import { useNavigation } from '@react-navigation/native'
+import { useIsFocused, useNavigation } from '@react-navigation/native'
 import { ScrollView, View } from 'react-native'
+import { SystemBars } from 'react-native-edge-to-edge'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useSession } from '../../core/react'
 import { Button } from '../../design/components/buttons/Button'
 import { t } from '../../i18n'
-import { profileBackground } from '../userProfile/profileColors'
+import {
+    profileBackground,
+    profileThemeName,
+} from '../userProfile/profileColors'
 import { UserProfile } from '../userProfile/UserProfile'
 import { useProfileView } from '../userProfile/useProfileView'
 
@@ -12,8 +16,13 @@ import { useProfileView } from '../userProfile/useProfileView'
 export function YouTab() {
     const session = useSession()
     const navigation = useNavigation<{ navigate: (route: string) => void }>()
+    const isFocused = useIsFocused()
     const { theme } = useUnistyles()
     const themeColors = useProfileView(session.userId, undefined)?.themeColors
+    const isDark = themeColors
+        ? profileThemeName(themeColors[0]) === 'dark'
+        : theme.isDark
+
     return (
         // The gradient sits on a View, which draws it where a ScrollView does not.
         <View
@@ -22,6 +31,10 @@ export function YouTab() {
                 themeColors ? profileBackground(themeColors) : undefined,
             ]}
         >
+            {/* The status bar follows the profile's theme when open. */}
+            {isFocused && (
+                <SystemBars style={{ statusBar: isDark ? 'light' : 'dark' }} />
+            )}
             <ScrollView>
                 <UserProfile
                     userId={session.userId}
