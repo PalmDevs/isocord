@@ -71,6 +71,11 @@ class MediaViewerViewManager :
     view.bottomInset = value
   }
 
+  @ReactProp(name = "speed", defaultFloat = 1f)
+  override fun setSpeed(view: MediaViewerView, value: Float) {
+    view.speed = value
+  }
+
   override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> =
     listOf("IndexChange", "OverlayChange", "Closing", "Closed", "LinkPress").associate {
       "top$it" to mapOf("registrationName" to "on$it")

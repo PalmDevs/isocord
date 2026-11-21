@@ -12,6 +12,7 @@ import me.palmdevs.isocord.core.decodeEach
 object ViewerAction {
   const val OPTIONS = "options"
   const val ALT = "alt"
+  const val SPEED = "speed"
 }
 
 /** One picture or video in the viewer, as `ViewerSource` in src/features/mediaViewer/sources.ts sends it. */

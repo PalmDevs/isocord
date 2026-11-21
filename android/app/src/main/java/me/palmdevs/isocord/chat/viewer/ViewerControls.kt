@@ -15,16 +15,26 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.palmdevs.isocord.R
@@ -36,13 +46,19 @@ import me.palmdevs.isocord.chat.media.PlayIcon
 import me.palmdevs.isocord.chat.media.formatDuration
 
 /**
- * MediaSlider: play or pause, the time played, the timeline and the length, in white; then the mute toggle
- * (MediaPlayerMuteManager), which the reference keeps in the header.
+ * MediaSlider: play or pause, the time played, the timeline and the length, in white; then the speed picker
+ * and the mute toggle (MediaPlayerMuteManager), which the reference keeps in the header.
  */
 @Composable
-internal fun VideoControls(state: MediaState) {
+internal fun VideoControls(
+  state: MediaState,
+  speed: Float,
+  onSpeedPress: (Float, Float, Float, Float) -> Unit,
+) {
   val fonts = LocalChatFonts.current
+  val density = LocalDensity.current.density
   val time = TextStyle(color = Color.White, fontFamily = fonts.sans, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp)
+  var anchorCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -54,6 +70,24 @@ internal fun VideoControls(state: MediaState) {
     BasicText(formatDuration(state.positionMs), style = time)
     Timeline(state, Modifier.weight(1f))
     BasicText(formatDuration(state.durationMs), style = time)
+    Box(
+      Modifier
+        .size(40.dp)
+        .onGloballyPositioned { anchorCoordinates = it }
+        .clip(CircleShape)
+        .chatPress(onClick = {
+          val coords = anchorCoordinates
+          val pos = coords?.positionInWindow() ?: Offset.Zero
+          val size = coords?.size ?: IntSize.Zero
+          onSpeedPress(pos.x / density, pos.y / density, size.width / density, size.height / density)
+        }),
+      contentAlignment = Alignment.Center,
+    ) {
+      BasicText(
+        formatSpeed(speed),
+        style = TextStyle(color = Color.White, fontFamily = fonts.sans, fontWeight = FontWeight.SemiBold, fontSize = 13.sp),
+      )
+    }
     Box(Modifier.size(40.dp).clip(CircleShape).chatPress(onClick = { ViewerMute.muted = !ViewerMute.muted }), contentAlignment = Alignment.Center) {
       Image(
         painter = painterResource(if (ViewerMute.muted) R.drawable.ic_voice_x else R.drawable.ic_voice_normal),
@@ -64,6 +98,9 @@ internal fun VideoControls(state: MediaState) {
     }
   }
 }
+
+internal fun formatSpeed(speed: Float): String =
+  if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
 
 /** The timeline: white at 10% for the rest, white for what has played; tap or drag to seek. */
 @Composable

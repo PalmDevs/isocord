@@ -13,10 +13,15 @@ import { StyleSheet } from 'react-native-unistyles'
 import { useSession, useSessionStore } from '../../core/react'
 import { IconButton } from '../../design/components/buttons/IconButton'
 import { NAV_BAR_HEIGHT } from '../../design/components/layout/navBarHeight'
-import { ContextMenu } from '../../design/components/overlays/ContextMenu'
+import {
+    ContextMenu,
+    ContextMenuPanel,
+} from '../../design/components/overlays/ContextMenu'
+import { AnchoredPopover } from '../../design/components/overlays/Popover'
 import { BottomSheet } from '../../design/components/sheets/Sheet'
 import { SheetContext } from '../../design/components/sheets/sheetContext'
 import { Text } from '../../design/components/Text'
+import { Icon } from '../../design/icons/Icon'
 import { STANDARD_EASING } from '../../design/tokens/motion'
 import { t } from '../../i18n'
 import MediaViewerView from '../../native/MediaViewerViewNativeComponent'
@@ -33,9 +38,13 @@ import {
 import { openActionSheet, showSimpleActionSheet } from '../sheets'
 import { copyMediaLink, openMediaLink, saveMedia } from './actions'
 import { closeMediaViewer, mediaViewerStore } from './store'
+import type { AnchorRect } from '../../design/components/overlays/popoverHooks'
 import type { SimpleActionSheetOption } from '../../design/components/sheets/SimpleActionSheet'
 import type { ViewerSource } from './sources'
 import type { OpenMediaViewer } from './store'
+
+/** Available playback speed options in the viewer. */
+const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
 /** The sheet `openMediaViewer` opens. Drops itself once the viewer is closed or the account switched. */
 export function MediaViewerHost() {
@@ -129,6 +138,8 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
     const { closing: closeRequested, close } = useContext(SheetContext)
     const [headerShown, setHeaderShown] = useState(true)
     const [index, setIndex] = useState(open.initialIndex)
+    const [speed, setSpeed] = useState(1)
+    const [speedAnchor, setSpeedAnchor] = useState<AnchorRect | null>(null)
     const opened = open.messages[index] ?? open.messages[0]
     // Reactions added while the viewer is open show up when the message is one the chat has loaded.
     const latest = useSessionStore(messagesStore, state =>
@@ -201,6 +212,7 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
                 altLabel={t('chat.media.alt')}
                 closeRequested={closeRequested}
                 bottomInset={insets.bottom}
+                speed={speed}
                 onIndexChange={event => setIndex(event.nativeEvent.index)}
                 onOverlayChange={event => {
                     const { visible } = event.nativeEvent
@@ -220,6 +232,10 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
                     const { url } = event.nativeEvent
                     const link = parseChatLink(url)
                     if (link?.kind === 'viewer') {
+                        if (link.action === viewerAction.speed && link.origin) {
+                            setSpeedAnchor(link.origin)
+                            return
+                        }
                         if (link.action === viewerAction.options)
                             showSimpleActionSheet({
                                 key: 'media-viewer-options',
@@ -240,6 +256,26 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
                     })
                 }}
             />
+            {speedAnchor && (
+                <AnchoredPopover
+                    dim
+                    anchor={speedAnchor}
+                    align="above"
+                    minWidth={140}
+                    onClose={() => setSpeedAnchor(null)}
+                >
+                    <ContextMenuPanel
+                        items={SPEEDS.map(s => ({
+                            label: `${s}x`,
+                            trailingIndicator:
+                                s === speed ? (
+                                    <Icon name="CheckmarkSmallIcon" />
+                                ) : undefined,
+                            action: () => setSpeed(s),
+                        }))}
+                    />
+                </AnchoredPopover>
+            )}
             <Animated.View
                 pointerEvents={headerShown ? 'box-none' : 'none'}
                 style={[styles.header(insets), headerStyle]}

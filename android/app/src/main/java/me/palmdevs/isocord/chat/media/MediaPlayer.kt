@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,12 @@ class MediaState(val id: String) {
   var playing by mutableStateOf(false)
   var positionMs by mutableLongStateOf(0L)
   var durationMs by mutableLongStateOf(0L)
+  var speed by mutableFloatStateOf(1f)
+
+  fun setPlaybackSpeed(newSpeed: Float) {
+    speed = newSpeed
+    player?.setPlaybackSpeed(newSpeed)
+  }
 
   /** The user asked for playback; a player is created and kept (even when paused) until another clip takes over. */
   var requested by mutableStateOf(false)
@@ -91,6 +98,7 @@ fun rememberMedia(id: String, url: String): MediaState {
         true,
       )
       setMediaItem(MediaItem.fromUri(url))
+      setPlaybackSpeed(state.speed)
       playWhenReady = true
       prepare()
     }
@@ -132,6 +140,9 @@ fun rememberMedia(id: String, url: String): MediaState {
       delay(200)
     }
     state.positionMs = player.currentPosition
+  }
+  LaunchedEffect(player, state.speed) {
+    player?.setPlaybackSpeed(state.speed)
   }
   return state
 }

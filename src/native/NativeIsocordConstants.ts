@@ -45,7 +45,7 @@ export interface Spec extends TurboModule {
             footer: string
         }
         /** The media viewer's own link actions (`ViewerAction`). */
-        viewerAction: { options: string; alt: string }
+        viewerAction: { options: string; alt: string; speed: string }
         /** ChatInputNodeType of the reference, plus our markdown (`NodeType` in StyleBlocks.kt). */
         nodeType: {
             EMOJI_HIGHLIGHT: number

@@ -69,8 +69,12 @@ const isPollAction = (value: string | undefined): value is PollLinkAction =>
 
 /** The query of a media link: the tile the viewer grows out of. */
 const ORIGIN_QUERY = `${originParam}=`
-/** The media viewer's own actions: a long press on the media, the alt text button. */
-const viewerActions = [viewerAction.options, viewerAction.alt]
+/** The media viewer's own actions: a long press on the media, the alt text button, the speed picker. */
+const viewerActions = [
+    viewerAction.options,
+    viewerAction.alt,
+    viewerAction.speed,
+]
 
 /** A link tapped in a chat, a search list or the media viewer, decoded. */
 export type ChatLink =
@@ -144,11 +148,12 @@ export type ChatLink =
     | { kind: 'editGroup'; channelId: string }
     /** A whole search result. */
     | { kind: 'result'; channelId: string; messageId: string }
-    /** The media viewer's own: a long press on the media, the alt text button. */
+    /** The media viewer's own: a long press on the media, the alt text button, the speed picker. */
     | {
           kind: 'viewer'
           action: (typeof viewerActions)[number]
           index: number
+          origin?: MediaOrigin
       }
 
 export type EmbedTextPart = (typeof embedTextPart)[keyof typeof embedTextPart]
@@ -431,7 +436,12 @@ export function parseChatLink(url: string): ChatLink | undefined {
         case linkKind.viewer: {
             const action = viewerActions.find(known => known === first)
             return action
-                ? { kind: 'viewer', action, index: Number(second) }
+                ? {
+                      kind: 'viewer',
+                      action,
+                      index: Number(second),
+                      origin: originOf(query),
+                  }
                 : undefined
         }
         default:

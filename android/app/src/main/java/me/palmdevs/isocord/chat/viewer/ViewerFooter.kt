@@ -77,9 +77,11 @@ internal fun ViewerFooter(
   sources: List<ViewerSource>,
   selected: Int,
   player: MediaState?,
+  speed: Float,
   hidden: (Int) -> Boolean,
   onSelect: (Int) -> Unit,
   onAlt: () -> Unit,
+  onSpeed: (Float, Float, Float, Float) -> Unit,
   labels: ViewerLabels,
   bottomInset: Dp,
   modifier: Modifier,
@@ -111,7 +113,7 @@ internal fun ViewerFooter(
         .background(theme.background)
         .padding(top = 8.dp, bottom = 8.dp + bottomInset),
     ) {
-      if (player != null) VideoControls(player)
+      if (player != null) VideoControls(player, speed, onSpeed)
       if (message != null) {
         Row(Modifier.padding(horizontal = FOOTER_HORIZONTAL)) {
           MessageAvatar(message, AVATAR_SIZE)

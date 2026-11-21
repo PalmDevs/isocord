@@ -46,6 +46,7 @@ class MediaViewerView(context: Context) : FrameLayout(context) {
   var labels by mutableStateOf(ViewerLabels())
   var closeRequested by mutableStateOf(false)
   var bottomInset by mutableFloatStateOf(0f)
+  var speed by mutableFloatStateOf(1f)
 
   private var layoutPosted = false
 
@@ -94,6 +95,7 @@ class MediaViewerView(context: Context) : FrameLayout(context) {
               labels = labels,
               closeRequested = closeRequested,
               bottomInset = bottomInset.dp,
+              speed = speed,
               actions = viewerActions,
             )
           }

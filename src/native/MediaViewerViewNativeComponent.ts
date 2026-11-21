@@ -25,6 +25,8 @@ export interface NativeProps extends ViewProps {
     closeRequested?: boolean
     /** dp of system navigation below the footer. */
     bottomInset?: CodegenTypes.Float
+    /** Playback speed multiplier (e.g. 1.0, 1.5). */
+    speed?: CodegenTypes.Float
     onIndexChange?: CodegenTypes.DirectEventHandler<{
         index: CodegenTypes.Int32
     }>

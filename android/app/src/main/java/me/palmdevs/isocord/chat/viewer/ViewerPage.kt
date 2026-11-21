@@ -120,7 +120,7 @@ internal fun ViewerPage(
   LaunchedEffect(zoomed) { onZoomedChange(zoomed) }
   // A page left behind is shown unzoomed when it comes back.
   LaunchedEffect(active) { if (!active) zoomState.resetZoom(snap()) }
-  val zoomable = !isVideo && !hidden && progress() >= 1f
+  val zoomable = source.embedUrl == null && !hidden && progress() >= 1f
 
   BoxWithConstraints(
     Modifier

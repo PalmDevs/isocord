@@ -71,6 +71,7 @@ fun MediaViewer(
   labels: ViewerLabels,
   closeRequested: Boolean,
   bottomInset: Dp,
+  speed: Float,
   actions: ViewerActions,
 ) {
   if (sources.isEmpty()) return
@@ -91,6 +92,10 @@ fun MediaViewer(
   val revealed = remember { mutableStateMapOf(opening to true) }
   val players = remember { mutableStateMapOf<Int, MediaState>() }
   val zoomed = zoomedPages[pager.currentPage] == true
+
+  LaunchedEffect(speed) {
+    players.values.forEach { it.setPlaybackSpeed(speed) }
+  }
 
   LaunchedEffect(Unit) {
     entrance.animateTo(1f, tween(ViewerMotion.ENTRANCE_MS, easing = FastOutSlowInEasing))
@@ -147,6 +152,7 @@ fun MediaViewer(
         revealed = revealed,
         zoomedPages = zoomedPages,
         players = players,
+        speed = speed,
         actions = latest,
         onTap = { overlayEnabled = !overlayEnabled },
       )
@@ -160,9 +166,13 @@ fun MediaViewer(
         sources = sources,
         selected = current,
         player = players[current],
+        speed = speed,
         hidden = { sources[it].spoiler != null && revealed[it] != true },
         onSelect = { scope.launch { pager.animateScrollToPage(it) } },
         onAlt = { latest.onLinkPress("${Links.SCHEME}${LinkKind.VIEWER}/${ViewerAction.ALT}/$current") },
+        onSpeed = { x, y, w, h ->
+          latest.onLinkPress("${Links.SCHEME}${LinkKind.VIEWER}/${ViewerAction.SPEED}?${Links.ORIGIN_PARAM}=$x,$y,$w,$h")
+        },
         labels = labels,
         bottomInset = bottomInset,
         modifier = Modifier.align(Alignment.BottomCenter).overlayMotion(entrance, overlay),
@@ -185,6 +195,7 @@ private fun ViewerPager(
   revealed: SnapshotStateMap<Int, Boolean>,
   zoomedPages: SnapshotStateMap<Int, Boolean>,
   players: SnapshotStateMap<Int, MediaState>,
+  speed: Float,
   actions: ViewerActions,
   onTap: () -> Unit,
 ) {
@@ -210,7 +221,14 @@ private fun ViewerPager(
       onTap = onTap,
       onLongPress = { actions.onLinkPress("${Links.SCHEME}${LinkKind.VIEWER}/${ViewerAction.OPTIONS}/$page") },
       onZoomedChange = { zoomedPages[page] = it },
-      onPlayer = { state -> if (state != null) players[page] = state else players.remove(page) },
+      onPlayer = { state ->
+        if (state != null) {
+          state.setPlaybackSpeed(speed)
+          players[page] = state
+        } else {
+          players.remove(page)
+        }
+      },
       onLinkPress = actions.onLinkPress,
     )
   }

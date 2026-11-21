@@ -69,7 +69,7 @@ class ConstantsModule(context: ReactApplicationContext) : NativeIsocordConstants
       "fieldValue" to EmbedTextPart.FIELD_VALUE,
       "footer" to EmbedTextPart.FOOTER,
     ),
-    "viewerAction" to mapOf("options" to ViewerAction.OPTIONS, "alt" to ViewerAction.ALT),
+    "viewerAction" to mapOf("options" to ViewerAction.OPTIONS, "alt" to ViewerAction.ALT, "speed" to ViewerAction.SPEED),
     "nodeType" to mapOf(
       "EMOJI_HIGHLIGHT" to NodeType.EMOJI_HIGHLIGHT,
       "USER_HIGHLIGHT" to NodeType.USER_HIGHLIGHT,
