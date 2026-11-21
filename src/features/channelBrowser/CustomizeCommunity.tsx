@@ -1,10 +1,9 @@
-import { Image } from 'expo-image'
 import { useEffect } from 'react'
 import { ScrollView, View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
-import { emojiUrl } from '../../core/discord/cdn'
 import { useSession, useSessionStore } from '../../core/react'
 import { ActivityIndicator } from '../../design/components/ActivityIndicator'
+import { Emoji } from '../../design/components/Emoji'
 import { Text } from '../../design/components/Text'
 import {
     TableCheckboxRow,
@@ -34,8 +33,9 @@ const EMPTY_HEIGHT = 400
 function OptionEmoji({ emoji }: { emoji: OnboardingOption['emoji'] }) {
     if (emoji?.id)
         return (
-            <Image
-                source={emojiUrl(emoji.id, emoji.animated, EMOJI_SIZE * 2)}
+            <Emoji
+                emoji={emoji}
+                cdnSize={EMOJI_SIZE * 2}
                 style={styles.emojiImage}
             />
         )

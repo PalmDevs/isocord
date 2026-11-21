@@ -6,12 +6,12 @@ import { useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StyleSheet } from 'react-native-unistyles'
 import { Endpoint } from '../../../core/api/paths'
-import { emojiUrl } from '../../../core/discord/cdn'
 import { ReactionType } from '../../../core/discord/messages'
 import { useSession, useSessionStore } from '../../../core/react'
 import { ActivityIndicator } from '../../../design/components/ActivityIndicator'
 import { cdnSize } from '../../../design/components/avatars/avatarUrl'
 import { RipplePressable } from '../../../design/components/buttons/RipplePressable'
+import { Emoji } from '../../../design/components/Emoji'
 import { BottomSheet } from '../../../design/components/sheets/Sheet'
 import { SheetDrag } from '../../../design/components/sheets/SheetDrag'
 import { openActionSheet } from '../../../design/components/sheets/sheetStore'
@@ -135,12 +135,7 @@ export function showReactionsSheet(
 
 function EmojiGlyph({ emoji }: { emoji: ReactionEmoji }) {
     if (emoji.id) {
-        return (
-            <Image
-                source={emojiUrl(emoji.id, emoji.animated, 48)}
-                style={[styles.emoji, styles.emojiImage]}
-            />
-        )
+        return <Emoji emoji={emoji} style={[styles.emoji, styles.emojiImage]} />
     }
     return (
         <Text variant="text-md/medium" style={[styles.emoji, styles.emojiText]}>

@@ -1,4 +1,3 @@
-import { Image } from 'expo-image'
 import { memo, useEffect, useRef } from 'react'
 import { ScrollView } from 'react-native'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
@@ -11,6 +10,7 @@ import { StyleSheet } from 'react-native-unistyles'
 import { useSessionStore } from '../../../core/react'
 import { GuildIcon } from '../../../design/components/avatars/GuildIcon'
 import { RipplePressable } from '../../../design/components/buttons/RipplePressable'
+import { Emoji } from '../../../design/components/Emoji'
 import { Icon } from '../../../design/icons/Icon'
 import { guildsStore } from '../../../stores/guilds'
 import { usePanelSheet } from '../../chat/composer'
@@ -149,7 +149,7 @@ function RailIcon({ section }: { section: RailSection }) {
     const url =
         section.railImage ??
         (section.railEmoji ? twemojiUrl(section.railEmoji) : undefined)
-    return <Image source={url} style={styles.image} />
+    return <Emoji source={url} style={styles.image} />
 }
 
 const styles = StyleSheet.create(theme => ({

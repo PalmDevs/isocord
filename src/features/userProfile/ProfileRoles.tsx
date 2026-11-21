@@ -1,7 +1,7 @@
-import { Image } from 'expo-image'
 import { View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { useSessionStore } from '../../core/react'
+import { Emoji } from '../../design/components/Emoji'
 import { TagGroup } from '../../design/components/TagGroup'
 import { t } from '../../i18n'
 import { guildsStore } from '../../stores/guilds'
@@ -33,7 +33,7 @@ export function ProfileRoles({
                 label: role.name,
                 icon: <View style={styles.dot(role.color)} />,
                 trailing: icon && (
-                    <Image
+                    <Emoji
                         source={icon.url}
                         accessibilityLabel={icon.emoji}
                         style={styles.icon}

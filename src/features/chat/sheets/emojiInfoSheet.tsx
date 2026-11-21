@@ -1,9 +1,8 @@
-import { Image } from 'expo-image'
 import { View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
-import { emojiUrl } from '../../../core/discord/cdn'
 import { useSessionStore } from '../../../core/react'
 import { GuildIcon } from '../../../design/components/avatars/GuildIcon'
+import { Emoji } from '../../../design/components/Emoji'
 import { ActionSheet } from '../../../design/components/sheets/Sheet'
 import { openActionSheet } from '../../../design/components/sheets/sheetStore'
 import { Text } from '../../../design/components/Text'
@@ -11,7 +10,6 @@ import { t } from '../../../i18n'
 import { expressionsStore } from '../../../stores/expressions'
 import { guildsStore } from '../../../stores/guilds'
 import { loadUnicodeEmojis, surrogatesToShortcode } from '../../expressions'
-import { twemojiUrl } from '../emoji'
 
 /** A tapped emoji, decoded from its `emoji` link (chatLink.ts). */
 export type EmojiInfo =
@@ -31,16 +29,20 @@ export async function openEmojiInfo(emoji: EmojiInfo): Promise<void> {
 
 function EmojiInfoSheet({ emoji }: { emoji: EmojiInfo }) {
     const custom = emoji.kind === 'custom'
-    const src = custom
-        ? emojiUrl(emoji.id, emoji.animated, 96)
-        : twemojiUrl(emoji.text)
+    const emojiData = custom
+        ? { id: emoji.id, animated: emoji.animated }
+        : emoji.text
     const title = custom ? `:${emoji.name}:` : surrogatesToShortcode(emoji.text)
     return (
         <ActionSheet>
             {/* useSharedMessageEmojiStyles: a 40px emoji, 12 before the name and description. */}
             <View style={styles.row}>
-                {src ? (
-                    <Image source={src} style={styles.emoji} />
+                {emojiData ? (
+                    <Emoji
+                        emoji={emojiData}
+                        cdnSize={96}
+                        style={styles.emoji}
+                    />
                 ) : (
                     <Text variant="text-md/medium" style={styles.surrogate}>
                         {custom ? '' : emoji.text}

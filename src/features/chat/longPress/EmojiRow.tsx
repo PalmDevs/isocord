@@ -1,8 +1,8 @@
-import { Image } from 'expo-image'
 import { useEffect, useMemo, useState } from 'react'
 import { useWindowDimensions, View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useSession, useSessionStore } from '../../../core/react'
+import { Emoji } from '../../../design/components/Emoji'
 import { Icon } from '../../../design/icons/Icon'
 import { t } from '../../../i18n'
 import { frecencyStore, loadFrecency } from '../../../stores/frecency'
@@ -100,9 +100,9 @@ export function EmojiRow({ channelId, onPressEmoji, onPressPicker }: Props) {
                     style={styles.button(container)}
                 >
                     {emoji && (
-                        <Image
+                        <Emoji
                             source={emojiImageUrl(emoji, false)}
-                            style={styles.emoji(mobile.EMOJI_ROW_EMOJI_SIZE)}
+                            size={mobile.EMOJI_ROW_EMOJI_SIZE}
                         />
                     )}
                 </PressableOpacity>

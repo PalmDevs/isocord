@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from 'react'
 import { ScrollView, View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { Endpoint } from '../../../core/api/paths'
-import { emojiUrl } from '../../../core/discord/cdn'
 import { useSession, useSessionStore } from '../../../core/react'
 import { ActivityIndicator } from '../../../design/components/ActivityIndicator'
 import { cdnSize } from '../../../design/components/avatars/avatarUrl'
 import { RipplePressable } from '../../../design/components/buttons/RipplePressable'
+import { Emoji } from '../../../design/components/Emoji'
 import { BottomSheet } from '../../../design/components/sheets/Sheet'
 import { openActionSheet } from '../../../design/components/sheets/sheetStore'
 import { Text } from '../../../design/components/Text'
@@ -50,13 +50,7 @@ export function openPollVoters(
 
 /** PollEmoji: a custom emoji's image, or the Unicode character. */
 function AnswerEmoji({ emoji }: { emoji: Answer['poll_media']['emoji'] }) {
-    if (emoji?.id)
-        return (
-            <Image
-                source={emojiUrl(emoji.id, emoji.animated, 48)}
-                style={styles.emoji}
-            />
-        )
+    if (emoji?.id) return <Emoji emoji={emoji} style={styles.emoji} />
     if (emoji?.name) return <Text variant="text-md/medium">{emoji.name}</Text>
     return null
 }

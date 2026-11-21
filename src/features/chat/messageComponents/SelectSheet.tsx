@@ -112,6 +112,7 @@ function OptionIcon({ option }: { option: SelectOption }) {
         return (
             <Image
                 source={option.emojiUrl}
+                contentFit={option.round ? 'cover' : 'contain'}
                 style={[styles.icon, option.round && styles.round]}
             />
         )

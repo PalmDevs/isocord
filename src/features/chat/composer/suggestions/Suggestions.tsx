@@ -12,11 +12,11 @@ import Animated, {
 } from 'react-native-reanimated'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { scheduleOnRN } from 'react-native-worklets'
-import { emojiUrl } from '../../../../core/discord/cdn'
 import { StickerFormat } from '../../../../core/discord/expressionTypes'
 import { useSession, useSessionStore } from '../../../../core/react'
 import { Avatar } from '../../../../design/components/avatars/Avatar'
 import { RipplePressable } from '../../../../design/components/buttons/RipplePressable'
+import { Emoji } from '../../../../design/components/Emoji'
 import { Text } from '../../../../design/components/Text'
 import { Icon } from '../../../../design/icons/Icon'
 import {
@@ -62,10 +62,7 @@ const emojiName = (emoji: SearchEmoji) =>
 
 function EmojiGlyph({ emoji }: { emoji: SearchEmoji }) {
     return emoji.type === 'custom' ? (
-        <Image
-            source={emojiUrl(emoji.id, emoji.animated, 48)}
-            style={styles.emoji}
-        />
+        <Emoji emoji={emoji} style={styles.emoji} />
     ) : (
         <Text variant="text-lg/normal">{emoji.surrogates}</Text>
     )
@@ -500,12 +497,11 @@ export function Suggestions({
                                         accessibilityLabel={`:${emojiName(item.emoji)}:`}
                                         onPress={() => pick(item)}
                                     >
-                                        <Image
+                                        <Emoji
                                             source={emojiImageUrl(
                                                 item.emoji,
                                                 animate,
                                             )}
-                                            contentFit="contain"
                                             style={styles.barEmoji}
                                         />
                                     </RipplePressable>

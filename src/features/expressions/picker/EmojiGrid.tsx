@@ -1,10 +1,10 @@
-import { Image } from 'expo-image'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { useSession, useSessionStore } from '../../../core/react'
 import { ToggleIconButton } from '../../../design/components/buttons/IconButton'
 import { RipplePressable } from '../../../design/components/buttons/RipplePressable'
+import { Emoji } from '../../../design/components/Emoji'
 import { Text } from '../../../design/components/Text'
 import { t } from '../../../i18n'
 import { expressionGrid } from '../../../native/NativeIsocordConstants'
@@ -345,7 +345,7 @@ export function SkinToneSelector({ onDone }: { onDone?: () => void }) {
                             onDone?.()
                         }}
                     >
-                        <Image source={url} style={styles.railEmoji} />
+                        <Emoji source={url} style={styles.railEmoji} />
                     </RipplePressable>
                 )
             })}
@@ -378,8 +378,8 @@ export function TonePickerButton({
             onPress={onPress}
             accessibilityLabel={t('expressions.skinTone')}
             icon={
-                <Image
-                    source={twemojiUrl(`\u{1F44B}${tone ?? ''}`)}
+                <Emoji
+                    emoji={`\u{1F44B}${tone ?? ''}`}
                     style={styles.toneImage}
                 />
             }

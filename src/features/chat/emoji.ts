@@ -1,4 +1,7 @@
-import { parse, toCodePoints } from '@twemoji/parser'
+import { parse } from '@twemoji/parser'
+import { twemojiUrl } from '../../core/discord/twemoji'
+
+export { twemojiUrl }
 
 /**
  * Twemoji art bundled as APK assets (`scripts/fetch-twemoji.sh`), as the reference does
@@ -7,17 +10,6 @@ import { parse, toCodePoints } from '@twemoji/parser'
  */
 const buildUrl = (codepoints: string) =>
     `file:///android_asset/twemoji/${codepoints}.png`
-
-/**
- * The image of one emoji, without parsing, so text-presentation ones (©, ®, ™) the picker lists get theirs too.
- * Twemoji drops U+FE0F from file names unless the sequence has a zero-width joiner.
- */
-export const twemojiUrl = (emoji: string) =>
-    buildUrl(
-        toCodePoints(
-            emoji.includes('\u200d') ? emoji : emoji.replaceAll('\ufe0f', ''),
-        ).join('-'),
-    )
 
 interface EmojiPart {
     text: string
