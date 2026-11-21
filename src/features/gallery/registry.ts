@@ -8,6 +8,7 @@ import {
 } from './pages/Buttons'
 import { FormPrimitivesPage } from './pages/FormPrimitives'
 import { InAppNotificationPage } from './pages/InAppNotification'
+import { LayerOrderPage } from './pages/LayerOrder'
 import {
     ActivityIndicatorPage,
     AnimatedEnterExitItemPage,
@@ -91,6 +92,7 @@ export const galleryGroups: GalleryGroup[] = [
             page('Coachmark', CoachmarkPage),
             page('Toast', ToastPage),
             page('In-App Notification', InAppNotificationPage),
+            page('Layer Order', LayerOrderPage),
         ],
     },
     {
