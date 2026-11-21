@@ -41,11 +41,11 @@ export function PlaintextFilePreviewScreen() {
                                 trailingIndicator: wordWrap ? (
                                     <Icon name="CheckmarkSmallIcon" />
                                 ) : undefined,
-                                action: () => setWordWrap(wrap => !wrap),
+                                onPress: () => setWordWrap(wrap => !wrap),
                             },
                             {
                                 label: t('filePreview.download'),
-                                action: () =>
+                                onPress: () =>
                                     void Linking.openURL(url).catch(() => {}),
                             },
                         ]}

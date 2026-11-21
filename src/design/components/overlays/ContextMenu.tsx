@@ -21,6 +21,8 @@ export interface ContextMenuItemDef {
     label: string
     /** Runs after the menu has closed. */
     action?: () => void
+    /** Runs immediately when tapped, before the menu begins closing. */
+    onPress?: () => void
     /** Shown before the label. */
     icon?: IconName
     /** Shown at the end of the row, e.g. a checkmark for a selected option. */
@@ -165,7 +167,10 @@ function ContextMenuItem({
             accessibilityRole={item.accessibilityRole ?? 'menuitem'}
             accessibilityLabel={item.label}
             accessibilityState={item.accessibilityState}
-            onPress={() => close(item.action)}
+            onPress={() => {
+                item.onPress?.()
+                close(item.action)
+            }}
             style={({ pressed }) => [
                 styles.item(pressed),
                 !last && !item.divider && styles.border,

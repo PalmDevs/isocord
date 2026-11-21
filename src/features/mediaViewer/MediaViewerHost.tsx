@@ -271,7 +271,7 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
                                 s === speed ? (
                                     <Icon name="CheckmarkSmallIcon" />
                                 ) : undefined,
-                            action: () => setSpeed(s),
+                            onPress: () => setSpeed(s),
                         }))}
                     />
                 </AnchoredPopover>
