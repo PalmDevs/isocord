@@ -46,6 +46,7 @@ export function Pages({
     const {
         activeIndex,
         selectedIndex,
+        targetIndex,
         paged,
         pagerRef,
         onPageSelected,
@@ -97,6 +98,7 @@ export function Pages({
     const onPageScroll = useEvent(
         (event: { position: number; offset: number }) => {
             'worklet'
+            if (targetIndex.get() >= 0) return
             activeIndex.set(event.position + event.offset)
         },
         ['onPageScroll'],

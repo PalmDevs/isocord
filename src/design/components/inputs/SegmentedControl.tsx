@@ -53,6 +53,7 @@ export function SegmentedControl({
     const {
         items,
         activeIndex,
+        targetIndex,
         pressedIndex,
         selectedIndex,
         setActiveIndex,
@@ -92,9 +93,10 @@ export function SegmentedControl({
         return {
             transform: [
                 {
-                    translateX: animate
-                        ? withSpring(translateX, INDICATOR_SPRING)
-                        : translateX,
+                    translateX:
+                        animate && targetIndex.get() < 0
+                            ? withSpring(translateX, INDICATOR_SPRING)
+                            : translateX,
                 },
                 { scaleX: withSpring(scaleX, INDICATOR_SPRING) },
             ],

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { useSharedValue } from 'react-native-reanimated'
+import { useSharedValue, withSpring } from 'react-native-reanimated'
+import { INDICATOR_SPRING } from '../../tokens/motion'
 import type { RefObject } from 'react'
 import type { PagerViewRef } from 'react-native-pager-view'
 import type { SharedValue } from 'react-native-reanimated'
@@ -13,6 +14,8 @@ export interface PagerState {
     setActiveIndex: (index: number) => void
     /** True while a `Pages` view is attached. */
     paged: SharedValue<boolean>
+    /** Target index while animating to a tapped page, or -1. */
+    targetIndex: SharedValue<number>
     pagerRef: RefObject<PagerViewRef | null>
     onPageSelected: (index: number) => void
     onDragStart: () => void
@@ -28,6 +31,7 @@ export function usePagerState({
 }): PagerState {
     const activeIndex = useSharedValue(defaultIndex)
     const paged = useSharedValue(false)
+    const targetIndex = useSharedValue(-1)
     const pagerRef = useRef<PagerViewRef>(null)
     const [selectedIndex, setSelectedIndex] = useState(defaultIndex)
     const selected = useRef(defaultIndex)
@@ -45,15 +49,23 @@ export function usePagerState({
 
     const setActiveIndex = useCallback(
         (index: number) => {
+            if (selected.current === index && targetIndex.get() < 0) return
+            target.current = index
+            targetIndex.set(index)
+            activeIndex.set(
+                withSpring(index, INDICATOR_SPRING, finished => {
+                    'worklet'
+                    if (finished && targetIndex.get() === index) {
+                        targetIndex.set(-1)
+                    }
+                }),
+            )
             if (paged.get()) {
-                target.current = index
                 pagerRef.current?.setPage(index)
-            } else {
-                activeIndex.set(index)
             }
             commit(index)
         },
-        [activeIndex, paged, commit],
+        [activeIndex, paged, targetIndex, commit],
     )
 
     // While animating to a tapped page the pager reports every page it passes; only the target counts.
@@ -61,14 +73,16 @@ export function usePagerState({
         (index: number) => {
             if (target.current != null && target.current !== index) return
             target.current = null
+            targetIndex.set(-1)
             commit(index)
         },
-        [commit],
+        [targetIndex, commit],
     )
 
     const onDragStart = useCallback(() => {
         target.current = null
-    }, [])
+        targetIndex.set(-1)
+    }, [targetIndex])
 
     // State object keeps its identity: it feeds contexts and native props.
     return useMemo(
@@ -77,6 +91,7 @@ export function usePagerState({
             selectedIndex,
             setActiveIndex,
             paged,
+            targetIndex,
             pagerRef,
             onPageSelected,
             onDragStart,
@@ -86,6 +101,7 @@ export function usePagerState({
             selectedIndex,
             setActiveIndex,
             paged,
+            targetIndex,
             onPageSelected,
             onDragStart,
         ],
