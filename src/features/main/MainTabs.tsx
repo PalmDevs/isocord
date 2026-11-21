@@ -32,6 +32,7 @@ import { serversUiStore } from '../servers/store'
 import { useServersPanels } from '../servers/useServersPanels'
 import { useSharedContent } from '../share'
 import { YouTab } from '../you/YouTab'
+import { resolveInitialTab, saveLastTab } from './lastTab'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import type { IconName } from '../../design/icons/Icon'
 import type { MessageKey } from '../../i18n'
@@ -170,6 +171,11 @@ function TabButton({
 }
 
 function TabBar({ state, navigation }: BottomTabBarProps) {
+    const session = useSession()
+    const active = state.routes[state.index]?.name
+    useEffect(() => {
+        saveLastTab(session.storage, active)
+    }, [active, session])
     return (
         <View style={styles.bar}>
             {state.routes.map((route, index) => (
@@ -291,6 +297,7 @@ function ChannelOpener() {
 
 /** The four main tabs. Replaces the reference client's floating "You bar" with a plain tab bar. */
 export function MainTabs() {
+    const session = useSession()
     useEffect(endMainWait, [])
     useEffect(hideSplashAfterFrame, [])
     return (
@@ -301,6 +308,8 @@ export function MainTabs() {
                 {/* The Notifications tab's message preview slides over the tab bar too, under the chat panels. */}
                 <SearchPreviewHost onDismiss={NOOP} closeOnJump>
                     <Tab.Navigator
+                        key={session.userId}
+                        initialRouteName={resolveInitialTab(session.storage)}
                         tabBar={renderTabBar}
                         screenOptions={{ headerShown: false }}
                     >
