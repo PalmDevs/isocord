@@ -104,7 +104,6 @@ export function ToastHost() {
     const frontDrag = useSharedValue(0)
     const visible = toasts.slice(0, MAX_VISIBLE_TOASTS)
     const frontKey = visible[0]?.key
-    const frontToast = visible[0]
     // A new front card starts undragged. Layout effects run children first, so the cards already know their
     // new places when this resets.
     useLayoutEffect(() => {
@@ -112,13 +111,7 @@ export function ToastHost() {
     }, [frontKey, frontDrag])
 
     return (
-        <View
-            pointerEvents="box-none"
-            style={[
-                NativeStyleSheet.absoluteFill,
-                frontToast ? { zIndex: frontToast.order } : undefined,
-            ]}
-        >
+        <View pointerEvents="box-none" style={styles.container}>
             {visible.map((toast, index) => (
                 <ToastCard
                     key={toast.key}
@@ -337,7 +330,7 @@ function ToastCard({
                 {
                     top: insets.top + MARGIN,
                     paddingHorizontal: MARGIN,
-                    zIndex: MAX_VISIBLE_TOASTS - index,
+                    zIndex: toast.order + (MAX_VISIBLE_TOASTS - index),
                 },
             ]}
         >
@@ -393,6 +386,12 @@ function ToastCard({
 }
 
 const styles = StyleSheet.create(theme => ({
+    container: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+    },
     layer: {
         position: 'absolute',
         left: 0,

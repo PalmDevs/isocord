@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-    AccessibilityInfo,
-    StyleSheet as NativeStyleSheet,
-    View,
-} from 'react-native'
+import { AccessibilityInfo, View } from 'react-native'
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler'
 import Animated, {
     cancelAnimation,
@@ -76,14 +72,7 @@ export function InAppNotificationHost() {
         state => state.current,
     )
     if (!current) return null
-    return (
-        <View
-            pointerEvents="box-none"
-            style={[NativeStyleSheet.absoluteFill, { zIndex: current.order }]}
-        >
-            <NotificationCard key={current.key} notification={current} />
-        </View>
-    )
+    return <NotificationCard key={current.key} notification={current} />
 }
 
 /**
@@ -219,7 +208,10 @@ function NotificationCard({
         <Animated.View
             exiting={reducedMotion ? undefined : EXITING}
             pointerEvents="box-none"
-            style={[styles.container, { top: insets.top + 8 }]}
+            style={[
+                styles.container,
+                { top: insets.top + 8, zIndex: notification.order },
+            ]}
         >
             <GestureDetector gesture={pan}>
                 <Animated.View pointerEvents="box-none" style={containerStyle}>
