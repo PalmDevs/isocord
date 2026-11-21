@@ -65,13 +65,17 @@ private fun guildIconUrl(id: String, icon: String?): String? = icon?.let { "${Di
 
 /**
  * NotificationDataUtils.getIconUrl for MESSAGE_CREATE: the author's avatar in a DM, the group icon in a group DM,
- * the server icon elsewhere. The reference leaves stage channels without one. Here every server channel has it.
+ * the server icon elsewhere. Falls back to the author's avatar when a group or server lacks an icon.
  */
 private fun conversationIconUrl(channel: ChannelInfo, guild: GuildInfo?, author: RawUser): String? =
   when {
     channel.type == ChannelType.DM -> avatarUrl(author.id, author.avatar, author.discriminator)
-    channel.isPrivate -> channel.icon?.let { "${Discord.CDN_BASE}/channel-icons/${channel.id}/$it.png?size=$AVATAR_PX" }
-    else -> channel.guildId?.let { guildIconUrl(it, guild?.icon) }
+    channel.isPrivate ->
+      channel.icon?.let { "${Discord.CDN_BASE}/channel-icons/${channel.id}/$it.png?size=$AVATAR_PX" }
+        ?: avatarUrl(author.id, author.avatar, author.discriminator)
+    else ->
+      channel.guildId?.let { guildIconUrl(it, guild?.icon) }
+        ?: avatarUrl(author.id, author.avatar, author.discriminator)
   }
 
 fun describe(message: RawMessage, channel: ChannelInfo, state: NotificationState, account: AccountConfig): Incoming {
@@ -296,6 +300,7 @@ fun eventAlert(event: ScheduledEvent, state: NotificationState, account: Account
     title = event.name,
     text = account.string("happeningNow"),
     subText = state.guilds[event.guild_id]?.name,
+    iconUrl = guildIconUrl(event.guild_id, state.guilds[event.guild_id]?.icon),
     link = event.channel_id?.let { Links.channel(event.guild_id, it) },
     interestIn = EventRef(event.guild_id, event.id),
   )

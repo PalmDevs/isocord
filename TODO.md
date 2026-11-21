@@ -26,7 +26,7 @@ Design rule (2026-11-17): keep the chat consistent with itself. Use the referenc
   - [x] Stray KDoc line above `TypingInsetSpring` in `ChatList.kt`; unused `combinedClickable` import in `ReplyPreview.kt`.
   - [x] Notifications: server, group DM or DM icon as the large (conversation) icon, as `NotificationDataUtils.getIconUrl` does. Fixes the blank "dot" in threads and posts. The reference has no per-channel-type icons; announcement and voice text just lacked the server icon. `forward.ts` sends the icons too. Built 2026-11-18, untested on device.
   - [x] Notifications: Reply only where the account may send (`getDirectReplyAction`'s `canReply`, which Discord's push carries). Worked out natively (`ChannelPermissions.kt`, canSendMessages over computePermissions), from READY and role/channel events in the background, from `forward.ts`'s guild roles and overwrites in front. Not done: the reference's app-DM exclusion, timeouts. Built 2026-11-18, untested on device.
-    - [ ] Publish conversation shortcuts (`getShortcutInfo`); default group DM icons for groups without one. Stage channels get the server icon (the reference gives none).
+    - [x] Publish conversation shortcuts (`getShortcutInfo`); default group DM icons for groups without one. Stage channels get the server icon (the reference gives none).
   - [x] Replied message area: no ripple, long press consumed (doesn't open the message's actions). Built 2026-11-18, untested on device.
   - [x] Reaction pills scale in and out (200 ms, shares `REACTIONS_RESIZE_MS`). Built 2026-11-18, untested on device.
   - [x] Welcome row icons (`ChatBeginningRowIcon`): text, thread, post. Built 2026-11-18, untested on device.

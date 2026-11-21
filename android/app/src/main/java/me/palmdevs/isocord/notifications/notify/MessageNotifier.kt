@@ -26,6 +26,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.content.FileProvider
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.facebook.react.modules.network.OkHttpClientProvider
 import java.io.File
@@ -259,6 +261,7 @@ object MessageNotifier {
       for (shown in context.getSystemService(NotificationManager::class.java).activeNotifications)
         if (shown.id == ALERT_ID) manager.cancel(shown.tag, ALERT_ID)
       File(context.cacheDir, IMAGE_DIR).deleteRecursively()
+      ShortcutManagerCompat.removeAllDynamicShortcuts(context)
     }
 
   private fun clear(context: Context, channelId: String) {
@@ -367,17 +370,20 @@ object MessageNotifier {
   fun cancelAlert(context: Context, tag: String) =
     work(context) { NotificationManagerCompat.from(context).cancel(tag, ALERT_ID) }
 
-  private fun openIntent(context: Context, link: String?, code: Int): PendingIntent {
+  private fun openActivityIntent(context: Context, link: String?): Intent {
     val intent =
       if (link != null) Intent(Intent.ACTION_VIEW, Uri.parse(link), context, MainActivity::class.java)
       else Intent(context, MainActivity::class.java)
-    return PendingIntent.getActivity(
+    return intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+  }
+
+  private fun openIntent(context: Context, link: String?, code: Int): PendingIntent =
+    PendingIntent.getActivity(
       context,
       code,
-      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+      openActivityIntent(context, link),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
-  }
 
   private fun show(context: Context, conversation: Conversation, alert: Boolean) {
     val account = NotificationPrefs.account(context) ?: return
@@ -388,6 +394,7 @@ object MessageNotifier {
     val style = NotificationCompat.MessagingStyle(me)
     if (conversation.isGroup) style.conversationTitle = conversation.title
     style.isGroupConversation = conversation.isGroup
+    var lastSenderPerson: Person? = null
     for (entry in conversation.entries) {
       val person =
         entry.authorId?.let { id ->
@@ -397,6 +404,7 @@ object MessageNotifier {
             .apply { entry.avatarUrl?.let { url -> avatar(url)?.let { setIcon(IconCompat.createWithBitmap(it)) } } }
             .build()
         }
+      if (entry === last && person != null) lastSenderPerson = person
       val message = NotificationCompat.MessagingStyle.Message(entry.text, entry.time, person)
       entry.image?.let { file ->
         val uri = imageUri(context, file)
@@ -429,12 +437,27 @@ object MessageNotifier {
         .setShowsUserInterface(false)
         .build()
 
+    val iconBitmap = (conversation.iconUrl ?: last.avatarUrl)?.let { avatar(it) }
+    val shortcutLabel = (conversation.title ?: last.authorName).takeIf { it.isNotBlank() } ?: account.string("channelMessages")
+    val shortcut =
+      ShortcutInfoCompat.Builder(context, channelId)
+        .setShortLabel(shortcutLabel)
+        .setLongLived(true)
+        .setIntent(openActivityIntent(context, link))
+        .apply {
+          iconBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) }
+          setPerson(lastSenderPerson ?: me)
+        }
+        .setCategories(setOf("android.shortcut.conversation"))
+        .build()
+    ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+
     val notification =
       NotificationCompat.Builder(context, conversation.notificationChannel)
         .setSmallIcon(R.drawable.ic_notification_message)
         .setStyle(style)
-        // Without it a group conversation shows a blank circle beside a lone sender.
-        .setLargeIcon(conversation.iconUrl?.let { avatar(it) })
+        .setShortcutInfo(shortcut)
+        .setLargeIcon(iconBitmap)
         .setCategory(NotificationCompat.CATEGORY_MESSAGE)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setWhen(last.time)
