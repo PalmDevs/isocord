@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
-import { AccessibilityInfo, View } from 'react-native'
+import {
+    AccessibilityInfo,
+    StyleSheet as NativeStyleSheet,
+    View,
+} from 'react-native'
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler'
 import Animated, {
     cancelAnimation,
@@ -72,7 +76,14 @@ export function InAppNotificationHost() {
         state => state.current,
     )
     if (!current) return null
-    return <NotificationCard key={current.key} notification={current} />
+    return (
+        <View
+            pointerEvents="box-none"
+            style={[NativeStyleSheet.absoluteFill, { zIndex: current.order }]}
+        >
+            <NotificationCard key={current.key} notification={current} />
+        </View>
+    )
 }
 
 /**

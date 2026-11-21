@@ -2,6 +2,7 @@ import { createStore } from 'zustand/vanilla'
 import { ChannelType } from '../../core/discord/channelType'
 import { compareSnowflakes } from '../../core/discord/snowflake'
 import { defineStore } from '../../core/session'
+import { nextInAppNotificationOrder } from '../../design/components/overlays/modalOrder'
 import { t } from '../../i18n'
 import { computeChannelName } from '../../stores/channels/channelName'
 import {
@@ -40,6 +41,8 @@ export interface InAppNotification {
     row: string
     /** "Received message from {userName}: {message}", announced when it shows. */
     announcement: string
+    /** Place among open overlays, from `nextInAppNotificationOrder`. */
+    order: number
 }
 
 interface InAppNotificationsState {
@@ -72,13 +75,14 @@ export function showingChannel(
 
 /** Takes the notification off screen and brings in the next one, if it is still the one showing. */
 export function dismissInAppNotification(session: Session, key: string): void {
-    session
-        .get(inAppNotificationsStore)
-        .setState(state =>
-            state.current?.key === key
-                ? { current: state.queue[0], queue: state.queue.slice(1) }
-                : state,
-        )
+    session.get(inAppNotificationsStore).setState(state => {
+        if (state.current?.key !== key) return state
+        const next = state.queue[0]
+        const current = next
+            ? { ...next, order: nextInAppNotificationOrder() }
+            : undefined
+        return { current, queue: state.queue.slice(1) }
+    })
 }
 
 function locationOf(
@@ -130,6 +134,7 @@ function build(
             userName: authorName,
             message: previewText(message) ?? '',
         }),
+        order: nextInAppNotificationOrder(),
     }
 }
 
@@ -189,8 +194,13 @@ export const inAppNotificationsStore = defineStore(
                 compareSnowflakes(notification.messageId, ack.message_id) <= 0
             store.setState(state => {
                 const queue = state.queue.filter(item => !covered(item))
-                if (state.current && covered(state.current))
-                    return { current: queue[0], queue: queue.slice(1) }
+                if (state.current && covered(state.current)) {
+                    const next = queue[0]
+                    const current = next
+                        ? { ...next, order: nextInAppNotificationOrder() }
+                        : undefined
+                    return { current, queue: queue.slice(1) }
+                }
                 return queue.length === state.queue.length ? state : { queue }
             })
         })
