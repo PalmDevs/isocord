@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { nextToastOrder } from './modalOrder'
 import type { IconName } from '../../icons/Icon'
 import type { SemanticColor } from '../../tokens'
 
@@ -26,6 +27,8 @@ export interface ToastOptions {
 
 export interface ToastEntry extends ToastOptions {
     key: string
+    /** Place among open overlays, from `nextToastOrder`. */
+    order: number
     /** Bumped each time the key is shown again, so the host restarts the timer and re-announces. */
     revision: number
 }
@@ -48,14 +51,17 @@ let counter = 0
  */
 export function showToast(options: ToastOptions): string {
     const key = options.key ?? `toast-${++counter}`
+    const order = nextToastOrder()
     useToastStore.setState(({ toasts }) => {
         const index = toasts.findIndex(toast => toast.key === key)
         if (index === -1)
-            return { toasts: [...toasts, { ...options, key, revision: 0 }] }
+            return {
+                toasts: [...toasts, { ...options, key, revision: 0, order }],
+            }
         return {
             toasts: toasts.map((toast, i) =>
                 i === index
-                    ? { ...options, key, revision: toast.revision + 1 }
+                    ? { ...options, key, revision: toast.revision + 1, order }
                     : toast,
             ),
         }
