@@ -88,7 +88,7 @@ export function AlertPile({
         >
             <Backdrop
                 animated
-                onDismiss={top.dismissable === false ? undefined : dismissTop}
+                onDismiss={top.dismissable === false ? () => {} : dismissTop}
             />
             <Dialog onDismiss={dismissTop}>
                 {visible.map((alert, index) => (
