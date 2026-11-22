@@ -49,6 +49,8 @@ private val MESSAGES_BOTTOM = 16.dp
 /** How long a group takes to open or close. Matches a message's reactions resize. */
 private const val REVEAL_MS = REACTIONS_RESIZE_MS
 
+private val HIDDEN_BACKGROUND_OPACITY = 0.25f
+
 /**
  * BlockedMessageGroupView: "N blocked messages" in a muted label. A tap opens the messages under it on a filled,
  * rounded background. Opening and closing animate the height, the fill and the messages' fade.
@@ -60,7 +62,7 @@ fun HiddenGroupRow(row: ChatRow.HiddenGroup) {
   val actions = LocalChatActions.current
   val spec = tween<Float>(REVEAL_MS, easing = FastOutSlowInEasing)
   val fill by animateColorAsState(
-    if (row.revealed) theme.hiddenGroupBackground else theme.hiddenGroupBackground.copy(alpha = .1f),
+    if (row.revealed) theme.hiddenGroupBackground else theme.hiddenGroupBackground.copy(alpha = HIDDEN_BACKGROUND_OPACITY),
     tween(REVEAL_MS, easing = FastOutSlowInEasing),
     label = "hiddenGroupFill",
   )
