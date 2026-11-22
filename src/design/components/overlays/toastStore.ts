@@ -1,9 +1,6 @@
 import { create } from 'zustand'
 import { nextToastOrder } from './modalOrder'
-import {
-    resolveScopedButtonTheme,
-    resolveScopedTheme,
-} from './scopedTheme'
+import { resolveScopedButtonTheme, resolveScopedTheme } from './scopedTheme'
 import type { UnistylesThemes } from 'react-native-unistyles'
 import type { IconName } from '../../icons/Icon'
 import type { SemanticColor } from '../../tokens'
@@ -82,9 +79,7 @@ export function showToast(options: ToastOptions): string {
                           revision: toast.revision + 1,
                           order,
                           theme:
-                              options.theme === undefined
-                                  ? toast.theme
-                                  : theme,
+                              options.theme === undefined ? toast.theme : theme,
                           buttonTheme:
                               options.buttonTheme === undefined
                                   ? toast.buttonTheme

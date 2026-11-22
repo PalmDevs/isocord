@@ -146,8 +146,7 @@ export function blendColors(
     const g = Math.round((og * a + bg * ba * (1 - a)) / outAlpha)
     const b = Math.round((ob * a + bb * ba * (1 - a)) / outAlpha)
     const roundedAlpha = Number(outAlpha.toFixed(ALPHA_DECIMALS))
-    if (!preserveBrightness || ba === 0)
-        return format([r, g, b, roundedAlpha])
+    if (!preserveBrightness || ba === 0) return format([r, g, b, roundedAlpha])
 
     const [targetL] = toLab([br, bg, bb, ba])
     const [, blendedA, blendedB] = toLab([r, g, b, outAlpha])

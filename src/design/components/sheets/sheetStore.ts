@@ -61,8 +61,7 @@ export function openActionSheet(
                 node,
                 closing: false,
                 order: nextModalOrder(),
-                theme:
-                    options?.theme === undefined ? existing.theme : theme,
+                theme: options?.theme === undefined ? existing.theme : theme,
                 buttonTheme:
                     options?.buttonTheme === undefined
                         ? existing.buttonTheme
