@@ -1,18 +1,7 @@
-import { Pressable, View } from 'react-native'
-import Animated, {
-    interpolateColor,
-    useAnimatedStyle,
-    useDerivedValue,
-    useSharedValue,
-    withSpring,
-} from 'react-native-reanimated'
+import { View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
-import { ON_PRESS_SPRING } from '../../tokens/motion'
-import type {
-    GestureResponderEvent,
-    PressableProps,
-    ViewProps,
-} from 'react-native'
+import { RipplePressable } from '../buttons/RipplePressable'
+import type { PressableProps, ViewProps } from 'react-native'
 import type { SemanticColor } from '../../tokens'
 
 export type CardVariant =
@@ -40,36 +29,21 @@ export interface CardProps extends ViewProps {
     end?: boolean
     /** Corner radius; defaults to the CARD_DEFAULT_RADIUS token. */
     radius?: number
-    /** Makes the card pressable, with an animated background. */
+    /** Makes the card pressable, with a ripple background. */
     onPress?: PressableProps['onPress']
     onPressIn?: PressableProps['onPressIn']
     onLongPress?: PressableProps['onLongPress']
     onPressOut?: PressableProps['onPressOut']
 }
 
-/** [rest, pressed] background of each variant; `null` pressed means TRANSPARENT's BACKGROUND_MOD_SUBTLE. */
-const BACKGROUNDS: Record<
-    CardVariant,
-    { rest: SemanticColor | null; pressed: SemanticColor }
-> = {
-    primary: {
-        rest: 'TABLEROW_BACKGROUND_DEFAULT',
-        pressed: 'TABLEROW_BACKGROUND_PRESSED',
-    },
-    secondary: {
-        rest: 'CARD_SECONDARY_BACKGROUND_DEFAULT',
-        pressed: 'CARD_SECONDARY_BACKGROUND_ACTIVE',
-    },
-    muted: { rest: 'CARD_MUTED_BG', pressed: 'CARD_MUTED_PRESSED_BG' },
-    transparent: { rest: null, pressed: 'BACKGROUND_MOD_SUBTLE' },
-    'control-secondary': {
-        rest: 'CONTROL_SECONDARY_BACKGROUND_DEFAULT',
-        pressed: 'CONTROL_SECONDARY_BACKGROUND_ACTIVE',
-    },
-    'surface-high': {
-        rest: 'BACKGROUND_SURFACE_HIGH',
-        pressed: 'BACKGROUND_BASE_LOW',
-    },
+/** Rest background of each variant. */
+const BACKGROUNDS: Record<CardVariant, SemanticColor | null> = {
+    primary: 'TABLEROW_BACKGROUND_DEFAULT',
+    secondary: 'CARD_SECONDARY_BACKGROUND_DEFAULT',
+    muted: 'CARD_MUTED_BG',
+    transparent: null,
+    'control-secondary': 'CONTROL_SECONDARY_BACKGROUND_DEFAULT',
+    'surface-high': 'BACKGROUND_SURFACE_HIGH',
 }
 
 const BORDERS: Record<Exclude<CardBorder, 'none'>, SemanticColor> = {
@@ -116,11 +90,11 @@ export function Card({
             </View>
         )
     }
+
     return (
-        <PressableCard
-            {...props}
+        <RipplePressable
             accessibilityRole={props.accessibilityRole ?? 'button'}
-            variant={variant}
+            {...props}
             onPress={onPress}
             onPressIn={onPressIn}
             onLongPress={onLongPress}
@@ -128,59 +102,9 @@ export function Card({
             style={cardStyle}
         >
             {children}
-        </PressableCard>
+        </RipplePressable>
     )
 }
-
-function PressableCard({
-    variant,
-    onPress,
-    onPressIn,
-    onLongPress,
-    onPressOut,
-    style,
-    children,
-    ...props
-}: ViewProps &
-    Pick<CardProps, 'onPress' | 'onPressIn' | 'onLongPress' | 'onPressOut'> & {
-        variant: CardVariant
-    }) {
-    const { theme } = useUnistyles()
-    const pressed = useSharedValue(0)
-    const progress = useDerivedValue(() =>
-        withSpring(pressed.value, ON_PRESS_SPRING),
-    )
-    const { rest, pressed: pressedColor } = BACKGROUNDS[variant]
-    const colors = [
-        rest ? theme.colors[rest] : 'transparent',
-        theme.colors[pressedColor],
-    ]
-    const animated = useAnimatedStyle(() => ({
-        backgroundColor: interpolateColor(progress.value, [0, 1], colors),
-    }))
-
-    return (
-        <AnimatedPressable
-            {...props}
-            unstable_pressDelay={130}
-            onPress={onPress}
-            onLongPress={onLongPress}
-            onPressIn={(event: GestureResponderEvent) => {
-                pressed.value = 1
-                onPressIn?.(event)
-            }}
-            onPressOut={(event: GestureResponderEvent) => {
-                pressed.value = 0
-                onPressOut?.(event)
-            }}
-            style={[style, animated]}
-        >
-            {children}
-        </AnimatedPressable>
-    )
-}
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
 
 const styles = StyleSheet.create(theme => ({
     card: (
@@ -191,7 +115,7 @@ const styles = StyleSheet.create(theme => ({
         end: boolean,
         radius: number,
     ) => {
-        const background = BACKGROUNDS[variant].rest
+        const background = BACKGROUNDS[variant]
         const backgroundColor = background
             ? theme.colors[background]
             : 'transparent'
