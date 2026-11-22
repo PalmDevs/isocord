@@ -200,6 +200,7 @@ const styles = StyleSheet.create(theme => ({
         borderRadius: theme.modules.mobile.TABLE_ROW_BORDER_RADIUS,
         backgroundColor: theme.colors.CARD_MUTED_BG,
         padding: theme.space.PX_8,
+        gap: theme.space.PX_12,
     },
     monthHeader: {
         flexDirection: 'row',

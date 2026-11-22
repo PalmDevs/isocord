@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 import { nextToastOrder } from './modalOrder'
+import {
+    resolveScopedButtonTheme,
+    resolveScopedTheme,
+} from './scopedTheme'
+import type { UnistylesThemes } from 'react-native-unistyles'
 import type { IconName } from '../../icons/Icon'
 import type { SemanticColor } from '../../tokens'
+import type { ButtonTheme } from '../buttons/buttonTheme'
 
 /** ToastVariant in the reference: the border/background tint and the default icon. */
 export type ToastVariant = 'default' | 'success' | 'critical'
@@ -23,6 +29,10 @@ export interface ToastOptions {
     iconUrl?: string
     /** Milliseconds before the toast leaves, counted while it is in front. 0 keeps it until dismissed. */
     duration?: number
+    /** Theme override, or `null` to keep the app theme. */
+    theme?: keyof UnistylesThemes | null
+    /** Button theme override, or `null` to keep the app theme. */
+    buttonTheme?: ButtonTheme | null
 }
 
 export interface ToastEntry extends ToastOptions {
@@ -52,16 +62,34 @@ let counter = 0
 export function showToast(options: ToastOptions): string {
     const key = options.key ?? `toast-${++counter}`
     const order = nextToastOrder()
+    const theme = resolveScopedTheme(options.theme)
+    const buttonTheme = resolveScopedButtonTheme(options.buttonTheme)
     useToastStore.setState(({ toasts }) => {
         const index = toasts.findIndex(toast => toast.key === key)
         if (index === -1)
             return {
-                toasts: [...toasts, { ...options, key, revision: 0, order }],
+                toasts: [
+                    ...toasts,
+                    { ...options, key, revision: 0, order, theme, buttonTheme },
+                ],
             }
         return {
             toasts: toasts.map((toast, i) =>
                 i === index
-                    ? { ...options, key, revision: toast.revision + 1, order }
+                    ? {
+                          ...options,
+                          key,
+                          revision: toast.revision + 1,
+                          order,
+                          theme:
+                              options.theme === undefined
+                                  ? toast.theme
+                                  : theme,
+                          buttonTheme:
+                              options.buttonTheme === undefined
+                                  ? toast.buttonTheme
+                                  : buttonTheme,
+                      }
                     : toast,
             ),
         }

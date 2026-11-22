@@ -1,14 +1,25 @@
-import { Fragment } from 'react'
+import { Fragment, useContext, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { StyleSheet } from 'react-native-unistyles'
+import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { Icon } from '../../icons/Icon'
+import { useSurfaceColor } from '../../surfaceTint'
+import { ButtonThemeContext } from '../buttons/buttonTheme'
 import { dismissKeyboard } from '../keyboard'
 import { Text } from '../Text'
 import { AnchoredPopover } from './Popover'
 import { useAnchor, usePopoverClose } from './popoverHooks'
+import {
+    pushScopedTheme,
+    resolveScopedButtonTheme,
+    resolveScopedTheme,
+    ScopedThemeScope,
+    useScopedTheme,
+} from './scopedTheme'
 import type { ReactNode } from 'react'
 import type { StyleProp, ViewStyle } from 'react-native'
+import type { UnistylesThemes } from 'react-native-unistyles'
 import type { IconName } from '../../icons/Icon'
+import type { ButtonTheme } from '../buttons/buttonTheme'
 import type { PopoverAlign } from './Popover'
 
 /** ContextMenuConstants: CONTEXT_MENU_LONG_PRESS_DURATION_MS, _MIN_WIDTH, _ITEM_BASE_HEIGHT, _DIVIDER_HEIGHT. */
@@ -52,6 +63,38 @@ export interface ContextMenuProps {
     onOpen?: () => void
     onClose?: () => void
     style?: StyleProp<ViewStyle>
+    /** Theme override, or `null` to keep the app theme. */
+    theme?: keyof UnistylesThemes | null
+    /** Surface tint override, or `null` to keep the app theme. */
+    buttonTheme?: ButtonTheme | null
+}
+
+/** Captures the enclosing or overridden scoped theme when a menu opens. */
+function useMenuTheme(
+    theme: ContextMenuProps['theme'],
+    buttonTheme: ContextMenuProps['buttonTheme'],
+) {
+    const enclosingTheme = useScopedTheme()
+    const enclosingButtonTheme = useContext(ButtonThemeContext)
+    const [captured, setCaptured] = useState<{
+        theme?: keyof UnistylesThemes
+        buttonTheme?: ButtonTheme
+    }>({})
+    const capture = () =>
+        setCaptured({
+            theme: resolveScopedTheme(theme, enclosingTheme),
+            buttonTheme: resolveScopedButtonTheme(
+                buttonTheme,
+                enclosingButtonTheme,
+            ),
+        })
+    return {
+        capture,
+        resolvedTheme:
+            theme === undefined ? captured.theme : (theme ?? undefined),
+        resolvedButtonTheme:
+            buttonTheme === undefined ? captured.buttonTheme : buttonTheme,
+    }
 }
 
 /** Wraps content so that long-pressing it opens a floating menu of actions, on a dimmed screen. */
@@ -66,10 +109,17 @@ export function ContextMenu({
     onOpen,
     onClose,
     style,
+    theme,
+    buttonTheme,
 }: ContextMenuProps) {
     const { ref, anchor, open, clear } = useAnchor()
+    const { capture, resolvedTheme, resolvedButtonTheme } = useMenuTheme(
+        theme,
+        buttonTheme,
+    )
     const show = () => {
         dismissKeyboard()
+        capture()
         open(onOpen)
     }
     const active = enabled && (triggerOnLongPress || triggerOnTap)
@@ -99,7 +149,17 @@ export function ContextMenu({
                         onClose?.()
                     }}
                 >
-                    <ContextMenuPanel items={items} title={title} />
+                    <ScopedThemeScope
+                        name={resolvedTheme}
+                        buttonTheme={resolvedButtonTheme}
+                        active
+                    >
+                        <ContextMenuPanel
+                            items={items}
+                            title={title}
+                            buttonTheme={resolvedButtonTheme}
+                        />
+                    </ScopedThemeScope>
                 </AnchoredPopover>
             )}
         </>
@@ -113,9 +173,19 @@ export function ContextMenu({
 export function ContextMenuPanel({
     items,
     title,
-}: Pick<ContextMenuProps, 'items' | 'title'>) {
+    buttonTheme,
+}: Pick<ContextMenuProps, 'items' | 'title' | 'buttonTheme'>) {
+    const { theme } = useUnistyles()
+    const surfaceColor = useSurfaceColor(
+        theme.colors.BACKGROUND_SURFACE_HIGHEST,
+        undefined,
+        buttonTheme,
+    )
     return (
-        <View accessibilityRole="list" style={styles.panel}>
+        <View
+            accessibilityRole="list"
+            style={[styles.panel, { backgroundColor: surfaceColor }]}
+        >
             {title != null && (
                 <>
                     <View style={styles.titleRow}>
@@ -149,6 +219,23 @@ export function ContextMenuPanel({
     )
 }
 
+/** Runs `action` with the menu's scoped theme pushed while it executes. */
+function bindScopedAction(
+    action: (() => void) | undefined,
+    theme: keyof UnistylesThemes | undefined,
+    buttonTheme: ButtonTheme | undefined,
+): (() => void) | undefined {
+    if (!action || (!theme && !buttonTheme)) return action
+    return () => {
+        const pop = pushScopedTheme(theme, buttonTheme)
+        try {
+            action()
+        } finally {
+            pop()
+        }
+    }
+}
+
 /** Discord's ContextMenuItem: icon, label, then the trailing indicator pushed to the end. */
 function ContextMenuItem({
     item,
@@ -160,6 +247,8 @@ function ContextMenuItem({
     last: boolean
 }) {
     const close = usePopoverClose()
+    const enclosingTheme = useScopedTheme()
+    const enclosingButtonTheme = useContext(ButtonThemeContext)
     const destructive = item.variant === 'destructive'
     const color = destructive ? 'TEXT_FEEDBACK_CRITICAL' : 'TEXT_STRONG'
     return (
@@ -169,7 +258,13 @@ function ContextMenuItem({
             accessibilityState={item.accessibilityState}
             onPress={() => {
                 item.onPress?.()
-                close(item.action)
+                close(
+                    bindScopedAction(
+                        item.action,
+                        enclosingTheme,
+                        enclosingButtonTheme,
+                    ),
+                )
             }}
             style={({ pressed }) => [
                 styles.item(pressed),
@@ -200,7 +295,6 @@ const styles = StyleSheet.create(theme => ({
         borderRadius: theme.radii.lg,
         borderWidth: 1,
         borderColor: theme.colors.BORDER_SUBTLE,
-        backgroundColor: theme.colors.BACKGROUND_SURFACE_HIGHEST,
         boxShadow: theme.shadows.SHADOW_HIGH,
     },
     titleRow: { padding: theme.space.PX_12 },

@@ -15,16 +15,18 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { StyleSheet } from 'react-native-unistyles'
+import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { scheduleOnRN } from 'react-native-worklets'
 import { t } from '../../../i18n'
 import { Icon } from '../../icons/Icon'
+import { useSurfaceColor } from '../../surfaceTint'
 import {
     SWIPE_RELEASE_TIMING,
     TOAST_ENTER_TIMING,
     TOAST_EXIT_TIMING,
 } from '../../tokens/motion'
 import { Text } from '../Text'
+import { ScopedThemeScope } from './scopedTheme'
 import {
     DEFAULT_TOAST_DURATION,
     hideToast,
@@ -113,13 +115,19 @@ export function ToastHost() {
     return (
         <View pointerEvents="box-none" style={styles.container}>
             {visible.map((toast, index) => (
-                <ToastCard
+                <ScopedThemeScope
                     key={toast.key}
-                    toast={toast}
-                    index={index}
-                    topSize={topSize}
-                    frontDrag={frontDrag}
-                />
+                    name={toast.theme}
+                    buttonTheme={toast.buttonTheme}
+                    active={false}
+                >
+                    <ToastCard
+                        toast={toast}
+                        index={index}
+                        topSize={topSize}
+                        frontDrag={frontDrag}
+                    />
+                </ScopedThemeScope>
             ))}
         </View>
     )
@@ -299,6 +307,16 @@ function ToastCard({
     })
 
     const variant = toast.variant ?? 'default'
+    const { theme } = useUnistyles()
+    const baseColor =
+        variant === 'default'
+            ? theme.colors.BACKGROUND_SURFACE_HIGHEST
+            : theme.colors.BACKGROUND_BASE_LOW
+    const surfaceColor = useSurfaceColor(
+        baseColor,
+        undefined,
+        toast.buttonTheme,
+    )
     const variantIcon = VARIANT_ICONS[variant]
     const iconName = toast.icon ?? variantIcon?.name
     const iconColor = toast.iconColor ?? variantIcon?.color ?? 'ICON_DEFAULT'
@@ -353,8 +371,9 @@ function ToastCard({
                                 })
                         }}
                         style={[
-                            styles.wrapper(variant),
+                            styles.wrapper,
                             {
+                                backgroundColor: surfaceColor,
                                 maxWidth: Math.min(
                                     MAX_WIDTH,
                                     windowWidth - MARGIN * 2,
@@ -398,19 +417,15 @@ const styles = StyleSheet.create(theme => ({
         right: 0,
         alignItems: 'center',
     },
-    wrapper: (variant: ToastVariant) => ({
+    wrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         padding: theme.space.PX_12,
         borderRadius: theme.radii.md,
         overflow: 'hidden',
-        backgroundColor:
-            variant === 'default'
-                ? theme.colors.BACKGROUND_SURFACE_HIGHEST
-                : theme.colors.BACKGROUND_BASE_LOW,
         boxShadow: theme.shadows.SHADOW_HIGH,
-    }),
+    },
     // The tint and border sit in a layer over the solid wrapper background.
     baselayer: {
         ...NativeStyleSheet.absoluteFill,

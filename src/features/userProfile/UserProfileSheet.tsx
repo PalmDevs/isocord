@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import { View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { IconButton } from '../../design/components/buttons/IconButton'
@@ -7,7 +7,10 @@ import {
     ActionSheet,
     ActionSheetHeaderBar,
 } from '../../design/components/sheets/Sheet'
-import { useCloseSheet } from '../../design/components/sheets/sheetContext'
+import {
+    SheetContext,
+    useCloseSheet,
+} from '../../design/components/sheets/sheetContext'
 import { t } from '../../i18n'
 import { profileBackground } from './profileColors'
 import { ProfileThemeScope } from './profileTheme'
@@ -32,6 +35,7 @@ export function UserProfileSheet({
 }) {
     const { theme } = useUnistyles()
     const closeSheet = useCloseSheet()
+    const { closing } = useContext(SheetContext)
     const [guildId, setGuildId] = useState(contextGuildId)
     // Reopened in place on another user or server, such as from the mutuals sheet: start on the new server.
     const opened = `${userId}:${contextGuildId}`
@@ -60,6 +64,7 @@ export function UserProfileSheet({
                     userId={userId}
                     guildId={guildId}
                     background={theme.colors.MOBILE_ACTIONSHEET_BACKGROUND}
+                    active={!closing}
                     action={
                         <ProfileMoreButton
                             view={view}

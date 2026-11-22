@@ -41,6 +41,8 @@ export interface UserProfileProps {
     action?: ReactNode
     /** Shown under the name, username and mutuals. */
     afterIdentity?: ReactNode
+    /** Whether overlays inherit this profile's theme. */
+    active?: boolean
 }
 
 /**
@@ -53,6 +55,7 @@ export function UserProfile({
     background,
     action,
     afterIdentity,
+    active = false,
 }: UserProfileProps) {
     const session = useSession()
     const view = useProfileView(userId, guildId)
@@ -65,7 +68,7 @@ export function UserProfile({
     }, [session, userId, guildId, hasProfile])
     if (!view) return null
     return (
-        <ProfileThemeScope colors={view.themeColors}>
+        <ProfileThemeScope colors={view.themeColors} active={active}>
             <ProfileHeader
                 view={view}
                 background={background}

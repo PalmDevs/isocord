@@ -1,5 +1,6 @@
 import { StyleSheet as NativeStyleSheet, View } from 'react-native'
 import { Dialog } from '../modals/Dialog'
+import { ScopedThemeScope } from '../overlays/scopedTheme'
 import { SheetContext } from './sheetContext'
 import { hideActionSheet, removeActionSheet } from './sheetStore'
 import type { SheetEntry } from './sheetStore'
@@ -12,11 +13,12 @@ export function SheetLayer({
     sheet: SheetEntry
     front: boolean
 }) {
-    const { key, closing } = sheet
-    return (
+    const { key, closing, theme, buttonTheme } = sheet
+    const content = (
         <SheetContext
             value={{
                 closing,
+                buttonTheme,
                 close: () => hideActionSheet(key),
                 onClosed: () => removeActionSheet(key),
             }}
@@ -34,5 +36,14 @@ export function SheetLayer({
                 </Dialog>
             </View>
         </SheetContext>
+    )
+    return (
+        <ScopedThemeScope
+            name={theme}
+            buttonTheme={buttonTheme}
+            active={front && !closing}
+        >
+            {content}
+        </ScopedThemeScope>
     )
 }

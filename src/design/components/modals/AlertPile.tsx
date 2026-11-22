@@ -11,10 +11,12 @@ import Animated, {
     withSpring,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { StyleSheet } from 'react-native-unistyles'
+import { StyleSheet, useUnistyles } from 'react-native-unistyles'
+import { useSurfaceColor } from '../../surfaceTint'
 import { MODAL_SPRING } from '../../tokens/motion'
 import { dismissKeyboard } from '../keyboard'
 import { Backdrop } from '../overlays/Backdrop'
+import { ScopedThemeScope } from '../overlays/scopedTheme'
 import { AlertKeyContext } from './alertKeyContext'
 import { dismissAlert } from './alertStore'
 import { Dialog } from './Dialog'
@@ -92,12 +94,18 @@ export function AlertPile({
             />
             <Dialog onDismiss={dismissTop}>
                 {visible.map((alert, index) => (
-                    <AlertCard
+                    <ScopedThemeScope
                         key={alert.key}
-                        alert={alert}
-                        index={index}
-                        topHeight={topHeight}
-                    />
+                        name={alert.theme}
+                        buttonTheme={alert.buttonTheme}
+                        active={alert.key === top.key}
+                    >
+                        <AlertCard
+                            alert={alert}
+                            index={index}
+                            topHeight={topHeight}
+                        />
+                    </ScopedThemeScope>
                 ))}
             </Dialog>
         </View>
@@ -118,6 +126,12 @@ function AlertCard({
     const insets = useSafeAreaInsets()
     const sharedIndex = useSharedValue(index)
     useLayoutEffect(() => sharedIndex.set(index), [index, sharedIndex])
+    const { theme } = useUnistyles()
+    const surfaceColor = useSurfaceColor(
+        theme.colors.MOBILE_ALERT_BACKGROUND_DEFAULT,
+        undefined,
+        alert.buttonTheme,
+    )
 
     const maxHeight =
         height - MARGIN * 2 - Math.max(insets.top, insets.bottom) * 2
@@ -157,6 +171,7 @@ function AlertCard({
                 style={[
                     styles.card,
                     {
+                        backgroundColor: surfaceColor,
                         width: Math.min(MAX_WIDTH, width - MARGIN * 2),
                         maxHeight,
                     },
@@ -179,7 +194,6 @@ const styles = StyleSheet.create(theme => ({
     },
     card: {
         overflow: 'hidden',
-        backgroundColor: theme.colors.MOBILE_ALERT_BACKGROUND_DEFAULT,
         borderRadius: theme.radii.xl,
         borderWidth: 1,
         borderColor: theme.colors.BORDER_SUBTLE,

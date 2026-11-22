@@ -3,6 +3,10 @@ import { ChannelType } from '../../core/discord/channelType'
 import { compareSnowflakes } from '../../core/discord/snowflake'
 import { defineStore } from '../../core/session'
 import { nextInAppNotificationOrder } from '../../design/components/overlays/modalOrder'
+import {
+    resolveScopedButtonTheme,
+    resolveScopedTheme,
+} from '../../design/components/overlays/scopedTheme'
 import { t } from '../../i18n'
 import { computeChannelName } from '../../stores/channels/channelName'
 import {
@@ -18,7 +22,9 @@ import { buildMessageRow, standaloneRow } from '../chat/rows/rowEncoder'
 import { previewText } from '../messages/preview'
 import { channelIcon } from '../servers/channelIcon'
 import { forwardMessage } from '../systemNotifications/forward'
+import type { UnistylesThemes } from 'react-native-unistyles'
 import type { Session } from '../../core/session'
+import type { ButtonTheme } from '../../design/components/buttons/buttonTheme'
 import type { IconName } from '../../design/icons/Icon'
 import type { Channel } from '../../stores/channels/channels'
 import type { Message } from '../../stores/readStates'
@@ -43,6 +49,10 @@ export interface InAppNotification {
     announcement: string
     /** Place among open overlays, from `nextInAppNotificationOrder`. */
     order: number
+    /** Scoped theme for this notification. */
+    theme?: keyof UnistylesThemes
+    /** Button and surface tint theme for this notification. */
+    buttonTheme?: ButtonTheme
 }
 
 interface InAppNotificationsState {
@@ -108,6 +118,8 @@ function build(
     session: Session,
     message: Message,
     channel: Channel,
+    theme?: keyof UnistylesThemes | null,
+    buttonTheme?: ButtonTheme | null,
 ): InAppNotification | undefined {
     const channels = session.get(channelsStore).getState().channels
     const known = session.get(usersStore).getState().users
@@ -135,6 +147,8 @@ function build(
             message: previewText(message) ?? '',
         }),
         order: nextInAppNotificationOrder(),
+        theme: resolveScopedTheme(theme),
+        buttonTheme: resolveScopedButtonTheme(buttonTheme),
     }
 }
 
@@ -143,8 +157,18 @@ export function showInAppNotification(
     session: Session,
     message: Message,
     channel: Channel,
+    options?: {
+        theme?: keyof UnistylesThemes | null
+        buttonTheme?: ButtonTheme | null
+    },
 ): void {
-    const notification = build(session, message, channel)
+    const notification = build(
+        session,
+        message,
+        channel,
+        options?.theme,
+        options?.buttonTheme,
+    )
     if (!notification) return
     session.get(inAppNotificationsStore).setState(state => {
         if (!state.current) return { current: notification }

@@ -12,13 +12,15 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { StyleSheet } from 'react-native-unistyles'
+import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { scheduleOnRN } from 'react-native-worklets'
 import { useSession, useSessionStore } from '../../core/react'
 import { Avatar } from '../../design/components/avatars/Avatar'
 import { RipplePressable } from '../../design/components/buttons/RipplePressable'
+import { ScopedThemeScope } from '../../design/components/overlays/scopedTheme'
 import { Text } from '../../design/components/Text'
 import { Icon } from '../../design/icons/Icon'
+import { useSurfaceColor } from '../../design/surfaceTint'
 import {
     IN_APP_NOTIFICATION_EXIT_FADE_TIMING,
     IN_APP_NOTIFICATION_EXIT_TIMING,
@@ -72,7 +74,16 @@ export function InAppNotificationHost() {
         state => state.current,
     )
     if (!current) return null
-    return <NotificationCard key={current.key} notification={current} />
+    return (
+        <ScopedThemeScope
+            key={current.key}
+            name={current.theme}
+            buttonTheme={current.buttonTheme}
+            active={false}
+        >
+            <NotificationCard notification={current} />
+        </ScopedThemeScope>
+    )
 }
 
 /**
@@ -89,6 +100,12 @@ function NotificationCard({
     const session = useSession()
     const insets = useSafeAreaInsets()
     const reducedMotion = useReducedMotion()
+    const { theme } = useUnistyles()
+    const surfaceColor = useSurfaceColor(
+        theme.colors.MOBILE_ALERT_BACKGROUND_DEFAULT,
+        undefined,
+        notification.buttonTheme,
+    )
     const [previewHeight, setPreviewHeight] = useState<number>()
     const [initialized, setInitialized] = useState(false)
     const [panning, setPanning] = useState(false)
@@ -215,7 +232,13 @@ function NotificationCard({
         >
             <GestureDetector gesture={pan}>
                 <Animated.View pointerEvents="box-none" style={containerStyle}>
-                    <Animated.View style={[styles.shadow, pressStyle]}>
+                    <Animated.View
+                        style={[
+                            styles.shadow,
+                            { backgroundColor: surfaceColor },
+                            pressStyle,
+                        ]}
+                    >
                         <RipplePressable
                             accessibilityRole="button"
                             onAccessibilityEscape={dismiss}
@@ -328,7 +351,6 @@ const styles = StyleSheet.create(theme => ({
     },
     shadow: {
         boxShadow: theme.shadows.SHADOW_HIGH,
-        backgroundColor: theme.colors.MOBILE_ALERT_BACKGROUND_DEFAULT,
         borderRadius: theme.radii.lg,
         maxWidth: NOTIFICATION_MAX_WIDTH,
         width: '100%',

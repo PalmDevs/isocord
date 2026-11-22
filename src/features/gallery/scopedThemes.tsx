@@ -1,7 +1,9 @@
+import { useIsFocused } from '@react-navigation/native'
 import { ScrollView, View } from 'react-native'
-import { ScopedTheme, StyleSheet } from 'react-native-unistyles'
+import { StyleSheet } from 'react-native-unistyles'
 import { create } from 'zustand'
 import { Button } from '../../design/components/buttons/Button'
+import { ScopedThemeScope } from '../../design/components/overlays/scopedTheme'
 import { profileBackground } from '../userProfile/profileColors'
 import { ProfileThemeScope } from '../userProfile/profileTheme'
 import type { ReactNode } from 'react'
@@ -70,26 +72,24 @@ export function ScopedThemePicker() {
     )
 }
 
-/**
- * Draws the page inside the picked example's scope, over its gradient when it has one. Sheets, alerts and menus
- * open outside it, so they keep the app's theme.
- */
+/** Draws the page in the picked scope so overlays inherit its theme. */
 export function ScopedThemeExample({ children }: { children: ReactNode }) {
+    const focused = useIsFocused()
     const id = useScopedExample(state => state.id)
     const example = EXAMPLES.find(item => item.id === id)
     if (!example) return <View style={styles.page}>{children}</View>
     if (example.colors)
         return (
             <View style={[styles.page, profileBackground(example.colors)]}>
-                <ProfileThemeScope colors={example.colors}>
+                <ProfileThemeScope colors={example.colors} active={focused}>
                     {children}
                 </ProfileThemeScope>
             </View>
         )
     return (
-        <ScopedTheme name={example.theme!}>
+        <ScopedThemeScope name={example.theme!} active={focused}>
             <View style={styles.themed}>{children}</View>
-        </ScopedTheme>
+        </ScopedThemeScope>
     )
 }
 

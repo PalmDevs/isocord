@@ -17,18 +17,27 @@ const LAB_EPSILON = 216 / 24389
 const LAB_KAPPA_SLOPE = 841 / 108
 const LAB_OFFSET = 4 / 29
 const BYTE = 255
-const HEX_ALPHA_LENGTH = 9
-const RGB_END = 7
+const SHORT_HEX_RGB = 3
+const SHORT_HEX_RGBA = 4
+const HEX_RGB_END = 6
+const HEX_RGBA_END = 8
 
-/** Parses `#rrggbb`, `#rrggbbaa` or `rgba(r, g, b, a)`. */
+/** Parses `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` or `rgba(r, g, b, a)`. */
 function parse(color: string): Rgba {
     if (color.startsWith('#')) {
+        let hex = color.slice(1)
+        if (hex.length === SHORT_HEX_RGB || hex.length === SHORT_HEX_RGBA) {
+            hex = hex
+                .split('')
+                .map(c => c + c)
+                .join('')
+        }
         const alpha =
-            color.length >= HEX_ALPHA_LENGTH
-                ? Number.parseInt(color.slice(RGB_END, HEX_ALPHA_LENGTH), 16) /
+            hex.length >= HEX_RGBA_END
+                ? Number.parseInt(hex.slice(HEX_RGB_END, HEX_RGBA_END), 16) /
                   BYTE
                 : 1
-        const rgb = Number.parseInt(color.slice(1, RGB_END), 16)
+        const rgb = Number.parseInt(hex.slice(0, HEX_RGB_END), 16)
         return [(rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, alpha]
     }
     const [r, g, b, a = 1] = color
@@ -110,6 +119,40 @@ export const darkenColor = (color: string, amount: number) =>
 export function setColorOpacity(color: string, alpha: number): string {
     const [r, g, b] = parse(color)
     return format([r, g, b, alpha])
+}
+
+const OPAQUE_ALPHA = 0.99
+const ALPHA_DECIMALS = 3
+
+/** Returns true when `color` is opaque (`alpha >= 0.99`). */
+export function isOpaqueColor(color: string): boolean {
+    const [, , , a = 1] = parse(color)
+    return a >= OPAQUE_ALPHA
+}
+
+/** Blends `overlayColor` at `overlayAlpha` over `backgroundColor`, optionally keeping brightness. */
+export function blendColors(
+    overlayColor: string,
+    backgroundColor: string,
+    overlayAlpha: number,
+    preserveBrightness = true,
+): string {
+    const [or, og, ob, oa] = parse(overlayColor)
+    const [br, bg, bb, ba] = parse(backgroundColor)
+    const a = Math.max(0, Math.min(1, overlayAlpha)) * oa
+    const outAlpha = a + ba * (1 - a)
+    if (outAlpha === 0) return 'rgba(0, 0, 0, 0)'
+    const r = Math.round((or * a + br * ba * (1 - a)) / outAlpha)
+    const g = Math.round((og * a + bg * ba * (1 - a)) / outAlpha)
+    const b = Math.round((ob * a + bb * ba * (1 - a)) / outAlpha)
+    const roundedAlpha = Number(outAlpha.toFixed(ALPHA_DECIMALS))
+    if (!preserveBrightness || ba === 0)
+        return format([r, g, b, roundedAlpha])
+
+    const [targetL] = toLab([br, bg, bb, ba])
+    const [, blendedA, blendedB] = toLab([r, g, b, outAlpha])
+    const [pr, pg, pb] = fromLab([targetL, blendedA, blendedB], outAlpha)
+    return format([pr, pg, pb, roundedAlpha])
 }
 
 /**

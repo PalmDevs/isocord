@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { ButtonTheme } from '../buttons/buttonTheme'
 
 /** What the sheet host tells a sheet about its place in the stack. */
 export interface SheetContextValue {
@@ -8,6 +9,8 @@ export interface SheetContextValue {
     close: () => void
     /** Tells the host the exit animation has finished, so it can drop the sheet. */
     onClosed: () => void
+    /** Button and surface tint theme for this sheet. */
+    buttonTheme?: ButtonTheme
 }
 
 export const NOOP = () => {}

@@ -1,10 +1,20 @@
 import { create } from 'zustand'
 import { nextModalOrder } from '../overlays/modalOrder'
+import {
+    resolveScopedButtonTheme,
+    resolveScopedTheme,
+} from '../overlays/scopedTheme'
 import type { ReactNode } from 'react'
+import type { UnistylesThemes } from 'react-native-unistyles'
+import type { ButtonTheme } from '../buttons/buttonTheme'
 
 export interface AlertOptions {
     /** False pins the alert: backdrop taps, and back presses leave it open. */
     dismissable?: boolean
+    /** Theme override, or `null` to keep the app theme. */
+    theme?: keyof UnistylesThemes | null
+    /** Button theme override, or `null` to keep the app theme. */
+    buttonTheme?: ButtonTheme | null
 }
 
 export interface AlertEntry extends AlertOptions {
@@ -31,14 +41,24 @@ export function openAlert(
     onDismiss?: () => void,
     options?: AlertOptions,
 ): void {
+    const theme = resolveScopedTheme(options?.theme)
+    const buttonTheme = resolveScopedButtonTheme(options?.buttonTheme)
     useAlertStore.setState(({ alerts }) => {
         const existing = alerts.find(alert => alert.key === key)
         const entry: AlertEntry = {
+            ...options,
             key,
             node,
             onDismiss,
             order: existing?.order ?? nextModalOrder(),
-            ...options,
+            theme:
+                existing && options?.theme === undefined
+                    ? existing.theme
+                    : theme,
+            buttonTheme:
+                existing && options?.buttonTheme === undefined
+                    ? existing.buttonTheme
+                    : buttonTheme,
         }
         if (!existing) return { alerts: [entry, ...alerts] }
         return {

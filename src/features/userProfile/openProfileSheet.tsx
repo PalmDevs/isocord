@@ -59,6 +59,7 @@ export function openProfileSheet(
         openActionSheet(
             PROFILE_SHEET_KEY,
             <Sheet userId={userId} guildId={guildId} />,
+            { theme: null, buttonTheme: null },
         )
     const user = session.get(usersStore).getState().users[userId]
     const restriction = speedBumpOf(session, userId)
@@ -78,5 +79,6 @@ export function openProfileSheet(
             restriction={restriction}
             onShow={open}
         />,
+        { theme: null, buttonTheme: null },
     )
 }

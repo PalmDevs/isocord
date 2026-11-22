@@ -25,10 +25,11 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { StyleSheet } from 'react-native-unistyles'
+import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { scheduleOnRN } from 'react-native-worklets'
 import { t } from '../../../i18n'
 import { Icon } from '../../icons/Icon'
+import { useSurfaceColor } from '../../surfaceTint'
 import {
     ACTION_SHEET_REDUCED_MOTION_TIMING,
     ACTION_SHEET_SPRING,
@@ -174,11 +175,17 @@ export function BottomSheet({
     contentStyles,
     bodyStyles,
 }: BottomSheetProps) {
-    const { closing, close, onClosed } = useContext(SheetContext)
+    const { closing, close, onClosed, buttonTheme } = useContext(SheetContext)
     const { height: windowHeight } = useWindowDimensions()
     const insets = useSafeAreaInsets()
     const reducedMotion = useReducedMotion()
     const keyboard = useReanimatedKeyboardAnimation()
+    const { theme } = useUnistyles()
+    const surfaceBg = useSurfaceColor(
+        theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
+        undefined,
+        buttonTheme,
+    )
 
     const limit = maxHeight ?? windowHeight - insets.top - TOP_GAP
     // A sheet without a scroll view sizes itself to its content, which is only known after layout.
@@ -316,7 +323,14 @@ export function BottomSheet({
     }
 
     const sheet = scrollable ? (
-        <Animated.View style={[styles.sheet, backgroundStyles, sheetStyle]}>
+        <Animated.View
+            style={[
+                styles.sheet,
+                { backgroundColor: surfaceBg },
+                backgroundStyles,
+                sheetStyle,
+            ]}
+        >
             <GestureDetector gesture={pan}>{chrome}</GestureDetector>
             <SheetDrag scrollAtTop={scrollAtTop} style={styles.fill}>
                 <ScrollView
@@ -342,7 +356,14 @@ export function BottomSheet({
         </Animated.View>
     ) : (
         <GestureDetector gesture={pan}>
-            <Animated.View style={[styles.sheet, backgroundStyles, sheetStyle]}>
+            <Animated.View
+                style={[
+                    styles.sheet,
+                    { backgroundColor: surfaceBg },
+                    backgroundStyles,
+                    sheetStyle,
+                ]}
+            >
                 <View
                     style={styles.natural}
                     onLayout={event =>
@@ -581,7 +602,6 @@ const styles = StyleSheet.create(theme => ({
         overflow: 'hidden',
         borderTopLeftRadius: theme.radii.xl,
         borderTopRightRadius: theme.radii.xl,
-        backgroundColor: theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
     },
     // Hangs from the top of the sheet at its natural height, so the sheet's growing edge reveals it
     // the way a slide would.

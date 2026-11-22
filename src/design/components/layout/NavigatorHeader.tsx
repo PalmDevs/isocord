@@ -12,6 +12,8 @@ interface NavigatorHeaderProps {
     subtitle?: string
     /** GenericHeaderTitle's `subtitleColor`, e.g. a warning. */
     subtitleColor?: SemanticColor
+    /** Header background token. */
+    backgroundColor?: SemanticColor
     /** Replaces the title and subtitle, e.g. an avatar with a name. */
     children?: ReactNode
     /** Shown before the title, e.g. a channel icon. */
@@ -35,6 +37,7 @@ export function NavigatorHeader({
     title,
     subtitle,
     subtitleColor = 'TEXT_MUTED',
+    backgroundColor = 'BACKGROUND_BASE_LOWER',
     children,
     titleIcon,
     onBack,
@@ -47,7 +50,7 @@ export function NavigatorHeader({
 }: NavigatorHeaderProps) {
     const Bar = onTitlePress ? RipplePressable : View
     return (
-        <View style={styles.container(safeArea)}>
+        <View style={styles.container(backgroundColor, safeArea)}>
             <Bar
                 style={styles.bar(safeArea)}
                 {...(onTitlePress && {
@@ -120,9 +123,9 @@ export function NavigatorHeader({
 }
 
 const styles = StyleSheet.create((theme, runtime) => ({
-    container: (safeArea: boolean) => ({
+    container: (backgroundColor: SemanticColor, safeArea: boolean) => ({
         height: (safeArea ? runtime.insets.top : 0) + NAV_BAR_HEIGHT,
-        backgroundColor: theme.colors.BACKGROUND_BASE_LOWER,
+        backgroundColor: theme.colors[backgroundColor],
         borderBottomWidth: 1,
         borderBottomColor: theme.colors.BORDER_SUBTLE,
     }),

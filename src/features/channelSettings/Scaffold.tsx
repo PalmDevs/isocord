@@ -24,6 +24,7 @@ export function ChannelSettingsScaffold({
                 title={title}
                 onBack={() => navigation.goBack()}
                 trailing={trailing}
+                backgroundColor="MOBILE_ACTIONSHEET_BACKGROUND"
             />
             <ScrollView
                 contentContainerStyle={styles.content}
@@ -70,7 +71,10 @@ export function HeaderSubmit({
 }
 
 const styles = StyleSheet.create((theme, runtime) => ({
-    container: { flex: 1, backgroundColor: theme.colors.BACKGROUND_BASE_LOWER },
+    container: {
+        flex: 1,
+        backgroundColor: theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
+    },
     content: {
         padding: theme.space.PX_16,
         paddingBottom: runtime.insets.bottom + theme.space.PX_32,

@@ -59,7 +59,7 @@ export function ProfileModeration({
                         title={t('userProfile.timeoutDuration')}
                         items={TIMEOUT_DURATIONS.map(({ key, ms }) => ({
                             label: t(key),
-                            action: () =>
+                            onPress: () =>
                                 confirm(
                                     t('userProfile.timeoutTitle', {
                                         user: name,

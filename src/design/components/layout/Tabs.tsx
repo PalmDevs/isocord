@@ -195,6 +195,7 @@ function TabStrip({
                                 <TabText
                                     index={index}
                                     position={position}
+                                    selected={isSelected}
                                     activeColor={activeColor}
                                     variant="text-sm/semibold"
                                     lineClamp={1}
@@ -205,6 +206,7 @@ function TabStrip({
                                     <TabText
                                         index={index}
                                         position={position}
+                                        selected={isSelected}
                                         activeColor={activeColor}
                                         variant="text-sm/medium"
                                         lineClamp={1}
@@ -232,14 +234,17 @@ function TabStrip({
 function TabText({
     index,
     position,
+    selected,
     activeColor,
     ...props
 }: Omit<TextProps, 'color' | 'animated'> & {
     index: number
     position: SharedValue<number>
+    selected: boolean
     activeColor: 'TEXT_STRONG' | 'TEXT_BRAND'
 }) {
     const { theme } = useUnistyles()
+    const [initialSelected] = useState(selected)
     const inactive = theme.colors.TEXT_MUTED
     const active = theme.colors[activeColor]
     const colorStyle = useAnimatedStyle(() => ({
@@ -250,7 +255,18 @@ function TabText({
         ),
     }))
     return (
-        <Text {...props} animated style={[props.style, colorStyle] as never} />
+        <Text
+            {...props}
+            animated
+            color={initialSelected ? activeColor : 'TEXT_MUTED'}
+            style={
+                [
+                    props.style,
+                    { color: initialSelected ? active : inactive },
+                    colorStyle,
+                ] as never
+            }
+        />
     )
 }
 

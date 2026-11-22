@@ -2,7 +2,13 @@ import { createElement } from 'react'
 import { create } from 'zustand'
 import { dismissKeyboard } from '../keyboard'
 import { nextModalOrder } from '../overlays/modalOrder'
+import {
+    resolveScopedButtonTheme,
+    resolveScopedTheme,
+} from '../overlays/scopedTheme'
 import type { ComponentType, ReactNode } from 'react'
+import type { UnistylesThemes } from 'react-native-unistyles'
+import type { ButtonTheme } from '../buttons/buttonTheme'
 
 /** How a new sheet relates to the ones already open (ActionSheetStore in the reference client). */
 export type SheetStackingBehavior = 'replaceTopSheet' | 'stack' | 'replaceAll'
@@ -16,6 +22,10 @@ export interface SheetEntry {
     closing: boolean
     /** False when a sheet opened over this one stacks instead of replacing it. */
     replaceable: boolean
+    /** Scoped theme for this sheet. */
+    theme?: keyof UnistylesThemes
+    /** Button and surface tint theme for this sheet. */
+    buttonTheme?: ButtonTheme
 }
 
 /** Open sheets, back-most first. Rendered by ModalStack. */
@@ -35,9 +45,13 @@ export function openActionSheet(
     options?: {
         stackingBehavior?: SheetStackingBehavior
         replaceable?: boolean
+        theme?: keyof UnistylesThemes | null
+        buttonTheme?: ButtonTheme | null
     },
 ): void {
     dismissKeyboard()
+    const theme = resolveScopedTheme(options?.theme)
+    const buttonTheme = resolveScopedButtonTheme(options?.buttonTheme)
     useSheetStore.setState(({ sheets }) => {
         const existing = sheets.find(sheet => sheet.key === key)
         if (existing) {
@@ -47,6 +61,12 @@ export function openActionSheet(
                 node,
                 closing: false,
                 order: nextModalOrder(),
+                theme:
+                    options?.theme === undefined ? existing.theme : theme,
+                buttonTheme:
+                    options?.buttonTheme === undefined
+                        ? existing.buttonTheme
+                        : buttonTheme,
             }
             return {
                 sheets: [
@@ -61,6 +81,8 @@ export function openActionSheet(
             order: nextModalOrder(),
             closing: false,
             replaceable: options?.replaceable ?? true,
+            theme,
+            buttonTheme,
         }
         switch (options?.stackingBehavior ?? 'replaceTopSheet') {
             case 'stack':
