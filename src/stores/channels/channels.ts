@@ -426,17 +426,59 @@ export const channelsStore = defineStore(
             )
                 put(thread)
         }
+        /**
+         * Applies a guild's whole thread list in one update. A THREAD_LIST_SYNC carries every thread of the
+         * guild, and `put` and `remove` copy every channel map on each call.
+         */
+        const syncThreads = (guildId: string, threads: Channel[]) => {
+            store.setState(state => {
+                let channels: Record<string, Channel> | undefined
+                let byGuild: Record<string, string[]> | undefined
+                for (const raw of threads) {
+                    const prev = (channels ?? state.channels)[raw.id]
+                    if (raw.thread_metadata?.archived) {
+                        if (!prev) continue
+                        channels ??= { ...state.channels }
+                        delete channels[raw.id]
+                        const ids = (byGuild ?? state.byGuild)[guildId] ?? []
+                        byGuild ??= { ...state.byGuild }
+                        byGuild[guildId] = ids.filter(id => id !== raw.id)
+                        continue
+                    }
+                    if (
+                        !(prev || raw.member || raw.owner_id === session.userId)
+                    )
+                        continue
+                    channels ??= { ...state.channels }
+                    const channel = normalize(
+                        { ...prev, ...raw, member: raw.member ?? prev?.member },
+                        guildId,
+                    )
+                    channels[channel.id] = channel
+                    if (channel.member !== undefined) {
+                        const ids = (byGuild ?? state.byGuild)[guildId] ?? []
+                        if (!ids.includes(channel.id)) {
+                            byGuild ??= { ...state.byGuild }
+                            byGuild[guildId] = [...ids, channel.id]
+                        }
+                    }
+                }
+                if (!channels) return state
+                return { channels, byGuild: byGuild ?? state.byGuild }
+            })
+        }
         dispatch.on('THREAD_CREATE', putThread)
         dispatch.on('THREAD_UPDATE', putThread)
         dispatch.on('THREAD_DELETE', thread => remove(thread.id))
         dispatch.on('THREAD_LIST_SYNC', sync => {
             const members = new Map(sync.members?.map(m => [m.id, m]))
-            for (const thread of sync.threads)
-                putThread({
+            syncThreads(
+                sync.guild_id,
+                sync.threads.map(thread => ({
                     ...thread,
-                    guild_id: sync.guild_id,
                     member: members.get(thread.id) ?? thread.member,
-                })
+                })),
+            )
         })
 
         /**
