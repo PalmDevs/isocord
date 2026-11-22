@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native'
 import { FlashList } from '@shopify/flash-list'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Pressable, View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useShallow } from 'zustand/react/shallow'
@@ -32,11 +32,14 @@ import { useChatTheme } from '../chat/rows/rowEncoder'
 import { TypingText } from '../chat/typing'
 import { useTypingUserIds } from '../chat/useTypingUserIds'
 import { useTabSelected } from '../main/useTabSelected'
+import { UnreadBar } from '../servers/UnreadBar'
+import { useUnreadBars } from '../servers/useUnreadBars'
 import { GroupAvatar } from './GroupAvatar'
 import { previewIcon, previewPrefix, usePreviewSpans } from './preview'
 import { useDm } from './useDm'
 import { useMessagesPanels } from './useMessagesPanels'
 import { useMinute } from './useMinute'
+import type { FlashListRef } from '@shopify/flash-list'
 
 const AVATAR_SIZE = 40
 
@@ -240,6 +243,19 @@ export function MessagesTab() {
         }),
     )
 
+    // ChannelsUnreadBars: conversations with mentions or unreads the bars can point at.
+    // Every private channel notifies, so an unread one shows unless it is muted.
+    const readStates = useSessionStore(readStatesStore, state => state)
+    const barRows = ids.flatMap((id, index) => {
+        const count = readStates.mentions[id] ?? 0
+        const mention = count > 0
+        const unread = !mention && isUnread(readStates, id)
+        if (!mention && !unread) return []
+        return [{ index, mention }]
+    })
+    const unreadBars = useUnreadBars(barRows)
+    const listRef = useRef<FlashListRef<string>>(null)
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -282,21 +298,56 @@ export function MessagesTab() {
                     {t('messages.search')}
                 </Text>
             </Pressable>
-            <FlashList
-                data={ids}
-                renderItem={renderItem}
-                keyExtractor={id => id}
-                contentContainerStyle={styles.content}
-                ListEmptyComponent={
-                    ready ? (
-                        <Text color="TEXT_MUTED" style={styles.empty}>
-                            {t('messages.empty')}
-                        </Text>
-                    ) : (
-                        <ConversationSkeleton />
-                    )
-                }
-            />
+            <View style={styles.listContainer}>
+                <FlashList
+                    ref={listRef}
+                    data={ids}
+                    renderItem={renderItem}
+                    keyExtractor={id => id}
+                    contentContainerStyle={styles.content}
+                    onViewableItemsChanged={unreadBars.onViewableItemsChanged}
+                    viewabilityConfig={unreadBars.viewabilityConfig}
+                    ListEmptyComponent={
+                        ready ? (
+                            <Text color="TEXT_MUTED" style={styles.empty}>
+                                {t('messages.empty')}
+                            </Text>
+                        ) : (
+                            <ConversationSkeleton />
+                        )
+                    }
+                />
+                <UnreadBar
+                    position="top"
+                    mention={unreadBars.target?.row.mention === true}
+                    shown={unreadBars.target?.edge === 'top'}
+                    onPress={() =>
+                        unreadBars.jump(index =>
+                            listRef.current?.scrollToIndex({
+                                index,
+                                viewPosition: 0.5,
+                                animated: true,
+                            }),
+                        )
+                    }
+                    style={styles.barTop}
+                />
+                <UnreadBar
+                    position="bottom"
+                    mention={unreadBars.target?.row.mention === true}
+                    shown={unreadBars.target?.edge === 'bottom'}
+                    onPress={() =>
+                        unreadBars.jump(index =>
+                            listRef.current?.scrollToIndex({
+                                index,
+                                viewPosition: 0.5,
+                                animated: true,
+                            }),
+                        )
+                    }
+                    style={styles.barBottom}
+                />
+            </View>
         </View>
     )
 }
@@ -338,6 +389,10 @@ const styles = StyleSheet.create((theme, runtime) => ({
         backgroundColor: theme.colors.BACKGROUND_MOD_SUBTLE,
     },
     content: { paddingBottom: theme.space.PX_24 },
+    // The bars float over the list (ChannelsUnreadBars' wrapper).
+    listContainer: { flex: 1 },
+    barTop: { top: 0 },
+    barBottom: { bottom: 0 },
     empty: { padding: theme.space.PX_16, textAlign: 'center' },
     row: {
         flexDirection: 'row',

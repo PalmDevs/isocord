@@ -923,6 +923,7 @@
   "unreadSettings.allMessagesDescription": "Highlighted channel name and half dot",
   "unreadSettings.mentionOnly": "Mention Only",
   "unreadSettings.mentionOnlyDisabled": "Disabled when notification is set to all messages",
+  "unreadBar.new": "New",
   "forum.empty.title": "Be the first to start the conversation!",
   "forum.empty.body": "What do you want to post about in #{channelName}?",
   "forum.empty.tags.one": "There are no posts with this tag yet!",

@@ -1,6 +1,7 @@
 import { ChannelFlags } from '../../core/discord/channelFlags'
 import { ChannelType } from '../../core/discord/channelType'
 import { GuildFeature } from '../../core/discord/guild'
+import { UnreadSetting } from '../../core/discord/notificationSettings'
 import { Permission } from '../../core/discord/permissions'
 import { compareSnowflakes } from '../../core/discord/snowflake'
 import { autoArchiveTime } from '../../core/discord/threads'
@@ -9,15 +10,18 @@ import { can } from '../../stores/permissions'
 import { isUnread } from '../../stores/readStates'
 import { isFavorite } from '../../stores/settings/userGuildSettings'
 import {
+    isChannelMuted,
     isChannelOrParentOptedIn,
     isOptInEnabledForGuild,
     isThreadMuted,
+    resolveUnreadSetting,
 } from '../../stores/unreadPolicy'
 import type { Session } from '../../core/session'
 import type { Channel } from '../../stores/channels/channels'
 import type { Guild } from '../../stores/guilds'
 import type { ReadStatesState } from '../../stores/readStates'
 import type { GuildSettings } from '../../stores/settings/userGuildSettings'
+import type { BarRow } from './useUnreadBars'
 
 export type ChannelRow =
     | { type: 'category'; id: string; collapsed: boolean }
@@ -217,4 +221,38 @@ export function buildChannelRows(
     if (rows.length === pinnedEnd && rows.at(-1)?.id === 'pinnedDivider')
         rows.pop()
     return rows
+}
+
+/**
+ * Returns the channels and threads ChannelsUnreadBars can point to, with their list indexes.
+ */
+export function buildBarRows(
+    guildId: string,
+    rows: ChannelRow[],
+    channels: Record<string, Channel>,
+    guildDefault: number | undefined,
+    readStates: ReadStatesState,
+    settings: GuildSettings | undefined,
+    joinedAck: string,
+): BarRow[] {
+    const policy = { guildSettings: settings ? { [guildId]: settings } : {} }
+    const now = Date.now()
+    const barRows: BarRow[] = []
+    for (const [index, row] of rows.entries()) {
+        if (row.type !== 'channel' && row.type !== 'thread') continue
+        const channel = channels[row.id]
+        if (!channel) continue
+        // hasMention: a channel with mentions; hasUnread: an unread shown in full, unmuted.
+        const mention = (readStates.mentions[row.id] ?? 0) > 0
+        const barUnread =
+            isUnread(readStates, row.id, joinedAck) &&
+            (row.type === 'thread'
+                ? !isThreadMuted(channel.member, now)
+                : !isVoice(channel) &&
+                  !isChannelMuted(policy, channel, now) &&
+                  resolveUnreadSetting(policy, channel, guildDefault) ===
+                      UnreadSetting.ALL_MESSAGES)
+        if (mention || barUnread) barRows.push({ index, mention })
+    }
+    return barRows
 }

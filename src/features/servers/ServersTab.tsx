@@ -104,6 +104,8 @@ export function ServersTab() {
                         <ChannelList
                             guild={shown}
                             scrollY={scrollY}
+                            bannerHeight={bannerHeight}
+                            headerHeight={headerHeight}
                             header={
                                 // The banner scrolls with the channels; the guild header is drawn over the gap below it.
                                 <View

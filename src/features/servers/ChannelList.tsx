@@ -1,10 +1,14 @@
 import { useNavigation } from '@react-navigation/native'
 import { FlashList } from '@shopify/flash-list'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useWindowDimensions, View } from 'react-native'
-import Animated, { useAnimatedScrollHandler } from 'react-native-reanimated'
+import Animated, {
+    useAnimatedScrollHandler,
+    useAnimatedStyle,
+} from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
+import { scheduleOnRN } from 'react-native-worklets'
 import { ChannelType } from '../../core/discord/channelType'
 import { GuildFeature } from '../../core/discord/guild'
 import { UnreadSetting } from '../../core/discord/notificationSettings'
@@ -28,9 +32,12 @@ import { settingsStore } from '../../stores/settings/settingsStore'
 import { isChannelMuted, resolveUnreadSetting } from '../../stores/unreadPolicy'
 import { openChannelActionSheet } from '../channelActions'
 import { channelIcon } from './channelIcon'
-import { buildChannelRows } from './channelList'
+import { buildBarRows, buildChannelRows } from './channelList'
 import { serversUiStore } from './store'
+import { UnreadBar } from './UnreadBar'
 import { useServersPanels } from './useServersPanels'
+import { UNREAD_BAR_VISIBLE_FRACTION, useUnreadBars } from './useUnreadBars'
+import type { FlashListRef } from '@shopify/flash-list'
 import type { ReactElement } from 'react'
 import type { SharedValue } from 'react-native-reanimated'
 import type { Guild } from '../../stores/guilds'
@@ -172,8 +179,8 @@ function ChannelItem({ guildId, id, joinedAck, thread }: ChannelRowProps) {
                 <View
                     style={[
                         styles.unreadPill,
-                        // ChannelUnreadBadge: MUTED_OPACITY_CONTENT unless the setting is all messages.
-                        !fullUnread && styles.lessImportant,
+                        // Muted unless unread indicator is all messages or there are mentions.
+                        (!fullUnread || mentions > 0) && styles.lessImportant,
                     ]}
                 />
             )}
@@ -326,10 +333,14 @@ export function ChannelList({
     guild,
     header,
     scrollY,
+    bannerHeight,
+    headerHeight,
 }: {
     guild: Guild
     header: ReactElement
     scrollY: SharedValue<number>
+    bannerHeight: number
+    headerHeight: number
 }) {
     const session = useSession()
     const ids = useSessionStore(channelsStore, state => state.byGuild[guild.id])
@@ -354,6 +365,54 @@ export function ChannelList({
         readStates,
     )
     const joinedAck = snowflakeFromTimestamp(new Date(guild.joinedAt).getTime())
+
+    // ChannelsUnreadBars: the rows a bar can point at, with each channel's unread kind.
+    const barRows = buildBarRows(
+        guild.id,
+        rows,
+        channels,
+        guild.defaultMessageNotifications,
+        readStates,
+        settings,
+        joinedAck,
+    )
+    const unreadBars = useUnreadBars(barRows)
+    const listRef = useRef<FlashListRef<ChannelRow>>(null)
+    const { setVisibleRange } = unreadBars
+
+    // findNearestUnreadItem: the viewport starts below the sticky header.
+    const updateVisibleRange = () => {
+        const list = listRef.current
+        if (!list?.getLayout(0)) return
+        const { startIndex, endIndex } = list.computeVisibleIndices()
+        const scroll = list.getAbsoluteLastScrollOffset()
+        const offset = scroll - list.getFirstItemOffset()
+        const top = offset + headerHeight + Math.max(0, bannerHeight - scroll)
+        const bottom = offset + list.getWindowSize().height
+        let first = startIndex
+        let last = endIndex
+        while (first <= last) {
+            const layout = list.getLayout(first)
+            if (
+                layout &&
+                layout.y + layout.height * (1 - UNREAD_BAR_VISIBLE_FRACTION) >=
+                    top
+            )
+                break
+            first += 1
+        }
+        while (last >= first) {
+            const layout = list.getLayout(last)
+            if (
+                layout &&
+                layout.y + layout.height * UNREAD_BAR_VISIBLE_FRACTION <= bottom
+            )
+                break
+            last -= 1
+        }
+        setVisibleRange(first, last)
+    }
+    useEffect(updateVisibleRange, [bannerHeight, headerHeight, setVisibleRange])
 
     const renderItem = ({ item }: { item: ChannelRow }) => {
         if (item.type === 'spacer') return <View style={styles.spacer} />
@@ -384,24 +443,58 @@ export function ChannelList({
 
     const onScroll = useAnimatedScrollHandler(event => {
         scrollY.set(event.contentOffset.y)
+        scheduleOnRN(updateVisibleRange)
     })
+    // ChannelsUnreadBar: top edge follows the bottom of the sticky guild header.
+    const barTop = useAnimatedStyle(() => ({
+        top: headerHeight + Math.max(0, bannerHeight - scrollY.get()),
+    }))
+
+    const renderBar = (edge: 'top' | 'bottom') => {
+        const target = unreadBars.target
+        return (
+            <UnreadBar
+                key={edge}
+                position={edge}
+                mention={target?.row.mention === true}
+                shown={target?.edge === edge}
+                onPress={() =>
+                    unreadBars.jump(index =>
+                        listRef.current?.scrollToIndex({
+                            index,
+                            viewPosition: 0.5,
+                            animated: true,
+                        }),
+                    )
+                }
+                style={edge === 'top' ? barTop : styles.barBottom}
+            />
+        )
+    }
 
     return (
-        <AnimatedFlashList
-            data={rows}
-            renderItem={renderItem}
-            keyExtractor={item => item.id}
-            getItemType={item => item.type}
-            contentContainerStyle={styles.content}
-            ListHeaderComponent={header}
-            onScroll={onScroll}
-            scrollEventThrottle={16}
-            ListEmptyComponent={
-                <Text color="TEXT_MUTED" style={styles.empty}>
-                    {t('servers.noChannels')}
-                </Text>
-            }
-        />
+        <View style={styles.listContainer}>
+            <AnimatedFlashList
+                ref={listRef}
+                data={rows}
+                renderItem={renderItem}
+                keyExtractor={item => item.id}
+                getItemType={item => item.type}
+                contentContainerStyle={styles.content}
+                ListHeaderComponent={header}
+                onScroll={onScroll}
+                scrollEventThrottle={16}
+                onViewableItemsChanged={updateVisibleRange}
+                viewabilityConfig={unreadBars.viewabilityConfig}
+                ListEmptyComponent={
+                    <Text color="TEXT_MUTED" style={styles.empty}>
+                        {t('servers.noChannels')}
+                    </Text>
+                }
+            />
+            {renderBar('top')}
+            {renderBar('bottom')}
+        </View>
     )
 }
 
@@ -411,6 +504,9 @@ const SPINE_LEFT = 16
 
 const styles = StyleSheet.create(theme => ({
     content: { paddingBottom: theme.space.PX_24 },
+    // ChannelsUnreadBars: overlay bounded by the list panel.
+    listContainer: { flex: 1 },
+    barBottom: { bottom: 0 },
     empty: { padding: theme.space.PX_16, textAlign: 'center' },
     spacer: { height: theme.space.PX_8 },
     // channel_list_v2 Divider.
