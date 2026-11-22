@@ -5,6 +5,7 @@ import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
+import me.palmdevs.isocord.compression.CompressionModule
 import me.palmdevs.isocord.network.NetworkModule
 import me.palmdevs.isocord.share.ShareModule
 
@@ -16,6 +17,7 @@ class CorePackage : BaseReactPackage() {
       FontScaleModule.NAME -> FontScaleModule(reactContext)
       TraceModule.NAME -> TraceModule(reactContext)
       NetworkModule.NAME -> NetworkModule(reactContext)
+      CompressionModule.NAME -> CompressionModule(reactContext)
       ShareModule.NAME -> ShareModule(reactContext)
       else -> null
     }
@@ -26,6 +28,7 @@ class CorePackage : BaseReactPackage() {
       FontScaleModule::class.java to FontScaleModule.NAME,
       TraceModule::class.java to TraceModule.NAME,
       NetworkModule::class.java to NetworkModule.NAME,
+      CompressionModule::class.java to CompressionModule.NAME,
       ShareModule::class.java to ShareModule.NAME,
     ).entries.associate { (type, name) ->
       name to

@@ -1,6 +1,5 @@
-import { strFromU8 } from 'fflate'
-import { Decompress } from 'fzstd'
 import { AppState } from 'react-native'
+import compression from '../../native/NativeIsocordCompression'
 import { gateway } from '../../native/NativeIsocordConstants'
 import {
     API_VERSION,
@@ -87,26 +86,18 @@ const {
 const EXPEDITED_ACK_MS = 5_000
 
 /**
+ * How long received frames are handled before yielding (ms). A resume replays dozens of payloads back to
+ * back. Handled in one go they hold the JS thread for seconds and freeze every screen.
+ */
+const DISPATCH_BUDGET_MS = 8
+
+/**
  * SessionHeartbeatScheduler: the session is active while the app is in the foreground ("foregrounded"). The
  * reference also counts a voice call, which Isocord does not have.
  */
 const qosPayload = () => {
     const active = AppState.currentState === 'active'
     return { ver: QOS_VERSION, active, reasons: active ? ['foregrounded'] : [] }
-}
-
-/** Joins chunks before decoding so multi-byte characters split across them survive. */
-function concat(chunks: Uint8Array[]): Uint8Array {
-    if (chunks.length === 1) return chunks[0]!
-    const joined = new Uint8Array(
-        chunks.reduce((total, chunk) => total + chunk.length, 0),
-    )
-    let offset = 0
-    for (const chunk of chunks) {
-        joined.set(chunk, offset)
-        offset += chunk.length
-    }
-    return joined
 }
 
 /** The reference's GatewaySocket logger. Payload sizes, timings and codes only, never contents. */
@@ -116,7 +107,6 @@ const log = logger('GatewaySocket')
 function logReadySize(
     ready: { guilds?: Array<{ data_mode?: string; unavailable?: boolean }> },
     chars: number,
-    compressed: number,
 ): void {
     const counts = { full: 0, partial: 0, unavailable: 0 }
     for (const guild of ready.guilds ?? []) {
@@ -127,7 +117,7 @@ function logReadySize(
     }
     log.info(
         `READY payload: ${chars} chars (${Math.round(chars / 1024)} KB), ` +
-            `${compressed} bytes compressed, guilds full ${counts.full}, ` +
+            `guilds full ${counts.full}, ` +
             `partial ${counts.partial}, unavailable ${counts.unavailable}`,
     )
 }
@@ -152,8 +142,6 @@ export class GatewaySocket {
     state: ConnectionState = 'disconnected'
 
     private ws: WebSocket | null = null
-    private decompress: Decompress | null = null
-    private chunks: Uint8Array[] = []
     private seq = 0
     private sessionId: string | null = null
     private resumeUrl: string | null = null
@@ -165,6 +153,11 @@ export class GatewaySocket {
     private appState: { remove(): void } | null = null
     private backoffMs = MIN_BACKOFF_MS
     private closed = true
+    /** Received payloads waiting for the drain, already decompressed by native code. */
+    private queue: string[] = []
+    private draining = false
+    /** The socket whose zstd frames native code decompresses, or null when compression is off. */
+    private socketId: number | null = null
     /** In the background with `pauseInBackground` on: closed, the session kept to resume. */
     private paused = false
     /**
@@ -221,7 +214,9 @@ export class GatewaySocket {
     }
 
     private open(): void {
+        this.disableCompression()
         const base = (this.sessionId && this.resumeUrl) || DEFAULT_GATEWAY_URL
+        const supportsZstd = compression.getConstants().supportsZstd
         // React Native's WebSocket takes an options argument its typings don't declare.
         const NativeWebSocket = WebSocket as unknown as new (
             url: string,
@@ -231,7 +226,7 @@ export class GatewaySocket {
         const ws = new NativeWebSocket(
             // The official client asks for zstd whenever its native decompressor supports it, which on Android it does.
             // The background session uses zlib-stream (COMPRESSION in NotificationGateway.kt).
-            `${base}/?encoding=json&v=${API_VERSION}&compress=zstd-stream`,
+            `${base}/?encoding=json&v=${API_VERSION}${supportsZstd ? '&compress=zstd-stream' : ''}`,
             null,
             {
                 // The gateway rejects the handshake (403) unless the origin is Discord's own,
@@ -239,46 +234,26 @@ export class GatewaySocket {
                 headers: { Origin: WEBSOCKET_ORIGIN },
             },
         )
-        // Supported by React Native but missing from its typings.
-        ;(ws as WebSocket & { binaryType: string }).binaryType = 'arraybuffer'
         this.ws = ws
+        // The frames are decompressed on the socket's reader thread and reach JS as text, so JS only parses them.
+        if (supportsZstd) {
+            this.socketId = (ws as WebSocket & { _socketId: number })._socketId
+            compression.enableZstdStreamSupport(this.socketId)
+        }
         this.setState('connecting')
+        this.queue = []
 
-        // One zstd context per connection. The server flushes the stream at the end of every message.
-        this.chunks = []
-        this.decompress = new Decompress(chunk => this.chunks.push(chunk))
-
-        let inflateMs = 0
-        let compressedBytes = 0
+        // The frames are only queued here. Handling them in the drain lets the JS thread yield between
+        // payloads, so a resume burst does not freeze React and native events.
         ws.onmessage = event => {
-            const frame = new Uint8Array(event.data as ArrayBuffer)
-            compressedBytes += frame.length
-            const started = performance.now()
-            this.decompress?.push(frame)
-            inflateMs += performance.now() - started
-            if (this.chunks.length === 0) return
-
-            const chunks = this.chunks
-            this.chunks = []
-            // Where a large payload (READY) spends its time on the JS thread.
-            const t0 = performance.now()
-            const text = strFromU8(concat(chunks))
-            const t1 = performance.now()
-            const payload: GatewayPayload = JSON.parse(text)
-            const t2 = performance.now()
-            this.handlePayload(payload)
-            const t3 = performance.now()
-            if (text.length > 100_000) {
-                const ms = (value: number) => Math.round(value)
-                log.info(
-                    `${payload.t}: ${ms(text.length / 1024)} KB, inflate ${ms(inflateMs)} ms, ` +
-                        `decode ${ms(t1 - t0)} ms, parse ${ms(t2 - t1)} ms, handlers ${ms(t3 - t2)} ms`,
-                )
+            const data = event.data
+            // The server mirrors the requested `compress`, so every frame arrives as text.
+            if (typeof data !== 'string') {
+                log.warn('Binary frame: zstd support is off')
+                return
             }
-            if (payload.t === 'READY')
-                logReadySize(payload.d, text.length, compressedBytes)
-            inflateMs = 0
-            compressedBytes = 0
+            this.queue.push(data)
+            this.scheduleDrain()
         }
         ws.onclose = event => {
             log.warn(
@@ -290,6 +265,56 @@ export class GatewaySocket {
         ws.onerror = event => {
             log.warn(`Error: ${(event as { message?: string }).message}`)
         }
+    }
+
+    /** Queues a drain, unless one is already scheduled. */
+    private scheduleDrain(): void {
+        if (this.draining) return
+        this.draining = true
+        setImmediate(this.drain)
+    }
+
+    /**
+     * Handles the queued payloads in order, for DISPATCH_BUDGET_MS at most, then yields. The queue is filled
+     * by `onmessage` and stays cheap, so React renders and native events run between the slices.
+     */
+    private drain = (): void => {
+        const started = performance.now()
+        try {
+            while (this.queue.length > 0) {
+                this.handleText(this.queue.shift() as string)
+                if (performance.now() - started >= DISPATCH_BUDGET_MS) break
+            }
+        } finally {
+            // A payload that fails to parse still lets the ones behind it through.
+            if (this.queue.length > 0) setImmediate(this.drain)
+            else this.draining = false
+        }
+    }
+
+    /** Parses a payload and hands it to the store listeners. */
+    private handleText(text: string): void {
+        // Where a large payload (READY) spends its time on the JS thread.
+        const t0 = performance.now()
+        const payload: GatewayPayload = JSON.parse(text)
+        const t1 = performance.now()
+        this.handlePayload(payload)
+        const t2 = performance.now()
+        if (text.length > 100_000) {
+            const ms = (value: number) => Math.round(value)
+            log.info(
+                `${payload.t}: ${ms(text.length / 1024)} KB, ` +
+                    `parse ${ms(t1 - t0)} ms, handlers ${ms(t2 - t1)} ms`,
+            )
+        }
+        if (payload.t === 'READY') logReadySize(payload.d, text.length)
+    }
+
+    /** Stops native decompression for the current socket and frees its zstd stream. */
+    private disableCompression(): void {
+        if (this.socketId === null) return
+        compression.disableZstdStreamSupport(this.socketId)
+        this.socketId = null
     }
 
     private handlePayload(payload: GatewayPayload): void {
@@ -488,7 +513,8 @@ export class GatewaySocket {
         this.heartbeatTimer = this.reconnectTimer = this.expeditedTimer = null
         const ws = this.ws
         this.ws = null
-        this.decompress = null
+        this.disableCompression()
+        this.queue = []
         if (ws && closeCode !== undefined) {
             ws.onmessage = ws.onclose = ws.onerror = null
             ws.close(closeCode)

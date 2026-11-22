@@ -315,7 +315,6 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [ ] `/experiments` `X-Context-Properties` location is assumed `/` (getFingerprintLocation with the router at its initial path). Confirm.
 - [ ] Super property key order for `device_model_name` and `install_source` is unverified: the datamine (350.2.3) predates them.
 - [ ] IDENTIFY always takes the non-fast-connect path (`is_fast_connect: false`); the reference fast-connects natively on cold start with an empty `client_state`.
-- [ ] Measure zstd (fzstd) decode time of READY on device against the old zlib path.
 - [ ] Refresh the phone list new accounts claim (`src/core/api/devices.ts`) as models age, and raise the SDK cap past 36 once Android 17 is common.
 - [ ] No analytics (`/science`) are sent; the reference sends many. Decide whether silence or fakes is the lesser signal.
 
@@ -652,6 +651,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [ ] External plugins on top of the `Feature` registry.
 - [ ] Cache follow-ups: per-store cache versions; cache size monitoring; persist DM previews lazily; maybe cache presences.
 - [ ] Startup: measure time to first *meaningful* frame in release (`reportFullyDrawn`); lazy-load screens that aren't on the first frame.
+  - Android 16 emulator, signed-in Servers, 20 cold launches per full build. Baseline first frame 1230 ms median and 1438 ms p90. Servers fully drawn 1386 ms median and 1630 ms p90. Deferring Gallery, Logs and Performance screens showed no repeatable gain. Minimal React Native view with the same native bootstrap took 555 ms median and 590 ms p90 across 12 launches. Repeat on a physical phone and profile the initial Servers mount.
 - [ ] Release builds: Android lint crashes (`lintVitalAnalyzeRelease`, a lint bug) — find the cause instead of skipping it; building every ABI takes over 20 minutes (use `-PreactNativeArchitectures=x86_64` for local testing); a real signing config.
 - [ ] Tests: there are none yet (stores, markdown, buildRows, gateway are good candidates).
 - [x] Version control: the project is not a git repository yet.
