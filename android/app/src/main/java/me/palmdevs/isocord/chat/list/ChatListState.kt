@@ -16,6 +16,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import me.palmdevs.isocord.chat.rows.ChatRow
 
 /**
@@ -23,6 +24,9 @@ import me.palmdevs.isocord.chat.rows.ChatRow
  * at once. The reference's DimensionStore.isAtBottom wants the exact bottom; a little slack forgives a nudge.
  */
 internal val AT_BOTTOM_BUFFER = 32.dp
+
+/** Time uncomposed arrivals stay eligible to animate before settling. */
+private const val ARRIVALS_SETTLE_MS = 1_000L
 
 /**
  * Where each chat was left, by channel, for the app process. Holds the first visible row's key and its offset.
@@ -70,10 +74,10 @@ internal class ComposerSize {
 }
 
 /** Whether the newest row is laid out within [buffer] px of its resting place at the bottom. */
-internal fun LazyListState.isAtBottom(buffer: Float): Boolean {
+internal fun LazyListState.isAtBottom(buffer: Float, maxIndex: Int = 0): Boolean {
   val newest = layoutInfo.visibleItemsInfo.firstOrNull() ?: return false
   // Offsets run from the bottom (reversed layout): a list scrolled up by d px has the newest row at -d.
-  return newest.index == 0 && -newest.offset <= buffer
+  return newest.index <= maxIndex && -newest.offset <= buffer
 }
 
 /**
@@ -82,13 +86,13 @@ internal fun LazyListState.isAtBottom(buffer: Float): Boolean {
  */
 internal class ChatArrivals {
   private var rows: List<ChatRow> = emptyList()
-  private var entering: MutableSet<String> = HashSet()
+  private val entering: MutableSet<String> = HashSet()
 
   /** Whether the last [update] got new rows. A recomposition with the same rows returns the same set, unchanged. */
   var fresh = false
     private set
 
-  fun update(next: List<ChatRow>): Set<String> {
+  fun update(next: List<ChatRow>, lazyKey: (String) -> String = { it }): Set<String> {
     fresh = next !== rows
     if (!fresh) return entering
     val previous = rows
@@ -97,11 +101,14 @@ internal class ChatArrivals {
     val at = if (newest == null || newest is ChatRow.Loading || next.firstOrNull() is ChatRow.Loading) {
       -1
     } else {
-      next.indexOfFirst { it.key == newest.key }
+      val newestKey = lazyKey(newest.key)
+      next.indexOfFirst { lazyKey(it.key) == newestKey }
     }
-    entering = if (at <= 0) HashSet() else {
-      val known = previous.mapTo(HashSet<String>()) { it.key }
-      next.subList(0, at).mapNotNullTo(HashSet<String>()) { row -> row.key.takeIf { it !in known } }
+    if (at < 0) {
+      entering.clear()
+    } else if (at > 0) {
+      val known = previous.mapTo(HashSet<String>()) { lazyKey(it.key) }
+      next.subList(0, at).mapNotNullTo(entering) { row -> row.key.takeIf { lazyKey(it) !in known } }
     }
     return entering
   }
@@ -155,24 +162,31 @@ internal fun RestoreScrollOnFirstRows(state: LazyListState, rows: List<ChatRow>,
 
 /** Scrolls to the bottom when the user's own or a read-along message arrives; returns the arrivals for row motion. */
 @Composable
-internal fun rememberArrivals(state: LazyListState, rows: List<ChatRow>, atBottomBuffer: Float): ChatArrivals {
+internal fun rememberArrivals(
+  state: LazyListState,
+  rows: List<ChatRow>,
+  changes: ChatRowChanges,
+  atBottomBuffer: Float,
+  typingInset: Float = 0f,
+): ChatArrivals {
   // Messages that just arrived at the newest end. A lazy list keeps its first visible row in place (by key) when
   // rows are inserted before it, which would leave a new message under the chat input. So, in the same pass that
   // composes it (no frame shows it hidden): the user's own message always brings the list to the bottom, as
   // sending does in the reference, and anyone's does while the user was reading the newest one.
   val arrivals = remember { ChatArrivals() }
-  val entering = arrivals.update(rows)
+  val entering = arrivals.update(rows, changes::lazyKey)
   // Only on the pass that got the new rows: later recompositions (the jump button, an inset) return the same set,
   // and scrolling again then would pull back a user who scrolled up while their message is still sending.
   if (arrivals.fresh && entering.isNotEmpty()) {
     val newest = rows.first()
     val own = newest is ChatRow.Message && newest.status == "sending" && newest.key in entering
     // Read without subscribing: this composable must not recompose on every scrolled frame.
-    if (own || Snapshot.withoutReadObservation { state.isAtBottom(atBottomBuffer) }) state.requestScrollToItem(0)
+    if (own || Snapshot.withoutReadObservation { state.isAtBottom(atBottomBuffer + typingInset, maxIndex = entering.size) }) {
+      state.requestScrollToItem(0)
+    }
   }
   LaunchedEffect(rows) {
-    withFrameNanos {}
-    withFrameNanos {}
+    delay(ARRIVALS_SETTLE_MS)
     arrivals.settle()
   }
   return arrivals

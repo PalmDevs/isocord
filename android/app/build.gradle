@@ -93,6 +93,9 @@ android {
     }
 
     namespace "me.palmdevs.isocord"
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
     defaultConfig {
         applicationId "me.palmdevs.isocord"
         minSdkVersion rootProject.ext.minSdkVersion

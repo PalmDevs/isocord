@@ -178,15 +178,20 @@ internal class RowMotionNode(var leaving: Boolean, var onLeft: () -> Unit) : Mod
   override fun onAttach() = start()
 
   override fun onDetach() {
+    job?.cancel()
     job = null
-    settle()
+    if (leaving) settle()
   }
 
   fun start() {
     job?.cancel()
+    val target = if (leaving) 0f else 1f
+    if (height == target && opacity == target) {
+      settle()
+      return
+    }
     val fromHeight = height
     val fromOpacity = opacity
-    val target = if (leaving) 0f else 1f
     val heightMs = if (leaving) EXIT_HEIGHT_MS else ENTER_HEIGHT_MS
     val fadeMs = if (leaving) EXIT_FADE_MS else ENTER_FADE_MS
     job = coroutineScope.launch {

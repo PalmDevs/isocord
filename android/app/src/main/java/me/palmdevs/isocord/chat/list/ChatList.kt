@@ -147,8 +147,8 @@ fun ChatList(
   val typing by animateDpAsState(typingInset, TypingInsetSpring.spec, label = "typingInset")
   key(scrollKey) {
     ChatListContent(
-      scrollKey, scrollTarget, jumpTarget, composerTarget, rows, theme, fonts, bottomInset + typing, onLoadOlder, onLoadNewer, onJumpToPresent,
-      onLinkPress, onMessageLongPress, onMessageSwipe, onRowsDrawn, onAtBottomChange, composerHeight,
+      scrollKey, scrollTarget, jumpTarget, composerTarget, rows, theme, fonts, bottomInset + typing, maxOf(typing, typingInset),
+      onLoadOlder, onLoadNewer, onJumpToPresent, onLinkPress, onMessageLongPress, onMessageSwipe, onRowsDrawn, onAtBottomChange, composerHeight,
     )
   }
 }
@@ -163,6 +163,7 @@ private fun ChatListContent(
   theme: ChatTheme,
   fonts: ChatFonts,
   bottomInset: Dp,
+  typingInset: Dp,
   onLoadOlder: () -> Unit,
   onLoadNewer: () -> Unit,
   onJumpToPresent: () -> Unit,
@@ -201,13 +202,14 @@ private fun ChatListContent(
   SideEffect { highlight.composerTarget = composerTarget }
   val scrollMargin = with(LocalDensity.current) { SCROLL_MARGIN.toPx() }
   val atBottomBuffer = with(LocalDensity.current) { AT_BOTTOM_BUFFER.toPx() }
+  val typingInsetPx = with(LocalDensity.current) { typingInset.toPx() }
   val gifvPool = rememberGifvPool()
   val scrolling = rememberChatScrolling(state)
   val hasContent = rows.any { it !is ChatRow.Loading }
   val postActionsPinned = postActionsPinned(state, rows, changes, postActions)
 
   RestoreScrollOnFirstRows(state, rows, changes, scrollKey, hasContent)
-  val arrivals = rememberArrivals(state, rows, atBottomBuffer)
+  val arrivals = rememberArrivals(state, rows, changes, atBottomBuffer, typingInsetPx)
 
   CompositionLocalProvider(
     LocalChatTheme provides theme,
@@ -259,6 +261,8 @@ private fun ChatListContent(
   LoadOlderEffect(state, rows, onLoadOlder)
 }
 
+private val NOOP_LEFT: () -> Unit = {}
+
 /** One row with its enter or leave motion. */
 @Composable
 private fun LazyItemScope.AnimatedRow(row: ChatRow, changes: ChatRowChanges, arrivals: ChatArrivals) {
@@ -268,7 +272,7 @@ private fun LazyItemScope.AnimatedRow(row: ChatRow, changes: ChatRowChanges, arr
   val enter = remember { arrivals.consume(row.key) }
   val motion = when {
     changes.isLeaving(row.key) -> RowMotion(leaving = true, onLeft = { changes.finish(row.key) })
-    enter -> RowMotion(leaving = false, onLeft = {})
+    enter -> RowMotion(leaving = false, onLeft = NOOP_LEFT)
     else -> Modifier
   }
   Box(motion) { RowContent(row) }
