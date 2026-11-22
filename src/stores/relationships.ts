@@ -59,6 +59,13 @@ export const relationshipsStore = defineStore('relationships', session => {
     return store
 })
 
+/** RelationshipStore.isBlockedOrIgnored: whether the relationship hides a user's messages. */
+export const isBlockedOrIgnored = (
+    relationship: Relationship | undefined,
+): boolean =>
+    relationship?.type === RelationshipType.BLOCKED ||
+    relationship?.user_ignored === true
+
 /** Returns the relationship type with a user (RelationshipType), undefined when there is none. */
 export const useRelationshipType = (userId: string): number | undefined =>
     useSessionStore(relationshipsStore, state => state.byId[userId]?.type)

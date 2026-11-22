@@ -14,6 +14,7 @@ import { defineStore } from '../core/session'
 import { channelsStore, isThread } from './channels/channels'
 import { dataModeOf, guildsStore } from './guilds'
 import { can } from './permissions'
+import { isBlockedOrIgnored, relationshipsStore } from './relationships'
 import { settingsStore } from './settings/settingsStore'
 import {
     isChannelOrParentOptedIn,
@@ -123,6 +124,7 @@ export const readStatesStore = defineStore(
         // Created first so their handlers run before this store's and it reads fresh data.
         const channels = session.get(channelsStore)
         const guilds = session.get(guildsStore)
+        const relationships = session.get(relationshipsStore)
         const settings = session.get(settingsStore)
         const store = createStore<ReadStatesState>(() => ({
             acks: {},
@@ -320,6 +322,13 @@ export const readStatesStore = defineStore(
 
         /** Whether a message counts as a mention, and how important: 'low' for MENTION_ON_ALL_MESSAGES. */
         const mentionsMe = (message: Message): 'high' | 'low' | false => {
+            // RelationshipStore.isBlockedOrIgnoredForMessage: a hidden author never badges.
+            if (
+                isBlockedOrIgnored(
+                    relationships.getState().byId[message.author.id],
+                )
+            )
+                return false
             const guildId = message.guild_id ?? guildOf(message.channel_id)
             const settingsState = settings.getState()
             // Every message in a private channel notifies, unless the conversation is muted.
@@ -557,12 +566,14 @@ export function markMessageUnread(
     const index = messages.findIndex(message => message.id === messageId)
     if (index === -1) return
     const previous = messages[index + 1]?.id ?? String(BigInt(messageId) - 1n)
+    const relationships = session.get(relationshipsStore).getState().byId
     const mentions = messages
         .slice(0, index + 1)
         .filter(
             message =>
-                message.mention_everyone ||
-                message.mentions?.some(user => user.id === session.userId),
+                !isBlockedOrIgnored(relationships[message.author.id]) &&
+                (message.mention_everyone ||
+                    message.mentions?.some(user => user.id === session.userId)),
         ).length
     ackManually(session, channelId, previous, mentions)
 }
