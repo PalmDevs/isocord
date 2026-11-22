@@ -38,7 +38,7 @@ Features (`src/core/feature.ts`) contribute stores, gateway handlers, screens an
 ```sh
 bun scripts/extract-tokens.ts <discord-mobile-datamining>
 bun scripts/extract-icons.ts <discord-mobile-datamining> <res.apk>
-bun scripts/read-datamine.ts <datamined-file> [--apk <base.apk>]   # readable view of a reference file
+bun scripts/read-datamine.ts --datamine <discord-mobile-datamining> <datamined-file> [--apk <base.apk>]   # readable view of a reference file
 scripts/extract-fonts.sh <base.apk>
 bun run twemoji                                                    # re-fetch Twemoji after a version bump
 ```

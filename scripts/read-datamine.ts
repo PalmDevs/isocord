@@ -1,11 +1,11 @@
 /**
- * Explores the decompiled Discord app in `../discord-mobile-datamining`.
+ * Explores a decompiled Discord app checkout, given with `--datamine`.
  *
- *   bun scripts/read-datamine.ts [read] <file> [--lines A-B] [--raw] [--apk <base.apk>]
- *   bun scripts/read-datamine.ts outline <file>
- *   bun scripts/read-datamine.ts find <word>...
- *   bun scripts/read-datamine.ts grep <regex> [dir] [-i] [--max N]   (searches the cleaned text)
- *   bun scripts/read-datamine.ts msg <hash|text> [--apk <base.apk>]
+ *   bun scripts/read-datamine.ts --datamine <path> [read] <file> [--lines A-B] [--raw] [--apk <base.apk>]
+ *   bun scripts/read-datamine.ts --datamine <path> outline <file>
+ *   bun scripts/read-datamine.ts --datamine <path> find <word>...
+ *   bun scripts/read-datamine.ts --datamine <path> grep <regex> [dir] [-i] [--max N]   (searches the cleaned text)
+ *   bun scripts/read-datamine.ts --datamine <path> msg <hash|text> [--apk <base.apk>]
  *
  * `read` prints a file with decompiler noise removed (see scripts/datamine/clean.ts):
  *   - the plain variant of components that also ship a React Compiler variant
@@ -21,10 +21,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { clean } from './datamine/clean.ts'
 import {
-    DATAMINE_ROOT,
+    getDatamineRoot,
     listFiles,
     resolveFile,
     SOURCE_ROOTS,
+    setDatamineRoot,
     sizeOf,
 } from './datamine/files.ts'
 import {
@@ -45,6 +46,7 @@ const DECLARATION =
 const USAGE_FOLDERS = ['discord_app']
 
 const USAGE = `usage:
+  --datamine <path>                                    (the decompiled Discord app checkout)
   read <file> [--lines A-B] [--raw] [--apk <base.apk>]   (read is the default)
   outline <file>
   find <word>...
@@ -119,7 +121,7 @@ function grep(args: string[]) {
     const pattern = new RegExp(source, ignoreCase ? 'i' : '')
     let count = 0
     for (const file of listFiles(dir ? [dir] : SOURCE_ROOTS)) {
-        const lines = view(join(DATAMINE_ROOT, file), false).split('\n')
+        const lines = view(join(getDatamineRoot(), file), false).split('\n')
         for (const [index, line] of lines.entries()) {
             if (!pattern.test(line)) continue
             if (++count > max)
@@ -137,7 +139,7 @@ function usedBy(hash: string): string[] {
     const reference = new RegExp(`\\bt\\.${hash}\\b|\\bt\\["${hash}"\\]`)
     return listFiles(USAGE_FOLDERS)
         .filter(file =>
-            reference.test(readFileSync(join(DATAMINE_ROOT, file), 'utf8')),
+            reference.test(readFileSync(join(getDatamineRoot(), file), 'utf8')),
         )
         .slice(0, MAX_USAGE_FILES)
 }
@@ -157,7 +159,11 @@ function msg(args: string[]) {
     if (!found.length) console.log('no messages')
 }
 
-const [command, ...rest] = process.argv.slice(2)
+const args = process.argv.slice(2)
+const datamine = takeOption(args, '--datamine')
+if (!datamine) fail(USAGE)
+setDatamineRoot(datamine)
+const [command, ...rest] = args
 if (!command) fail(USAGE)
 const commands: Record<string, (args: string[]) => void> = {
     read,

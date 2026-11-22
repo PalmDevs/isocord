@@ -168,8 +168,9 @@ yourself. `read-datamine.ts` shows the text for each hash.
 
 ### Reading the datamine
 
-The files are large and noisy, so `bun scripts/read-datamine.ts` narrows
-before it reads. Every command works from any folder.
+The files are large and noisy, so
+`bun scripts/read-datamine.ts --datamine <path>` narrows before it reads.
+Every command works from any folder.
 
 | Command | Use |
 | --- | --- |

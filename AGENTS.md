@@ -15,7 +15,7 @@ uploads are native Kotlin and Jetpack Compose, in
 - **Copy the reference, don't invent.** Before building or changing UI or
   behaviour, look up how the official client does it:
   - the decompiled JS in `../discord-mobile-datamining`, explored with
-    `bun scripts/read-datamine.ts`. Never `cat` or read a raw file. Narrow
+    `bun scripts/read-datamine.ts --datamine <path>`. Never `cat` or read a raw file. Narrow
     down first, then read only the lines you need ([details](CONTRIBUTING.md#reading-the-datamine)):
     - `find <words>` lists files, `grep <regex>` finds code and English text,
       `msg <text|hash>` finds a Discord string and where it is used;
@@ -32,7 +32,7 @@ uploads are native Kotlin and Jetpack Compose, in
   Add no speculative abstractions, options or fallbacks.
 - **Strings:** use `t('key')` and `src/i18n/locales/en-US.json`. Copy the
   English text from Discord's intl messages by hash. Don't write it
-  yourself. `read-datamine.ts --apk <base.apk>` prints the text next to
+  yourself. `read-datamine.ts --datamine <path> --apk <base.apk>` prints the text next to
   each hash.
 - **Styling:**
   - use generated tokens through unistyles (`theme.colors`, `theme.space`,
