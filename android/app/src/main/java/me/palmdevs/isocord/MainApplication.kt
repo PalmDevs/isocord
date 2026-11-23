@@ -1,6 +1,7 @@
 package me.palmdevs.isocord
 import android.content.res.Configuration
 import android.content.res.Resources
+import android.util.Log
 import androidx.compose.foundation.AndroidComposeFoundationFlags
 import androidx.compose.foundation.ExperimentalFoundationApi
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -14,6 +15,8 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
+import com.facebook.react.internal.featureflags.ReactNativeFeatureFlags
+import com.facebook.react.internal.featureflags.ReactNativeNewArchitectureFeatureFlagsDefaults
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -26,6 +29,8 @@ import me.palmdevs.isocord.input.ChatInputPackage
 import me.palmdevs.isocord.network.IsocordNetwork
 import me.palmdevs.isocord.notifications.NotificationsPackage
 import me.palmdevs.isocord.upload.UploaderPackage
+
+private const val TAG = "IsocordStartup"
 
 class MainApplication : Application(), ReactApplication {
 
@@ -60,6 +65,12 @@ class MainApplication : Application(), ReactApplication {
     IsocordNetwork.install(this)
     TwemojiFonts.registerReactFonts(assets)
     loadReactNative(this)
+    if (BuildConfig.DISCORD_MOUNTING_FLAGS) {
+      // Flags read before this keep their stable value, so they are logged.
+      ReactNativeFeatureFlags.dangerouslyForceOverride(DiscordMountingFlags)?.let {
+        Log.w(TAG, "Feature flags read before the override: $it")
+      }
+    }
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
     // The reference's PreInitReactHost thread: builds the host while the activity starts.
     CoroutineScope(Dispatchers.Default).launch { reactHost }
@@ -90,4 +101,17 @@ class MainApplication : Application(), ReactApplication {
     super.onConfigurationChanged(newConfig)
     ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
   }
+}
+
+/**
+ * The reference's mounting-mode experiment at mode 3 (MainApplication$reactNativeInitializationTask$1$1).
+ * Every other flag keeps the stable value that loadReactNative sets.
+ */
+private object DiscordMountingFlags : ReactNativeNewArchitectureFeatureFlagsDefaults() {
+  override fun enableAccumulatedUpdatesInRawPropsAndroid() = true
+
+  override fun enablePropsUpdateReconciliationAndroid() = true
+
+  // The reference's usePullModelOnAndroid is a fork flag. React Native's own pull model.
+  override fun enableMountingCoordinatorPullModelAndroid() = true
 }
