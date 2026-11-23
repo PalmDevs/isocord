@@ -6,7 +6,8 @@ import type { SemanticColor, TextVariant } from '../tokens'
 
 export interface TextProps extends NativeTextProps {
     variant?: TextVariant
-    color?: SemanticColor
+    /** Pass null when an animated style owns the color. */
+    color?: SemanticColor | null
     /** Maximum number of lines before truncating. */
     lineClamp?: number
     /** Fixed-width digits, for counters and timers that change in place. */
@@ -37,11 +38,11 @@ export function Text({
 const styles = StyleSheet.create(theme => ({
     text: (
         variant: TextVariant,
-        color: SemanticColor,
+        color: SemanticColor | null,
         tabularNumbers: boolean,
     ) => ({
         ...theme.text[variant],
-        color: theme.colors[color],
+        ...(color === null ? {} : { color: theme.colors[color] }),
         includeFontPadding: false,
         fontVariant: tabularNumbers ? ['tabular-nums' as const] : undefined,
     }),

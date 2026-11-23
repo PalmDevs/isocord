@@ -287,6 +287,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 
 ### Design system
 - [ ] Tabs / SegmentedControl paging (`Pages.tsx`, `react-native-pager-view@10`) is untested on device: swipe, fling, tap-to-jump across unmounted pages, lazy mounting.
+- [x] Scoped tab labels and counts use Reanimated for color.
 - [ ] `Pages.tsx` passes `onPageScroll` as `never` (Reanimated handler vs codegen event type).
 - [ ] Large SegmentedControl: indicator dragging is disabled while attached to pages.
 - [ ] `onSetActiveIndex` no longer fires when re-selecting the active index (behaviour change; no callers rely on it).

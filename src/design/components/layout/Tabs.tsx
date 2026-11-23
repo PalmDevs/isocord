@@ -195,7 +195,6 @@ function TabStrip({
                                 <TabText
                                     index={index}
                                     position={position}
-                                    selected={isSelected}
                                     activeColor={activeColor}
                                     variant="text-sm/semibold"
                                     lineClamp={1}
@@ -206,7 +205,6 @@ function TabStrip({
                                     <TabText
                                         index={index}
                                         position={position}
-                                        selected={isSelected}
                                         activeColor={activeColor}
                                         variant="text-sm/medium"
                                         lineClamp={1}
@@ -230,21 +228,18 @@ function TabStrip({
     )
 }
 
-/** Label whose colour blends from muted to active as the pager position nears `index`. Colour only, never weight. */
+/** SegmentedControlItem: Animates the label color with selection. */
 function TabText({
     index,
     position,
-    selected,
     activeColor,
     ...props
 }: Omit<TextProps, 'color' | 'animated'> & {
     index: number
     position: SharedValue<number>
-    selected: boolean
     activeColor: 'TEXT_STRONG' | 'TEXT_BRAND'
 }) {
     const { theme } = useUnistyles()
-    const [initialSelected] = useState(selected)
     const inactive = theme.colors.TEXT_MUTED
     const active = theme.colors[activeColor]
     const colorStyle = useAnimatedStyle(() => ({
@@ -258,14 +253,8 @@ function TabText({
         <Text
             {...props}
             animated
-            color={initialSelected ? activeColor : 'TEXT_MUTED'}
-            style={
-                [
-                    props.style,
-                    { color: initialSelected ? active : inactive },
-                    colorStyle,
-                ] as never
-            }
+            color={null}
+            style={[props.style, colorStyle] as never}
         />
     )
 }
