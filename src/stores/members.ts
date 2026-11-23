@@ -156,6 +156,7 @@ export const membersStore = defineStore(
             }
             return { members }
         },
+        deferRestore: true,
     },
 )
 

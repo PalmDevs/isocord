@@ -28,6 +28,9 @@ export function SessionProvider({
         }
     }, [])
 
+    // After the first commit with this session: restores the stores it didn't need.
+    useEffect(() => session?.restoreWhenIdle(), [session])
+
     if (!session) return fallback
     return <SessionContext value={session}>{children}</SessionContext>
 }

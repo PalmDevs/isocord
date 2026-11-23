@@ -105,6 +105,7 @@ export const frecencyStore = defineStore(
         ],
         // favoriteGifs was added.
         cacheVersion: 1,
+        deferRestore: true,
     },
 )
 

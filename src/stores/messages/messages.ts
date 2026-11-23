@@ -309,6 +309,8 @@ export const messagesStore = defineStore(
         return store
     },
     {
+        // The first frame shows a chat only when one is open. `get` restores it then.
+        deferRestore: true,
         cache: state => ({
             channels: Object.fromEntries(
                 cachedChannels(state).map(([id, messages]) => [

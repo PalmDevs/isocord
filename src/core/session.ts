@@ -8,8 +8,8 @@ import { features } from './feature'
 import { GatewaySocket } from './gateway/socket'
 import { logger } from './log'
 import { NotifyBatch } from './notifyBatch'
-import { accountStorage, readJson, writeJson } from './storage'
-import { beginSection, endSection } from './trace'
+import { accountStorage } from './storage'
+import { StoreCache } from './storeCache'
 import type { MMKV } from 'react-native-mmkv'
 import type { StoreApi } from 'zustand/vanilla'
 import type { ClientState } from './gateway/socket'
@@ -35,11 +35,25 @@ export type CacheSpec<State> =
     | ReadonlyArray<keyof State & string>
     | ((state: State, references: () => CacheReferences) => Partial<State>)
 
+/** Saves a store's cache as one storage entry per part, so a change rewrites only its part. */
+export interface CacheParts<State> {
+    /** Splits the saved state. A part is rewritten when a value two levels down changes identity. */
+    split: (saved: Partial<State>) => Record<string, object>
+    /** Rebuilds the state to restore from the parts read back. Some may be missing. */
+    join: (parts: Record<string, object>) => Partial<State>
+}
+
 /** A per-session store. Create with `defineStore`, read with `session.get` or `useSessionStore`. */
 export interface StoreDefinition<T> {
     name: string
     create: (session: Session) => T
     cache?: CacheSpec<StateOf<T>>
+    cacheParts?: CacheParts<StateOf<T>>
+    /**
+     * Restores the cache in idle time after the first commit, not at startup. For stores the first frame
+     * doesn't show. The first dispatch or a later `get` restores it at once.
+     */
+    deferRestore?: boolean
     /** Bump when this store's cached state changes shape. Only its own older cache is then ignored. */
     cacheVersion?: number
     /** Adds the users and members that the store's saved state shows. */
@@ -100,14 +114,11 @@ export class Session {
 
     private stores = new Map<StoreDefinition<unknown>, unknown>()
     private cleanups: Array<() => void> = []
-    /** Cached stores that have changed since the cache was last written. */
-    private cacheDirty = new Set<StoreDefinition<unknown>>()
-    /** False when the previous launch crashed while starting from the cache. */
-    private readonly useCache: boolean
-    /** How many stores got their state from the cache this launch. */
-    private restoredStores = 0
+    private readonly cache: StoreCache
     /** Holds UI notifications during a gateway slice. */
     private readonly notify = new NotifyBatch()
+    /** True while the constructor wires stores. A `get` after it restores a deferred store. */
+    private starting = true
     private clientStateProviders: Array<
         () => Partial<ClientState> | undefined
     > = []
@@ -122,12 +133,13 @@ export class Session {
     ) {
         const started = performance.now()
         this.storage = accountStorage(userId)
-        this.useCache = !this.storage.getBoolean(RESTORING_KEY)
-        if (!this.useCache)
+        const useCache = !this.storage.getBoolean(RESTORING_KEY)
+        if (!useCache)
             log.warn(
                 'The last launch crashed while starting, so the cache is skipped',
             )
         this.storage.set(RESTORING_KEY, true)
+        this.cache = new StoreCache(this, this.storage, cacheVersion, useCache)
         // A 401 is not a logout: the reference only logs out when the gateway rejects the token (4004).
         this.rest = new RestClient({
             identity: accountIdentity(userId, this.storage),
@@ -140,6 +152,8 @@ export class Session {
             () => this.clientState(),
             () => this.storage.getString(QOS_KEY),
             slice => {
+                // Partial READY merges onto restored state, and IDENTIFY claims it.
+                this.cache.restorePending()
                 if (this.gateway.state === 'resuming')
                     this.notify.pause(RESUME_NOTIFY_PAUSE_MS)
                 this.notify.batched(slice)
@@ -151,7 +165,9 @@ export class Session {
             ),
         )
 
-        // Stores and handlers are wired before connecting so none of them miss READY.
+        // The handshake runs on native threads while the cache restores. Frames wait for a drain timer,
+        // so every handler below is wired before READY.
+        this.gateway.connect()
         for (const feature of features) {
             const featureStarted = performance.now()
             for (const store of feature.stores ?? []) this.get(store)
@@ -161,14 +177,15 @@ export class Session {
                 `Set up ${feature.name} in ${Math.round(performance.now() - featureStarted)} ms`,
             )
         }
+        this.starting = false
         log.info(
-            `Started in ${Math.round(performance.now() - started)} ms, ${this.restoredStores} stores from the cache`,
+            `Started in ${Math.round(performance.now() - started)} ms, ${this.cache.restored} stores from the cache`,
         )
 
         const scheduleSave = () => {
             clearTimeout(this.cacheTimer)
             this.cacheTimer = setTimeout(
-                () => this.saveCache(),
+                () => this.cache.saveWhenIdle(),
                 CACHE_SAVE_DELAY_MS,
             )
         }
@@ -202,8 +219,6 @@ export class Session {
             }
         })
         this.cleanups.push(() => appState.remove())
-
-        this.gateway.connect()
     }
 
     /**
@@ -220,7 +235,7 @@ export class Session {
     /** Plain `{ guild_versions: {} }` unless this launch restored a cache or READY has filled the stores since. */
     private clientState(): ClientState {
         const state: ClientState = { guild_versions: {} }
-        if (this.restoredStores === 0 && !this.ready) return state
+        if (this.cache.restored === 0 && !this.ready) return state
         state.api_code_version = this.storage.getNumber(API_CODE_VERSION_KEY)
         for (const provider of this.clientStateProviders) {
             try {
@@ -240,16 +255,19 @@ export class Session {
     }
 
     get<T>(definition: StoreDefinition<T>): T {
-        if (!this.stores.has(definition)) {
-            const store = definition.create(this)
+        let store = this.stores.get(definition) as T | undefined
+        if (store === undefined) {
+            store = definition.create(this)
             this.stores.set(definition, store)
             if (definition.cache)
-                this.restore(
+                this.cache.add(
                     definition as StoreDefinition<unknown>,
                     store as StoreApi<object>,
+                    this.starting && definition.deferRestore === true,
                 )
-        }
-        return this.stores.get(definition) as T
+        } else if (!this.starting)
+            this.cache.restorePending(definition as StoreDefinition<unknown>)
+        return store
     }
 
     /** Returns a store whose listeners hear once per gateway slice. For React subscriptions. */
@@ -257,96 +275,24 @@ export class Session {
         return this.notify.view(this.get(definition))
     }
 
-    private restore(
-        definition: StoreDefinition<unknown>,
-        store: StoreApi<object>,
-    ): void {
-        const key = `cache.${definition.name}`
-        beginSection(`cache:${definition.name}`)
-        try {
-            const cached = this.useCache
-                ? readJson<{ version: string; state: object }>(
-                      this.storage,
-                      key,
-                  )
-                : undefined
-            if (cached?.version === cacheVersion(definition)) {
-                store.setState(cached.state)
-                this.restoredStores++
-                log.debug(`Restored ${definition.name} from the cache`)
-            }
-        } catch (error) {
-            // A corrupt cache only costs the head start; READY rebuilds the state.
-            log.warn(`Dropped the cache of ${definition.name}`, error)
-            this.storage.remove(key)
-        } finally {
-            endSection()
-        }
-        store.subscribe(() => this.cacheDirty.add(definition))
+    /** Restores the deferred stores in idle time. Call after the first commit. */
+    restoreWhenIdle(): void {
+        this.cache.restoreWhenIdle()
     }
 
-    /** Writes the stores that changed since the last save. Cheap enough to call on backgrounding. */
+    /**
+     * Writes the stores that changed since the last save, at once. Backgrounding calls it.
+     * Timers and idle callbacks stop in the background, and the process can be killed.
+     */
     saveCache(): void {
         clearTimeout(this.cacheTimer)
-        if (this.cacheDirty.size === 0 || !this.ready) return
-        const started = performance.now()
-        const picked = new Map<StoreDefinition<unknown>, object>()
-        let references: CacheReferences | undefined
-        const pick = (definition: StoreDefinition<unknown>) => {
-            let state = picked.get(definition)
-            if (!state) {
-                state = this.pickCache(definition, () => {
-                    references ??= this.cacheReferences(pick)
-                    return references
-                })
-                picked.set(definition, state)
-            }
-            return state
-        }
-        for (const definition of this.cacheDirty)
-            writeJson(this.storage, `cache.${definition.name}`, {
-                version: cacheVersion(definition),
-                state: pick(definition),
-            })
-        log.debug(
-            `Saved ${this.cacheDirty.size} stores to the cache in ${Math.round(performance.now() - started)} ms`,
-        )
-        this.cacheDirty.clear()
-    }
-
-    /** Returns the part of a cached store's state that its `cache` spec saves. */
-    private pickCache(
-        definition: StoreDefinition<unknown>,
-        references: () => CacheReferences,
-    ): object {
-        const cache = definition.cache as CacheSpec<Record<string, unknown>>
-        const state = (
-            this.stores.get(definition) as StoreApi<Record<string, unknown>>
-        ).getState()
-        return typeof cache === 'function'
-            ? cache(state, references)
-            : Object.fromEntries(cache.map(key => [key, state[key]]))
-    }
-
-    /** Collects the users and members the saved state of every cached store shows. */
-    private cacheReferences(
-        pick: (definition: StoreDefinition<unknown>) => object,
-    ): CacheReferences {
-        const references: CacheReferences = {
-            users: new Set([this.userId]),
-            members: new Map(),
-        }
-        for (const definition of this.stores.keys()) {
-            const store = definition as StoreDefinition<StoreApi<object>>
-            if (store.cache && store.references)
-                store.references(pick(definition), references, this)
-        }
-        return references
+        if (this.ready) this.cache.save()
     }
 
     dispose(): void {
         log.info('Ended')
         clearTimeout(this.cacheTimer)
+        this.cache.dispose()
         this.notify.dispose()
         this.endRestoreGuard()
         for (const cleanup of this.cleanups) cleanup()

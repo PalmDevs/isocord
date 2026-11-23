@@ -97,6 +97,7 @@ export const userProfilesStore = defineStore(
                 Object.entries(state.profiles).slice(-MAX_CACHED_PROFILES),
             ),
         }),
+        deferRestore: true,
     },
 )
 

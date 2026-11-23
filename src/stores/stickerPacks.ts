@@ -21,7 +21,7 @@ interface StickerPacksState {
 export const stickerPacksStore = defineStore(
     'stickerPacks',
     () => createStore<StickerPacksState>(() => ({ packs: [], fetchedAt: 0 })),
-    { cache: ['packs', 'fetchedAt'] },
+    { cache: ['packs', 'fetchedAt'], deferRestore: true },
 )
 
 const fetches = new WeakMap<Session, Promise<StickerPack[]>>()

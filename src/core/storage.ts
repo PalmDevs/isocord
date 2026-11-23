@@ -9,11 +9,18 @@ export function accountStorage(userId: string): MMKV {
     return createMMKV({ id: `account.${userId}` })
 }
 
-export function readJson<T>(storage: MMKV, key: string): T | undefined {
+export function readJson<T>(
+    storage: Pick<MMKV, 'getString'>,
+    key: string,
+): T | undefined {
     const raw = storage.getString(key)
     return raw === undefined ? undefined : (JSON.parse(raw) as T)
 }
 
-export function writeJson(storage: MMKV, key: string, value: unknown): void {
+export function writeJson(
+    storage: Pick<MMKV, 'set'>,
+    key: string,
+    value: unknown,
+): void {
     storage.set(key, JSON.stringify(value))
 }

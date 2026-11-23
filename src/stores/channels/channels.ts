@@ -134,6 +134,15 @@ interface ChannelsState {
     versions: Record<string, number>
 }
 
+/** One guild's saved channels, or the private ones. */
+interface ChannelsPart {
+    ids: string[]
+    version?: number
+    channels: Channel[]
+}
+/** The cache part of DMs and group DMs. Guild parts are keyed by guild id. */
+const PRIVATE_PART = '@me'
+
 /** Guild channels, joined threads and private channels. */
 export const channelsStore = defineStore(
     'channels',
@@ -564,8 +573,50 @@ export const channelsStore = defineStore(
     },
     {
         cache: ['channels', 'byGuild', 'privateIds', 'versions'],
-        // The forum fields only reach cached channels with a full channel payload, so older caches are dropped.
-        cacheVersion: 1,
+        // One entry per guild, so a channel change rewrites only its guild.
+        cacheParts: {
+            split: ({
+                channels = {},
+                byGuild = {},
+                privateIds = [],
+                versions = {},
+            }) => {
+                const of = (ids: string[]) =>
+                    ids.flatMap(id => channels[id] ?? [])
+                const parts: Record<string, ChannelsPart> = {
+                    [PRIVATE_PART]: {
+                        ids: privateIds,
+                        channels: of(privateIds),
+                    },
+                }
+                for (const [guildId, ids] of Object.entries(byGuild))
+                    parts[guildId] = {
+                        ids,
+                        version: versions[guildId],
+                        channels: of(ids),
+                    }
+                return parts
+            },
+            join: parts => {
+                const state: ChannelsState = {
+                    channels: {},
+                    byGuild: {},
+                    privateIds: [],
+                    versions: {},
+                }
+                for (const [key, part] of Object.entries(parts)) {
+                    const { ids, version, channels } = part as ChannelsPart
+                    for (const channel of channels)
+                        state.channels[channel.id] = channel
+                    if (key === PRIVATE_PART) state.privateIds = ids
+                    else state.byGuild[key] = ids
+                    if (version !== undefined) state.versions[key] = version
+                }
+                return state
+            },
+        },
+        // 1: forum fields reach cached channels only with a full channel payload. 2: saved per guild.
+        cacheVersion: 2,
         references: ({ channels = {}, privateIds = [] }, references) => {
             for (const id of privateIds)
                 for (const recipient of channels[id]?.recipient_ids ?? [])

@@ -65,6 +65,9 @@ const nextVersion = (
           : Math.max(previous ?? 0, newest)
 }
 
+/** The cache part of `premiumType`. Guild parts are keyed by guild id. */
+const USER_PART = '@me'
+
 export const expressionsStore = defineStore(
     'expressions',
     session => {
@@ -240,7 +243,23 @@ export const expressionsStore = defineStore(
 
         return store
     },
-    { cache: ['guilds', 'premiumType'] },
+    {
+        cache: ['guilds', 'premiumType'],
+        // One entry per guild, so an emoji change rewrites only its guild.
+        cacheParts: {
+            split: ({ guilds = {}, premiumType = 0 }) => ({
+                ...guilds,
+                [USER_PART]: { premiumType },
+            }),
+            join: ({ [USER_PART]: user, ...guilds }) => ({
+                guilds: guilds as Record<string, GuildExpressions>,
+                ...(user as Pick<ExpressionsState, 'premiumType'> | undefined),
+            }),
+        },
+        // 1: saved per guild.
+        cacheVersion: 1,
+        deferRestore: true,
+    },
 )
 
 /** Returns the newest version of a guild's emojis and stickers, 0 when they carry none, undefined when not held. */
