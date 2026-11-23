@@ -271,8 +271,8 @@ private fun LazyItemScope.AnimatedRow(row: ChatRow, changes: ChatRowChanges, arr
   // The motion is a modifier of a box every row has, so the row's content never moves in the tree.
   val enter = remember { arrivals.consume(row.key) }
   val motion = when {
-    changes.isLeaving(row.key) -> RowMotion(leaving = true, onLeft = { changes.finish(row.key) })
-    enter -> RowMotion(leaving = false, onLeft = NOOP_LEFT)
+    changes.isLeaving(row.key) -> RowMotion(changes.lazyKey(row.key), leaving = true, onLeft = { changes.finish(row.key) })
+    enter -> RowMotion(changes.lazyKey(row.key), leaving = false, onLeft = NOOP_LEFT)
     else -> Modifier
   }
   Box(motion) { RowContent(row) }

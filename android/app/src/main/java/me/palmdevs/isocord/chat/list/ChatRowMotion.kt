@@ -152,23 +152,18 @@ internal class ChatRowChanges {
  * Animates a row in (its height grows from nothing while it fades in) or out (it fades out while its height
  * collapses), then calls [onLeft] for one going out. Changing direction carries on from where it is.
  */
-internal data class RowMotion(val leaving: Boolean, val onLeft: () -> Unit) : ModifierNodeElement<RowMotionNode>() {
-  override fun create() = RowMotionNode(leaving, onLeft)
+internal data class RowMotion(val rowKey: String, val leaving: Boolean, val onLeft: () -> Unit) : ModifierNodeElement<RowMotionNode>() {
+  override fun create() = RowMotionNode(rowKey, leaving, onLeft)
 
-  override fun update(node: RowMotionNode) {
-    node.onLeft = onLeft
-    if (node.leaving != leaving) {
-      node.leaving = leaving
-      node.start()
-    }
-  }
+  override fun update(node: RowMotionNode) = node.update(this)
 }
 
 /**
  * The node behind [RowMotion]. Progress is plain fields, and every frame requests a new measure and placement.
  * The animation runs on the node's scope. A node that goes away first counts as finished, so no row stays clipped.
  */
-internal class RowMotionNode(var leaving: Boolean, var onLeft: () -> Unit) : Modifier.Node(), LayoutModifierNode {
+internal class RowMotionNode(private var rowKey: String, private var leaving: Boolean, private var onLeft: () -> Unit) :
+  Modifier.Node(), LayoutModifierNode {
   /** Shown fraction of the row's height, and its opacity. */
   private var height = if (leaving) 1f else 0f
   private var opacity = height
@@ -183,7 +178,21 @@ internal class RowMotionNode(var leaving: Boolean, var onLeft: () -> Unit) : Mod
     if (leaving) settle()
   }
 
-  fun start() {
+  fun update(motion: RowMotion) {
+    onLeft = motion.onLeft
+    if (rowKey == motion.rowKey && leaving == motion.leaving) return
+    leaving = motion.leaving
+    if (rowKey != motion.rowKey) {
+      // LazyColumn can reuse a node that already finished animating a different row.
+      rowKey = motion.rowKey
+      height = if (leaving) 1f else 0f
+      opacity = height
+      left = false
+    }
+    if (isAttached) start()
+  }
+
+  private fun start() {
     job?.cancel()
     val target = if (leaving) 0f else 1f
     if (height == target && opacity == target) {

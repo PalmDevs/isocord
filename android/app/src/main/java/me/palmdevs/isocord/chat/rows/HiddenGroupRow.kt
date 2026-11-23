@@ -116,7 +116,7 @@ private fun GroupMessages(row: ChatRow.HiddenGroup) {
     messages.asReversed().forEach { message ->
       key(message.key) {
         val motion = if (changes.isLeaving(message.key)) {
-          Modifier.then(RowMotion(leaving = true, onLeft = { changes.finish(message.key) }))
+          Modifier.then(RowMotion(message.key, leaving = true, onLeft = { changes.finish(message.key) }))
         } else {
           Modifier
         }

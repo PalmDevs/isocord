@@ -386,6 +386,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
   - [ ] Confirm DCDChatList emits the first scroll event that acks a channel opened at the bottom.
 - [x] Sending doesn't auto-scroll until the new message is fully hidden by the composer. (untested on device)
 - [x] Message enter animations: `RowMotion` node driven by frame time (can't freeze part-grown; snaps to the end if detached), height 200 ms FastOutSlowIn, fade 400 ms; a sent message keeps its pending row's list item (`lazyKey` alias). The reference sets no item animator; the timings are ours. Built 2026-11-15, untested on device.
+  - [ ] *Verify* that messages grow and fade in during the typing indicator transition. Reused motion nodes start fresh for each row, and server confirmation preserves pending entrances.
 - [x] Exit animation for messages deleted on screen (`ChatRowChanges`): fade 150 ms, collapse 200 ms, only when the update adds nothing else; pending → sent never exits. Deleting the newest message no longer snaps a scrolled-up list to the bottom. Built 2026-11-15, untested on device.
 - [x] Reactions in a message row have 4 dp above and below. Built 2026-11-15, untested on device.
 - [x] Reply headers to attachment-only messages use Mana's ImageIcon (`ic_image.png`) instead of a hand-drawn glyph. Built 2026-11-15, untested on device.

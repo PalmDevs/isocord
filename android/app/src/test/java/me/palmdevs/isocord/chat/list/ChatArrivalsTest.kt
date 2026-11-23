@@ -74,20 +74,23 @@ class ChatArrivalsTest {
 
   @Test
   fun aliasedKeyPreservesArrivals() {
-    val arrivals = ChatArrivals()
+    val aliases = mutableMapOf<String, String>()
+    val arrivals = ChatArrivals { aliases[it] ?: it }
     val r0 = listOf(message("0"))
     arrivals.update(r0)
 
     val pending = message("nonce-1", status = "sending")
     arrivals.update(listOf(pending, message("0")))
 
-    val aliases = mapOf("server-1" to "nonce-1")
+    aliases["server-1"] = "nonce-1"
     val confirmed = message("server-1")
     val nextFromOther = message("2")
     val r2 = listOf(nextFromOther, confirmed, message("0"))
 
-    val entering = arrivals.update(r2) { aliases[it] ?: it }
+    val entering = arrivals.update(r2)
     assertTrue(entering.contains("2"))
     assertTrue(arrivals.consume("2"))
+    assertTrue(arrivals.consume(confirmed.key))
+    assertFalse(arrivals.consume(pending.key))
   }
 }
