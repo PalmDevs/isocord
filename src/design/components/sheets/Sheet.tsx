@@ -18,7 +18,9 @@ import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller
 import Animated, {
     Extrapolation,
     interpolate,
+    useAnimatedReaction,
     useAnimatedStyle,
+    useDerivedValue,
     useReducedMotion,
     useSharedValue,
     withSpring,
@@ -26,8 +28,9 @@ import Animated, {
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
-import { scheduleOnRN } from 'react-native-worklets'
+import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets'
 import { t } from '../../../i18n'
+import NativeIsocordBack from '../../../native/NativeIsocordBack'
 import { Icon } from '../../icons/Icon'
 import { useSurfaceColor } from '../../surfaceTint'
 import {
@@ -42,7 +45,8 @@ import { TableRowGroup } from '../table/TableRowGroup'
 import { SheetDrag } from './SheetDrag'
 import { SheetContext, useCloseSheet } from './sheetContext'
 import { SheetDragContext } from './sheetDragContext'
-import type { ReactNode, Ref } from 'react'
+import { useSheetBackPreview } from './useSheetBackPreview'
+import type { ComponentRef, ReactNode, Ref } from 'react'
 import type {
     NativeScrollEvent,
     NativeSyntheticEvent,
@@ -56,6 +60,7 @@ import type { SharedValue } from 'react-native-reanimated'
 const START_HEIGHT_RATIO = 0.6
 /** ACTION_SHEET_MAX_WIDTH: on wide screens the sheet stays this wide and centred. */
 const MAX_WIDTH = 500
+const BACKGROUND_BLEED = NativeStyleSheet.hairlineWidth
 /** ACTION_SHEET_MINIMUM_BOTTOM_PADDING, before the safe-area inset. */
 const MIN_BOTTOM_PADDING = 16
 /** NAV_BAR_HEIGHT_MULTILINE: the sheet never reaches higher than this below the status bar. */
@@ -176,8 +181,10 @@ export function BottomSheet({
     contentStyles,
     bodyStyles,
 }: BottomSheetProps) {
-    const { closing, close, onClosed, buttonTheme } = useContext(SheetContext)
-    const { height: windowHeight } = useWindowDimensions()
+    const { closing, close, onClosed, buttonTheme, backPreviewKey } =
+        useContext(SheetContext)
+    const { height: windowHeight, width } = useWindowDimensions()
+    const backScale = useSheetBackPreview(backPreviewKey, width)
     const insets = useSafeAreaInsets()
     const reducedMotion = useReducedMotion()
     const keyboard = useReanimatedKeyboardAnimation()
@@ -199,6 +206,20 @@ export function BottomSheet({
 
     // Height of the sheet that is on screen: 0 is closed, `lowSnap` to `highSnap` is open.
     const visible = useSharedValue(0)
+    const dismissHeight = useSharedValue<number | undefined>(undefined)
+    // Height available above the keyboard without crossing the top safe area.
+    const sheetHeight = useDerivedValue(() =>
+        Math.max(
+            0,
+            Math.min(
+                visible.get(),
+                windowHeight - insets.top + keyboard.height.get(),
+            ),
+        ),
+    )
+    const layoutHeight = useDerivedValue(
+        () => dismissHeight.get() ?? sheetHeight.get(),
+    )
     const expanded = useRef(scrollable && startExpanded)
     const finished = useRef(false)
 
@@ -221,14 +242,33 @@ export function BottomSheet({
             if (closing) finish()
             return
         }
-        if (closing) animateTo(visible, 0, reducedMotion, finish)
-        else
+        const target = expanded.current ? highSnap : lowSnap
+        scheduleOnUI(() => {
+            'worklet'
+            // withPanGestureSpring: the viewport moves as a unit during dismissal.
+            dismissHeight.set(
+                closing
+                    ? (dismissHeight.get() ?? sheetHeight.get())
+                    : undefined,
+            )
             animateTo(
                 visible,
-                expanded.current ? highSnap : lowSnap,
+                closing ? 0 : target,
                 reducedMotion,
+                closing ? finish : undefined,
             )
-    }, [closing, ready, lowSnap, highSnap, reducedMotion, visible, finish])
+        })
+    }, [
+        closing,
+        ready,
+        lowSnap,
+        highSnap,
+        reducedMotion,
+        visible,
+        dismissHeight,
+        sheetHeight,
+        finish,
+    ])
 
     const settle = (isExpanded: boolean) => {
         if (isExpanded && !expanded.current) onExpand?.()
@@ -286,16 +326,36 @@ export function BottomSheet({
                   )
                 : 0,
     }))
-    // While the keyboard lifts the sheet, it gives up height rather than rising past the top safe area.
-    const sheetStyle = useAnimatedStyle(() => ({
-        height: Math.max(
-            0,
-            Math.min(
-                visible.get(),
-                windowHeight - insets.top + keyboard.height.get(),
-            ),
-        ),
-    }))
+    const sheetStyle = useAnimatedStyle(() => {
+        const height = layoutHeight.get()
+        return {
+            height,
+            transform: [
+                { translateY: Math.max(0, height - sheetHeight.get()) },
+                { scale: backScale.get() },
+            ],
+        }
+    })
+    const sheetSurfaceStyle = useAnimatedStyle(() => {
+        const scale = backScale.get()
+        const height = layoutHeight.get()
+        return {
+            // Background-only compensation for the top-anchored scale.
+            bottom:
+                scale < 1 ? height - (height + BACKGROUND_BLEED) / scale : 0,
+        }
+    })
+    const sheetContentStyle = useAnimatedStyle(() => {
+        const height = layoutHeight.get()
+        return {
+            height,
+            // Content fitting in its viewport shares the extended surface clip.
+            overflow:
+                height < (scrollable ? lowSnap : (measured ?? 0))
+                    ? 'hidden'
+                    : 'visible',
+        }
+    })
     // The keyboard pushes the sheet up by its own height.
     const liftStyle = useAnimatedStyle(() => ({
         paddingBottom: -keyboard.height.get(),
@@ -319,19 +379,31 @@ export function BottomSheet({
 
     // A scrollable sheet's own ScrollView drags the sheet while it is at its top (see SheetDrag).
     const scrollAtTop = useSharedValue(true)
+    const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null)
+    const canExtendScroll = scrollable && footer == null
+    const setScrollOverflow = (visible: boolean) => {
+        const tag = scrollRef.current?.getScrollableNode()
+        if (tag != null) NativeIsocordBack?.setSheetScrollOverflow(tag, visible)
+    }
+    useAnimatedReaction(
+        () => canExtendScroll && backScale.get() < 1,
+        (extended, previous) => {
+            if (extended !== previous && (extended || previous))
+                scheduleOnRN(setScrollOverflow, extended)
+        },
+    )
     const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
         scrollAtTop.set(event.nativeEvent.contentOffset.y <= 1)
     }
 
-    const sheet = scrollable ? (
-        <Animated.View
-            style={[styles.sheet, { backgroundColor: surfaceBg }, sheetStyle]}
-        >
-            {background}
+    const content = scrollable ? (
+        <>
             <GestureDetector gesture={pan}>{chrome}</GestureDetector>
             <SheetDrag scrollAtTop={scrollAtTop} style={styles.fill}>
                 <ScrollView
+                    ref={scrollRef}
                     style={styles.fill}
+                    removeClippedSubviews={canExtendScroll ? false : undefined}
                     onScroll={onScroll}
                     scrollEventThrottle={16}
                     keyboardShouldPersistTaps={keyboardShouldPersistTaps}
@@ -350,41 +422,53 @@ export function BottomSheet({
                     {footer}
                 </View>
             )}
-        </Animated.View>
+        </>
     ) : (
-        <GestureDetector gesture={pan}>
-            <Animated.View
+        <View
+            style={styles.natural}
+            onLayout={event =>
+                setMeasured(Math.ceil(event.nativeEvent.layout.height))
+            }
+        >
+            {chrome}
+            <View
                 style={[
-                    styles.sheet,
-                    { backgroundColor: surfaceBg },
-                    sheetStyle,
+                    contentStyles,
+                    bodyStyles,
+                    { paddingBottom: footer ? 0 : bottomPadding },
                 ]}
             >
-                {background}
-                <View
-                    style={styles.natural}
-                    onLayout={event =>
-                        setMeasured(Math.ceil(event.nativeEvent.layout.height))
-                    }
-                >
-                    {chrome}
+                {children}
+            </View>
+            {footer != null && (
+                <View style={{ paddingBottom: bottomPadding }}>{footer}</View>
+            )}
+        </View>
+    )
+    const sheet = (
+        <Animated.View style={[styles.sheet, sheetStyle]}>
+            <Animated.View
+                pointerEvents="box-none"
+                style={[
+                    NativeStyleSheet.absoluteFill,
+                    styles.sheetClip,
+                    { backgroundColor: surfaceBg },
+                    sheetSurfaceStyle,
+                ]}
+            >
+                {background != null && (
                     <View
-                        style={[
-                            contentStyles,
-                            bodyStyles,
-                            { paddingBottom: footer ? 0 : bottomPadding },
-                        ]}
+                        pointerEvents="none"
+                        style={NativeStyleSheet.absoluteFill}
                     >
-                        {children}
+                        {background}
                     </View>
-                    {footer != null && (
-                        <View style={{ paddingBottom: bottomPadding }}>
-                            {footer}
-                        </View>
-                    )}
-                </View>
+                )}
+                <Animated.View style={sheetContentStyle}>
+                    {content}
+                </Animated.View>
             </Animated.View>
-        </GestureDetector>
+        </Animated.View>
     )
 
     return (
@@ -407,7 +491,11 @@ export function BottomSheet({
                     pointerEvents="box-none"
                     style={[styles.lift, liftStyle]}
                 >
-                    {sheet}
+                    {scrollable ? (
+                        sheet
+                    ) : (
+                        <GestureDetector gesture={pan}>{sheet}</GestureDetector>
+                    )}
                 </Animated.View>
             </View>
         </SheetDragContext>
@@ -596,6 +684,10 @@ const styles = StyleSheet.create(theme => ({
     sheet: {
         width: '100%',
         maxWidth: MAX_WIDTH,
+        transformOrigin: 'top center',
+        overflow: 'visible',
+    },
+    sheetClip: {
         overflow: 'hidden',
         borderTopLeftRadius: theme.radii.xl,
         borderTopRightRadius: theme.radii.xl,

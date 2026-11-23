@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
@@ -181,6 +182,7 @@ fun MessageText(
     fontSize = if (jumbo) 40.sp else fontSize,
     lineHeight = if (jumbo) 52.sp else lineHeight,
     lineHeightStyle = CENTERED,
+    textMotion = TextMotion.Animated,
   )
 
   val clamped = maxLines != Int.MAX_VALUE
@@ -354,6 +356,7 @@ private fun CodeBlock(spans: List<Span>, base: TextStyle) {
       fontSize = fontSize,
       lineHeight = lineHeight,
       lineHeightStyle = CENTERED,
+      textMotion = base.textMotion,
     ),
     modifier = Modifier
       .padding(vertical = 4.dp)

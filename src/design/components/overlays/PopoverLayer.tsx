@@ -14,6 +14,10 @@ const usePopoverLayer = create<{ entry: PopoverEntry | null }>(() => ({
     entry: null,
 }))
 
+export function useLayerPopoverOpen() {
+    return usePopoverLayer(state => state.entry !== null)
+}
+
 /** Keeps covered controls out of Android's accessibility tree. */
 export function PopoverBackground({
     accessibilityHidden = false,
@@ -24,7 +28,7 @@ export function PopoverBackground({
     children: ReactNode
     style: StyleProp<ViewStyle>
 }) {
-    const covered = usePopoverLayer(state => state.entry !== null)
+    const covered = useLayerPopoverOpen()
     return (
         <View
             collapsable={false}

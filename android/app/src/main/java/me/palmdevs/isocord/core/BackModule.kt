@@ -1,5 +1,8 @@
 package me.palmdevs.isocord.core
 
+import android.graphics.Rect
+import android.util.Log
+import android.view.View
 import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedCallback
 import com.facebook.react.bridge.Arguments
@@ -7,7 +10,10 @@ import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.module.annotations.ReactModule
+import com.facebook.react.uimanager.IllegalViewOperationException
 import com.facebook.react.uimanager.PixelUtil
+import com.facebook.react.uimanager.UIManagerHelper
+import com.facebook.react.views.scroll.ReactScrollView
 import me.palmdevs.isocord.MainActivity
 import me.palmdevs.isocord.specs.NativeIsocordBackSpec
 
@@ -19,6 +25,16 @@ class BackModule(context: ReactApplicationContext) : NativeIsocordBackSpec(conte
   private var gestureOwner: String? = null
   private var startX = 0f
   private var fromRight = false
+  private val scrollPreviewLayout = View.OnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+    extendScrollClip(view)
+  }
+  private val scrollPreviewAttachment = object : View.OnAttachStateChangeListener {
+    override fun onViewAttachedToWindow(view: View) = Unit
+
+    override fun onViewDetachedFromWindow(view: View) {
+      updateScrollOverflow(view as ReactScrollView, false)
+    }
+  }
   private val callback = object : OnBackPressedCallback(false) {
     override fun handleOnBackStarted(backEvent: BackEventCompat) {
       gestureOwner = owners.entries.lastOrNull { it.value }?.key ?: owners.keys.lastOrNull()
@@ -62,6 +78,39 @@ class BackModule(context: ReactApplicationContext) : NativeIsocordBackSpec(conte
       if (gestureOwner == owner && !enabled) finish()
       syncCallback()
     }
+  }
+
+  override fun setSheetScrollOverflow(reactTag: Double, visible: Boolean) {
+    UiThreadUtil.runOnUiThread {
+      val tag = reactTag.toInt()
+      val manager = UIManagerHelper.getUIManagerForReactTag(reactApplicationContext, tag)
+      try {
+        val view = manager?.resolveView(tag) as? ReactScrollView ?: return@runOnUiThread
+        if (visible && !view.isAttachedToWindow) return@runOnUiThread
+        updateScrollOverflow(view, visible)
+      } catch (error: IllegalViewOperationException) {
+        Log.d(NAME, "Sheet scroll view detached during Back preview", error)
+      }
+    }
+  }
+
+  private fun updateScrollOverflow(view: ReactScrollView, visible: Boolean) {
+    view.removeOnAttachStateChangeListener(scrollPreviewAttachment)
+    view.removeOnLayoutChangeListener(scrollPreviewLayout)
+    if (visible) {
+      extendScrollClip(view)
+      view.addOnAttachStateChangeListener(scrollPreviewAttachment)
+      view.addOnLayoutChangeListener(scrollPreviewLayout)
+    } else {
+      view.clipBounds = null
+    }
+    // Drawing overflow only. Yoga keeps the scroll layout.
+    view.setOverflow(if (visible) "visible" else "scroll")
+  }
+
+  private fun extendScrollClip(view: View) {
+    // Fixed header and side boundaries. The outer sheet clips the lower edge.
+    view.clipBounds = Rect(0, 0, view.width, view.height + view.rootView.height)
   }
 
   private fun syncCallback() {

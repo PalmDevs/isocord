@@ -1,36 +1,56 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { DeviceEventEmitter } from 'react-native'
 import { useSharedValue, withTiming } from 'react-native-reanimated'
 import { scheduleOnUI } from 'react-native-worklets'
 import NativeIsocordBack from '../../../native/NativeIsocordBack'
 import {
-    PANEL_ANDROID_PREDICTIVE_BACK_INPUT_TIMING,
+    ANDROID_PREDICTIVE_BACK_INPUT_TIMING,
     SWIPE_RELEASE_TIMING,
 } from '../../tokens/motion'
 import type { SharedValue } from 'react-native-reanimated'
-import type { BackPreviewFrame } from '../../../native/NativeIsocordBack'
+import type { BackPreviewFrame, Spec } from '../../../native/NativeIsocordBack'
 
 const DIRECT_PANEL_BACK_TRAVEL = 0
 const MAX_PANEL_BACK_TRAVEL = 0.25
 const HARDWARE_BACK_EVENT = 'hardwareBackPress'
 
 const previewListeners = new Map<string, (frame: BackPreviewFrame) => void>()
+let nextOwner = 0
 let dispatchUsers = 0
-let subscription: ReturnType<typeof NativeIsocordBack.onBackPreview> | undefined
+let subscription: ReturnType<Spec['onBackPreview']> | undefined
 
 function easeOutCubic(t: number) {
     return 1 - (1 - t) ** 3
 }
 
+export function dispatchBackPress() {
+    DeviceEventEmitter.emit(HARDWARE_BACK_EVENT)
+}
+
+export function watchBackPreview(
+    overlay: boolean,
+    listener: (frame: BackPreviewFrame) => void,
+) {
+    const back = NativeIsocordBack
+    if (!back) return
+    const owner = String(++nextOwner)
+    previewListeners.set(owner, listener)
+    back.watch(owner, true, overlay)
+    return () => {
+        previewListeners.delete(owner)
+        back.watch(owner, false, overlay)
+    }
+}
+
 /** Routes commits that arrive after the preview owner unmounts. */
 export function usePanelBackEvents() {
     useEffect(() => {
+        if (!NativeIsocordBack) return
         if (dispatchUsers++ === 0) {
             subscription = NativeIsocordBack.onBackPreview(frame => {
                 const listener = previewListeners.get(frame.owner)
                 if (listener) listener(frame)
-                else if (frame.committed)
-                    DeviceEventEmitter.emit(HARDWARE_BACK_EVENT)
+                else if (frame.committed) dispatchBackPress()
             })
         }
         return () => {
@@ -64,26 +84,23 @@ export function usePanelBackPreview(
     width: number,
     overlay = false,
 ) {
-    const id = useId()
     const offset = useSharedValue(0)
     const layer = useSharedValue<string | undefined>(undefined)
     const committingTarget = useRef<string | undefined>(undefined)
-    const registrations = useRef(0)
     useEffect(() => {
         if (!target) return
-        const owner = `${id}:${++registrations.current}`
         let previewing = false
         const restore = () => {
             previewing = false
             offset.set(withTiming(0, SWIPE_RELEASE_TIMING))
         }
-        previewListeners.set(owner, frame => {
+        const unwatch = watchBackPreview(overlay, frame => {
             if (frame.finished) {
                 if (frame.committed) {
                     committingTarget.current = target
                     try {
                         // BackHandler: panel, composer and overlay priority in one dispatch.
-                        DeviceEventEmitter.emit(HARDWARE_BACK_EVENT)
+                        dispatchBackPress()
                     } finally {
                         committingTarget.current = undefined
                         restore()
@@ -98,17 +115,15 @@ export function usePanelBackPreview(
             offset.set(
                 withTiming(
                     panelBackOffset(frame.offset, width),
-                    PANEL_ANDROID_PREDICTIVE_BACK_INPUT_TIMING,
+                    ANDROID_PREDICTIVE_BACK_INPUT_TIMING,
                 ),
             )
         })
-        NativeIsocordBack.watch(owner, true, overlay)
         return () => {
-            previewListeners.delete(owner)
-            NativeIsocordBack.watch(owner, false, overlay)
+            unwatch?.()
             if (previewing) restore()
         }
-    }, [id, layer, offset, overlay, target, width])
+    }, [layer, offset, overlay, target, width])
     const takeOffset = (panel: string, x: SharedValue<number>) => {
         if (committingTarget.current !== panel) return
         scheduleOnUI(() => {

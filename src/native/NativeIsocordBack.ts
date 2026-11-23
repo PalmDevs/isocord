@@ -1,4 +1,4 @@
-import { TurboModuleRegistry } from 'react-native'
+import { Platform, TurboModuleRegistry } from 'react-native'
 import type { CodegenTypes, TurboModule } from 'react-native'
 
 export interface BackPreviewFrame {
@@ -10,7 +10,10 @@ export interface BackPreviewFrame {
 
 export interface Spec extends TurboModule {
     watch(owner: string, enabled: boolean, overlay: boolean): void
+    setSheetScrollOverflow(reactTag: number, visible: boolean): void
     readonly onBackPreview: CodegenTypes.EventEmitter<BackPreviewFrame>
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('IsocordBack')
+export default Platform.OS === 'android'
+    ? TurboModuleRegistry.getEnforcing<Spec>('IsocordBack')
+    : null

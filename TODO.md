@@ -309,6 +309,10 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [x] Check predictive Back commit and cancel after backing out to Home and reopening. Replace the vendored Native Stack package when `/next` is published on npm.
 - Android 16 hosts the app's stacks in a child fragment so they receive Back progress ahead of ReactActivity.
 - [x] Check rounded predictive Back from both edges and with cancellation. On commit, the previous page finishes its slide using the full 450 ms Screens preset.
+- [x] Verify a quick predictive Back from Settings to You. The outgoing frame now stays visible until the commit fade ends.
+- [x] Verify chat text, the You bio and the revealed page corners during predictive Back.
+- [x] Verify the sheet background reaches the bottom during predictive Back on both edges, including cancellation and dismissal.
+- [x] Verify profile roles draw to the bottom during predictive Back and the fixed-height dismissal slide.
 - [x] Check that system Back closes the media viewer from chat and from a pushed screen.
 - [x] Check Compose views during a push and after tapping Back before enter finishes, including the chat list and You-tab bio.
 - [x] Check that chat panels and search previews close rightward from both Back gesture edges. The first 15% tracks finger travel, then interpolates to the 25% cap.

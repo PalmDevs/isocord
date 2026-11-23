@@ -1,5 +1,6 @@
 import { StyleSheet as NativeStyleSheet, View } from 'react-native'
 import { Dialog } from '../modals/Dialog'
+import { useLayerPopoverOpen } from '../overlays/PopoverLayer'
 import { ScopedThemeScope } from '../overlays/scopedTheme'
 import { SheetContext } from './sheetContext'
 import { hideActionSheet, removeActionSheet } from './sheetStore'
@@ -14,11 +15,14 @@ export function SheetLayer({
     front: boolean
 }) {
     const { key, closing, theme, buttonTheme } = sheet
+    const popoverOpen = useLayerPopoverOpen()
     const content = (
         <SheetContext
             value={{
                 closing,
                 buttonTheme,
+                backPreviewKey:
+                    front && !closing && !popoverOpen ? key : undefined,
                 close: () => hideActionSheet(key),
                 onClosed: () => removeActionSheet(key),
             }}

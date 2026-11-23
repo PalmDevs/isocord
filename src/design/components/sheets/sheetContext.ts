@@ -5,6 +5,8 @@ import type { ButtonTheme } from '../buttons/buttonTheme'
 export interface SheetContextValue {
     /** True while the sheet should animate out. */
     closing: boolean
+    /** Key of the sheet while it owns the Back preview. */
+    backPreviewKey?: string
     /** Asks the host to close this sheet (`hideActionSheet(key)`). */
     close: () => void
     /** Tells the host the exit animation has finished, so it can drop the sheet. */

@@ -38,13 +38,13 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
 new file mode 100644
 --- /dev/null
 +++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/PredictiveBackCard.kt
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,315 @@
 +package com.swmansion.rnscreens.core.containers.stack.animation.engine
 +
 +import android.animation.Animator
 +import android.animation.AnimatorListenerAdapter
 +import android.animation.ValueAnimator
-+import android.graphics.Bitmap
++import android.graphics.Canvas
 +import android.graphics.Outline
 +import android.graphics.Picture
 +import android.os.Build
@@ -54,9 +54,7 @@ new file mode 100644
 +import android.view.ViewOutlineProvider
 +import android.view.animation.LinearInterpolator
 +import android.view.animation.PathInterpolator
-+import android.widget.ImageView
 +import androidx.activity.BackEventCompat
-+import androidx.annotation.RequiresApi
 +import com.swmansion.rnscreens.core.containers.stack.animation.engine.binding.TrackBinding
 +import com.swmansion.rnscreens.core.containers.stack.animation.engine.binding.ViewPropertyBinding
 +import com.swmansion.rnscreens.core.containers.stack.animation.engine.binding.ViewTarget
@@ -143,6 +141,9 @@ new file mode 100644
 +        // DefaultPreset.slide easing for the remaining distance after commit.
 +        val easing = Interpolators.of(track.timing.easing, view.context)
 +        return object : TrackBinding {
++            private val originalOutline = view.outlineProvider
++            private val originalClipping = view.clipToOutline
++            private var rounded = false
 +            private var fraction = 0f
 +            private val draw = { drawFrame() }
 +
@@ -161,6 +162,13 @@ new file mode 100644
 +                val touchRatio = (dragX * edgeDirection / width).coerceIn(0f, 1f)
 +                val preview = from + maxParallax * touchRatio
 +                val playTime = commitTimeMs
++                if (playTime != null && playTime >= track.timing.endMs) {
++                    restoreOutline()
++                } else if (!rounded) {
++                    view.outlineProvider = cardOutline(view)
++                    view.clipToOutline = true
++                    rounded = true
++                }
 +                view.translationX =
 +                    if (playTime != null) {
 +                        val progress = easing.getInterpolation(track.timing.progressAt(playTime))
@@ -180,6 +188,14 @@ new file mode 100644
 +                if (playTime != null && playTime < track.timing.endMs) return
 +                frames.remove(draw)
 +                stock.restore()
++                restoreOutline()
++            }
++
++            private fun restoreOutline() {
++                if (!rounded) return
++                view.outlineProvider = originalOutline
++                view.clipToOutline = originalClipping
++                rounded = false
 +            }
 +        }
 +    }
@@ -269,7 +285,7 @@ new file mode 100644
 +                val playTime = commitTimeMs
 +                commitRestored = playTime != null
 +                // Visibility.OverlayListener can remove the live view before the fade ends.
-+                val retained = if (playTime != null && playTime < opacityEndMs && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
++                val retained = if (playTime != null && playTime < opacityEndMs) {
 +                    retainOutgoingFrame(view, sceneRoot)
 +                } else {
 +                    null
@@ -297,17 +313,22 @@ new file mode 100644
 +    }
 +}
 +
-+@RequiresApi(Build.VERSION_CODES.P)
 +private fun retainOutgoingFrame(view: View, host: ViewGroup): View? {
 +    if (!view.isAttachedToWindow || view.width <= 0 || view.height <= 0) return null
 +
-+    // TransitionUtils.copyViewImage: record before fragment view teardown.
++    // Picture.draw: replay text and shapes at the final transform.
 +    val frame = Picture()
-+    view.draw(frame.beginRecording(view.width, view.height))
-+    frame.endRecording()
-+    return ImageView(host.context).apply {
-+        setImageBitmap(Bitmap.createBitmap(frame))
-+        scaleType = ImageView.ScaleType.FIT_XY
++    val canvas = frame.beginRecording(view.width, view.height)
++    try {
++        view.draw(canvas)
++    } finally {
++        frame.endRecording()
++    }
++    return object : View(host.context) {
++        override fun onDraw(canvas: Canvas) {
++            canvas.drawPicture(frame)
++        }
++    }.apply {
 +        layout(view.left, view.top, view.right, view.bottom)
 +        pivotX = view.pivotX
 +        pivotY = view.pivotY
