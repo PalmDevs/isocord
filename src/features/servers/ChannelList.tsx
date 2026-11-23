@@ -347,6 +347,10 @@ export function ChannelList({
         settingsStore,
         state => state.guildSettings[guild.id],
     )
+    const newNotifications = useSessionStore(
+        settingsStore,
+        state => state.newNotifications,
+    )
     const selectedChannelId = useSessionStore(
         serversUiStore,
         state => state.selectedChannelIds[guild.id],
@@ -373,6 +377,7 @@ export function ChannelList({
         readStates,
         settings,
         joinedAck,
+        newNotifications,
     )
     const unreadBars = useUnreadBars(barRows)
     const listRef = useRef<FlashListRef<ChannelRow>>(null)

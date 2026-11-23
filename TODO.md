@@ -515,6 +515,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 ## Shell: Servers tab
 
 - [x] Channel-list unread bar follows the sticky header or the bottom of the tab. It targets offscreen unreads and mentions, using FlashList indexes (ChannelsUnreadBars).
+  - [x] Pass the account notification flag to the unread bar so it respects explicit and inherited unread settings (ChannelsUnreadBars).
 
 - [x] Guild header (`servers/GuildHeader.tsx`, reference `RedesignGuildHeader` + `ChannelListStickyHeader` + `GuildSearchAndInvite`): name with chevron, "N Members · Community" for community servers, Search / Invite / Events buttons, divider; banner (scrolls and fades, darkens on press, animated only when focused with no sheet open). The header is an overlay outside the list (`translateY = max(0, bannerHeight - scroll)`) instead of being counter-translated inside the scroll content, so it can't come unstuck. Built and installed on the emulator 2026-11-14, **not yet looked at on a device**.
   - [ ] The guild action sheet, invite and events are placeholder sheets (title only).

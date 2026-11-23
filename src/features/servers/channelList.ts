@@ -234,15 +234,19 @@ export function buildBarRows(
     readStates: ReadStatesState,
     settings: GuildSettings | undefined,
     joinedAck: string,
+    newNotifications: boolean | undefined,
 ): BarRow[] {
-    const policy = { guildSettings: settings ? { [guildId]: settings } : {} }
+    const policy = {
+        guildSettings: settings ? { [guildId]: settings } : {},
+        newNotifications,
+    }
     const now = Date.now()
     const barRows: BarRow[] = []
     for (const [index, row] of rows.entries()) {
         if (row.type !== 'channel' && row.type !== 'thread') continue
         const channel = channels[row.id]
         if (!channel) continue
-        // hasMention: a channel with mentions; hasUnread: an unread shown in full, unmuted.
+        // ChannelsUnreadBars uses the resolved unread setting for plain unreads.
         const mention = (readStates.mentions[row.id] ?? 0) > 0
         const barUnread =
             isUnread(readStates, row.id, joinedAck) &&
