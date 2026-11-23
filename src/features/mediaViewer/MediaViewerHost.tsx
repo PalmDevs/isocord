@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StyleSheet } from 'react-native-unistyles'
+import { GifFormat } from '../../core/frecency'
 import { useSession, useSessionStore } from '../../core/react'
 import { IconButton } from '../../design/components/buttons/IconButton'
 import { NAV_BAR_HEIGHT } from '../../design/components/layout/navBarHeight'
@@ -22,6 +23,7 @@ import { BottomSheet } from '../../design/components/sheets/Sheet'
 import { SheetContext } from '../../design/components/sheets/sheetContext'
 import { Text } from '../../design/components/Text'
 import { Icon } from '../../design/icons/Icon'
+import { rawColors } from '../../design/tokens/generated/rawColors'
 import { STANDARD_EASING } from '../../design/tokens/motion'
 import { t } from '../../i18n'
 import MediaViewerView from '../../native/MediaViewerViewNativeComponent'
@@ -35,6 +37,8 @@ import {
     standaloneRow,
     useChatTheme,
 } from '../chat/rows/rowEncoder'
+import { useIsFavoriteGif } from '../expressions/gifs/favorites'
+import { toggleFavorite } from '../expressions/picker/gifActionsSheet'
 import { openActionSheet, showSimpleActionSheet } from '../sheets'
 import { copyMediaLink, openMediaLink, saveMedia } from './actions'
 import { closeMediaViewer, mediaViewerStore } from './store'
@@ -127,6 +131,51 @@ function showAltText(description: string) {
 }
 
 /**
+ * MediaViewerOverlayButtonFavoriteGIF: a star that adds or removes the GIF as a favorite. Only GIFs get one;
+ * a GIFV is saved as a video.
+ */
+function FavoriteGifButton({ source }: { source: ViewerSource }) {
+    const session = useSession()
+    const favorite = useIsFavoriteGif(source.link)
+    if (source.kind !== 'gif') return null
+    return (
+        <IconButton
+            variant="secondary-overlay"
+            size="lg"
+            icon={
+                favorite ? (
+                    <Icon
+                        name="StarIcon"
+                        style={{ tintColor: rawColors.YELLOW_300 }}
+                    />
+                ) : (
+                    <Icon name="StarOutlineIcon" />
+                )
+            }
+            accessibilityLabel={t(
+                favorite
+                    ? 'expressions.gifActions.removeFavorite'
+                    : 'expressions.gifActions.addFavorite',
+            )}
+            onPress={() =>
+                void toggleFavorite(
+                    session,
+                    {
+                        id: source.link,
+                        url: source.link,
+                        src: source.url,
+                        width: source.width,
+                        height: source.height,
+                    },
+                    favorite,
+                    source.gifv ? GifFormat.VIDEO : GifFormat.IMAGE,
+                )
+            }
+        />
+    )
+}
+
+/**
  * MediaModal: the native pager, footer and gestures (IsocordMediaViewerView), with the header drawn here on top.
  * The header follows the native side: it comes in over the last quarter of the entrance (useOverlayLayoutDriver),
  * hides while the media is tapped away or dragged, and goes at once when the viewer closes (MediaViewerTsx6).
@@ -140,6 +189,7 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
     const [index, setIndex] = useState(open.initialIndex)
     const [speed, setSpeed] = useState(1)
     const [speedAnchor, setSpeedAnchor] = useState<AnchorRect | null>(null)
+    const viewed = open.sources[index]
     const opened = open.messages[index] ?? open.messages[0]
     // Reactions added while the viewer is open show up when the message is one the chat has loaded.
     const latest = useSessionStore(messagesStore, state =>
@@ -287,24 +337,29 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
                     accessibilityLabel={t('common.close')}
                     onPress={close}
                 />
-                <ContextMenu
-                    triggerOnLongPress={false}
-                    items={options(index).map(option => ({
-                        label: option.label,
-                        icon: option.icon,
-                        action: option.onPress,
-                    }))}
-                >
-                    {({ open: openMenu }) => (
-                        <IconButton
-                            variant="secondary-overlay"
-                            size="lg"
-                            icon="MoreVerticalIcon"
-                            accessibilityLabel={t('mediaViewer.moreOptions')}
-                            onPress={openMenu}
-                        />
-                    )}
-                </ContextMenu>
+                <View style={styles.actions}>
+                    {viewed && <FavoriteGifButton source={viewed} />}
+                    <ContextMenu
+                        triggerOnLongPress={false}
+                        items={options(index).map(option => ({
+                            label: option.label,
+                            icon: option.icon,
+                            action: option.onPress,
+                        }))}
+                    >
+                        {({ open: openMenu }) => (
+                            <IconButton
+                                variant="secondary-overlay"
+                                size="lg"
+                                icon="MoreVerticalIcon"
+                                accessibilityLabel={t(
+                                    'mediaViewer.moreOptions',
+                                )}
+                                onPress={openMenu}
+                            />
+                        )}
+                    </ContextMenu>
+                </View>
             </Animated.View>
         </View>
     )
@@ -326,6 +381,11 @@ const styles = StyleSheet.create(theme => ({
         paddingLeft: insets.left + 6,
         paddingRight: insets.right + 6,
     }),
+    actions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.space.PX_4,
+    },
     // MediaModalOverlayAltTextSheet: 16 around the title and the text.
     altTitle: { padding: theme.space.PX_16 },
     altText: {

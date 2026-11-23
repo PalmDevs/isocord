@@ -162,6 +162,7 @@ export interface DecodedFrecency {
 
 /** GIFType of a FavoriteGIF: a still or animated image, or a video. */
 export const GifFormat = { NONE: 0, IMAGE: 1, VIDEO: 2 } as const
+export type GifFormatValue = (typeof GifFormat)[keyof typeof GifFormat]
 
 /** The most FavoriteGIFs may take, encoded (UserSettingsConstants.MAX_FAVORITE_GIFS_SIZE). */
 export const MAX_FAVORITE_GIFS_SIZE = 762_880

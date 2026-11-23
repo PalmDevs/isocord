@@ -19,6 +19,7 @@ import {
     removeFavoriteGif,
     useIsFavoriteGif,
 } from '../gifs/favorites'
+import type { GifFormatValue } from '../../../core/frecency'
 import type { Session } from '../../../core/session'
 import type { Gif } from '../gifs/providers'
 
@@ -106,10 +107,15 @@ function GifActionsSheet({
 }
 
 /** Adds or removes the favorite, then says so (the reference's toasts, and its alert when full). */
-async function toggleFavorite(session: Session, gif: Gif, favorite: boolean) {
+export async function toggleFavorite(
+    session: Session,
+    gif: Gif,
+    favorite: boolean,
+    format?: GifFormatValue,
+) {
     const result = favorite
         ? await removeFavoriteGif(session, gif.url)
-        : await addFavoriteGif(session, gif)
+        : await addFavoriteGif(session, gif, format)
     if (result === 'full')
         return showAlert({
             key: 'gif-favorites-full',

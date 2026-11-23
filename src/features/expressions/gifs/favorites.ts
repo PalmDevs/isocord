@@ -2,7 +2,7 @@ import { MEDIA_BASE } from '../../../core/constants'
 import { GifFormat } from '../../../core/frecency'
 import { useSessionStore } from '../../../core/react'
 import { frecencyStore, updateFavoriteGifs } from '../../../stores/frecency'
-import type { FavoriteGif } from '../../../core/frecency'
+import type { FavoriteGif, GifFormatValue } from '../../../core/frecency'
 import type { Session } from '../../../core/session'
 import type { FavoriteGifsResult } from '../../../stores/frecency'
 import type { Gif } from './providers'
@@ -61,11 +61,12 @@ export const useIsFavoriteGif = (url: string): boolean =>
     )
 
 /**
- * Adds a GIF as the newest favorite (addFavoriteGIF). Picker GIFs are always images, so the format is IMAGE.
+ * Adds a GIF as the newest favorite (addFavoriteGIF). Picker GIFs are images, the default; the viewer's GIFVs are videos.
  */
 export function addFavoriteGif(
     session: Session,
     gif: Gif,
+    format: GifFormatValue = GifFormat.IMAGE,
 ): Promise<FavoriteGifsResult> {
     return updateFavoriteGifs(session, gifs => {
         const order = Math.max(0, ...gifs.map(favorite => favorite.order)) + 1
@@ -74,7 +75,7 @@ export function addFavoriteGif(
             {
                 url: gif.url,
                 src: gif.src,
-                format: GifFormat.IMAGE,
+                format,
                 width: Math.round(gif.width),
                 height: Math.round(gif.height),
                 order,
