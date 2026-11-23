@@ -124,9 +124,12 @@ class NotificationState(selfId: String = "") {
     context.parent?.let { onChannel(it) }
     context.channel?.let { onChannel(it) }
     val guildId = context.guildId
-    if (guildId != null && context.guild != null) guilds[guildId] = context.guild
-    else if (guildId != null) guilds.remove(guildId)
-    if (context.settings != null) guildSettings[context.guildId] = context.settings else guildSettings.remove(context.guildId)
+    if (!context.guildUnchanged && guildId != null) {
+      if (context.guild != null) guilds[guildId] = context.guild else guilds.remove(guildId)
+    }
+    if (!context.settingsUnchanged) {
+      if (context.settings != null) guildSettings[guildId] = context.settings else guildSettings.remove(guildId)
+    }
     status = context.status
   }
 

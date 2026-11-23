@@ -15,7 +15,8 @@ export interface Spec extends TurboModule {
     clearAccount(): void
     /**
      * A dispatch the app's session hears in front (AppSession.kt). `event` is its `d` and `dispatchContext` what the
-     * stores know around it (`DispatchContext`), both as JSON. The background session's rules decide it and post what
+     * stores know around it (`DispatchContext`, whose guild and settings JS leaves out once native holds them), both as
+     * JSON. The background session's rules decide it and post what
      * it notifies, on channels that sound but don't pop up. Resolves whether a MESSAGE_CREATE notifies, even with
      * system notifications off: the in-app notifications follow it.
      */

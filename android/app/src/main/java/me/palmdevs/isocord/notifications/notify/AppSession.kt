@@ -22,8 +22,12 @@ class DispatchContext(
   /** Null outside a server. */
   val guildId: String? = null,
   val guild: GuildInfo? = null,
+  /** JS sent this guild before and it is unchanged: [guild] is left out and what is held stays. */
+  val guildUnchanged: Boolean = false,
   /** The account's settings for [guildId], or for direct messages. */
   val settings: GuildSettings? = null,
+  /** Likewise for [settings]. */
+  val settingsUnchanged: Boolean = false,
   /** Group DM recipients, the caller, the reactor, the new friend. */
   val users: List<RawUser> = emptyList(),
   /** The account's status. */
@@ -45,12 +49,13 @@ class AppSession(context: Context, @Volatile var account: AccountConfig) {
   /** `event` is the dispatch's `d` as JSON. Returns whether a MESSAGE_CREATE notifies. */
   fun dispatch(type: String, event: String, context: DispatchContext): Boolean {
     val dispatch = GatewayDispatch.ofPayload(type, event)
+    // Every context is learned, READY and RESUMED included: JS sends a guild or settings object only once.
+    state.learn(context)
     if (type == "READY" || type == "RESUMED") {
       Handover.shared.appSettled()
       if (type == "READY") state.onRelationships(dispatch.decode(ReadyRelationships.serializer()).relationships)
       return false
     }
-    state.learn(context)
     return notifier.onDispatch(dispatch, state, account)
   }
 }

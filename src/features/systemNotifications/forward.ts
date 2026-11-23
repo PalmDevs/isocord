@@ -1,3 +1,4 @@
+import { traced } from '../../core/trace'
 import { dmGuild } from '../../native/NativeIsocordConstants'
 import native from '../../native/NativeIsocordNotifications'
 import { channelsStore } from '../../stores/channels/channels'
@@ -99,6 +100,29 @@ function channelOf(channel: Channel | undefined) {
     }
 }
 
+/**
+ * The guild and settings objects last sent to native for a session, by guild. Native's app state keeps what it learns
+ * (NotificationState.learn), so a store object it already has is not sent again. Per session, as native's is.
+ */
+const sent = new WeakMap<
+    Session,
+    {
+        guilds: Map<string, Guild | undefined>
+        settings: Map<string, GuildSettings | undefined>
+    }
+>()
+
+/** Whether `value` is what native already holds under `key`. Records it as sent. */
+function alreadySent<T>(
+    known: Map<string, T | undefined>,
+    key: string,
+    value: T | undefined,
+): boolean {
+    const same = known.has(key) && known.get(key) === value
+    known.set(key, value)
+    return same
+}
+
 /** `DispatchContext` in AppSession.kt, as JSON. */
 function contextOf(session: Session, about: About): string {
     const channels = session.get(channelsStore).getState().channels
@@ -109,6 +133,19 @@ function contextOf(session: Session, about: About): string {
         ...(channel?.recipient_ids ?? []),
         ...(about.userIds ?? []),
     ]
+    const known = sent.get(session) ?? {
+        guilds: new Map<string, Guild | undefined>(),
+        settings: new Map<string, GuildSettings | undefined>(),
+    }
+    sent.set(session, known)
+    const guild = session.get(guildsStore).getState().guilds[guildId ?? '']
+    // Private channels' settings sit under the same `@me` as their links.
+    const settingsKey = guildId ?? dmGuild
+    const settings = session.get(settingsStore).getState().guildSettings[
+        settingsKey
+    ]
+    const guildUnchanged = alreadySent(known.guilds, guildId ?? '', guild)
+    const settingsUnchanged = alreadySent(known.settings, settingsKey, settings)
     return JSON.stringify({
         channel: channelOf(channel),
         parent: channelOf(channels[channel?.parent_id ?? '']),
@@ -116,15 +153,10 @@ function contextOf(session: Session, about: About): string {
             .map(id => channelOf(channels[id]))
             .filter(Boolean),
         guildId,
-        guild: guildOf(
-            session.get(guildsStore).getState().guilds[guildId ?? ''],
-        ),
-        // Private channels' settings sit under the same `@me` as their links.
-        settings: settingsOf(
-            session.get(settingsStore).getState().guildSettings[
-                guildId ?? dmGuild
-            ],
-        ),
+        guild: guildUnchanged ? undefined : guildOf(guild),
+        guildUnchanged,
+        settings: settingsUnchanged ? undefined : settingsOf(settings),
+        settingsUnchanged,
         users: userIds.map(id => users[id]).filter(Boolean),
         status: session.get(presencesStore).getState().presences[session.userId]
             ?.status,
@@ -153,10 +185,12 @@ export const forwardMessage = (
     session: Session,
     message: Message,
 ): Promise<boolean> =>
-    forward(session, 'MESSAGE_CREATE', message, {
-        channelId: message.channel_id,
-        mentionedChannelIds: Array.from(
-            (message.content ?? '').matchAll(CHANNEL_MENTION),
-            match => match[1] as string,
-        ),
-    })
+    traced('js:notify:forward', () =>
+        forward(session, 'MESSAGE_CREATE', message, {
+            channelId: message.channel_id,
+            mentionedChannelIds: Array.from(
+                (message.content ?? '').matchAll(CHANNEL_MENTION),
+                match => match[1] as string,
+            ),
+        }),
+    )
