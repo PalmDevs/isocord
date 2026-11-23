@@ -1,6 +1,7 @@
 import { View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { Button } from '../../../design/components/buttons/Button'
+import { TextField } from '../../../design/components/inputs/TextField'
 import {
     AlertActionButton,
     AlertActions,
@@ -102,6 +103,35 @@ export function AlertModalPage() {
                             actions={
                                 <AlertActions>
                                     <AlertActionButton text="Okay" />
+                                </AlertActions>
+                            }
+                        />,
+                    )
+                }
+            />
+            <Button
+                text="Text fields (keyboard)"
+                variant="secondary"
+                onPress={() =>
+                    openAlert(
+                        'demo-fields',
+                        <AlertModal
+                            title="Create a thing"
+                            content="Focus a field. The alert should stay above the keyboard."
+                            extraContent={
+                                <View style={styles.column}>
+                                    <TextField placeholder="Name" />
+                                    <TextField placeholder="Description" />
+                                    <TextField placeholder="Notes" />
+                                </View>
+                            }
+                            actions={
+                                <AlertActions>
+                                    <AlertActionButton text="Create" />
+                                    <AlertActionButton
+                                        variant="secondary"
+                                        text="Cancel"
+                                    />
                                 </AlertActions>
                             }
                         />,

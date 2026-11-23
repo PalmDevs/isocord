@@ -4,6 +4,7 @@ import {
     useWindowDimensions,
     View,
 } from 'react-native'
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, {
     useAnimatedStyle,
     useReducedMotion,
@@ -135,9 +136,15 @@ function AlertCard({
 
     const maxHeight =
         height - MARGIN * 2 - Math.max(insets.top, insets.bottom) * 2
+    // Height is negative while the keyboard is open. The pile sits above it and shrinks to fit.
+    const keyboard = useReanimatedKeyboardAnimation()
+    const layerStyle = useAnimatedStyle(() => ({
+        paddingBottom: -keyboard.height.get(),
+    }))
     const stackStyle = useAnimatedStyle(() => {
         const i = sharedIndex.get()
         return {
+            maxHeight: maxHeight + keyboard.height.get(),
             height: i > 0 ? topHeight.get() : 'auto',
             transform: reducedMotion
                 ? []
@@ -161,7 +168,7 @@ function AlertCard({
             importantForAccessibility={
                 index === 0 ? 'auto' : 'no-hide-descendants'
             }
-            style={[styles.layer, { zIndex: MAX_VISIBLE - index }]}
+            style={[styles.layer, { zIndex: MAX_VISIBLE - index }, layerStyle]}
         >
             <Animated.View
                 onLayout={event => {
@@ -173,7 +180,6 @@ function AlertCard({
                     {
                         backgroundColor: surfaceColor,
                         width: Math.min(MAX_WIDTH, width - MARGIN * 2),
-                        maxHeight,
                     },
                     stackStyle,
                 ]}

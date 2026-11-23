@@ -31,7 +31,10 @@ export function AlertModal({
     actions,
 }: AlertModalProps) {
     return (
-        <ScrollView alwaysBounceVertical={false}>
+        <ScrollView
+            alwaysBounceVertical={false}
+            keyboardShouldPersistTaps="handled"
+        >
             <View style={styles.container}>
                 {header}
                 <View style={styles.body}>
