@@ -3,11 +3,6 @@ import { themes } from '../../design/tokens'
 import { hexColor } from '../chat/color'
 import type { ViewStyle } from 'react-native'
 
-/** Returns the Nitro theme's gradient as a vertical `linear-gradient` from its primary to its accent colour. */
-export function profileGradient(colors: [number, number]): string {
-    return `linear-gradient(${hexColor(colors[0])}, ${hexColor(colors[1])})`
-}
-
 /** getDarkness above this picks the dark theme (getProfileTheme). */
 export const DARK_THRESHOLD = 0.5
 
@@ -24,15 +19,15 @@ export function profileThemeName(primary: number): 'dark' | 'light' {
 export const profileOverlay = (colors: [number, number]) =>
     themes[profileThemeName(colors[0])].colors.PROFILE_GRADIENT_OVERLAY
 
-/**
- * useProfileThemeValues: the sheet's background, the theme gradient under PROFILE_GRADIENT_OVERLAY. Set on the
- * sheet itself, so it also fills the sheet's bottom padding.
- */
+/** useUserProfileGradientColors: blends the overlay into both stops for a single background draw. */
 export function profileBackground(colors: [number, number]): ViewStyle {
     const overlay = profileOverlay(colors)
+    const [primary, accent] = colors
+    const start = flattenColor(overlay, hexColor(primary))
+    const end = flattenColor(overlay, hexColor(accent))
     return {
         // TODO: experimental_backgroundImage is experimental in RN 0.88
-        experimental_backgroundImage: `linear-gradient(${overlay}, ${overlay}), ${profileGradient(colors)}`,
+        experimental_backgroundImage: `linear-gradient(${start}, ${end})`,
     }
 }
 
