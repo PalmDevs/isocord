@@ -25,7 +25,9 @@ const MAX_ENTRIES = 5000
 const CRASH_KEY = 'log.crash'
 const CRASH_ENTRIES = 100
 
+/** Ring buffer of entries, like trace.ts spans: `next` is where the following one goes. */
 const entries: LogEntry[] = []
+let next = 0
 const listeners = new Set<() => void>()
 
 /** The captured console methods, so dev builds still print without being captured twice. */
@@ -56,8 +58,8 @@ function stringify(value: unknown): string {
 }
 
 function push(entry: LogEntry): void {
-    entries.push(entry)
-    if (entries.length > MAX_ENTRIES) entries.shift()
+    entries[next] = entry
+    next = (next + 1) % MAX_ENTRIES
     for (const listener of listeners) listener()
 }
 
@@ -86,7 +88,8 @@ export function logger(category: string): Logger {
 
 /** LogAggregator `getAllForDebugPanel`: a copy, oldest first unless `newestFirst`. */
 export function getLogs(newestFirst = false): LogEntry[] {
-    return newestFirst ? entries.slice().reverse() : entries.slice()
+    const ordered = [...entries.slice(next), ...entries.slice(0, next)]
+    return newestFirst ? ordered.reverse() : ordered
 }
 
 /** Calls `listener` after every new entry; returns the unsubscribe. */
@@ -102,8 +105,7 @@ export function subscribeLogs(listener: () => void): () => void {
 export function stringifyLogs(maxChars: number): string {
     const lines: string[] = []
     let length = 0
-    for (let index = entries.length - 1; index >= 0; index--) {
-        const entry = entries[index]!
+    for (const entry of getLogs(true)) {
         const line = `${new Date(entry.time).toISOString()} -> ${entry.level.toUpperCase()} -> ${entry.category} -> ${entry.message}`
         length += line.length + 1
         if (length > maxChars) break
@@ -117,7 +119,7 @@ const crash = deviceStorage.getString(CRASH_KEY)
 if (crash !== undefined) {
     deviceStorage.remove(CRASH_KEY)
     try {
-        entries.push(...(JSON.parse(crash) as LogEntry[]))
+        for (const entry of JSON.parse(crash) as LogEntry[]) push(entry)
         report(
             'info',
             'Log',
@@ -150,7 +152,7 @@ ErrorUtils.setGlobalHandler((error, isFatal) => {
     if (isFatal)
         deviceStorage.set(
             CRASH_KEY,
-            JSON.stringify(entries.slice(-CRASH_ENTRIES)),
+            JSON.stringify(getLogs().slice(-CRASH_ENTRIES)),
         )
     previousHandler(error, isFatal)
 })
