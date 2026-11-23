@@ -222,12 +222,11 @@ export const messagesStore = defineStore(
             })),
         )
         // MessageStore MESSAGE_DELETE: a deleted revealed message hands the reveal to the next newer one.
-        const passReveal = (channelId: string, ids: string[]) =>
+        const passReveal = (channelId: string, ids: Set<string>) =>
             store.setState(state => {
                 const channel = state.channels[channelId]
                 const revealed = channel?.revealedId
-                if (!channel || !revealed || !ids.includes(revealed))
-                    return state
+                if (!channel || !revealed || !ids.has(revealed)) return state
                 const index = channel.messages.findIndex(
                     message => message.id === revealed,
                 )
@@ -235,7 +234,7 @@ export const messagesStore = defineStore(
                 const newer = channel.messages
                     .slice(0, Math.max(index, 0))
                     .reverse()
-                    .find(message => !ids.includes(message.id))
+                    .find(message => !ids.has(message.id))
                 return {
                     channels: {
                         ...state.channels,
@@ -244,17 +243,18 @@ export const messagesStore = defineStore(
                 }
             })
         dispatch.on('MESSAGE_DELETE', ({ id, channel_id }) => {
-            passReveal(channel_id, [id])
+            passReveal(channel_id, new Set([id]))
             edit(channel_id, messages => {
                 const next = messages.filter(message => message.id !== id)
                 return next.length === messages.length ? messages : next
             })
         })
         dispatch.on('MESSAGE_DELETE_BULK', ({ ids, channel_id }) => {
-            passReveal(channel_id, ids)
+            const deleted = new Set(ids)
+            passReveal(channel_id, deleted)
             edit(channel_id, messages => {
                 const next = messages.filter(
-                    message => !ids.includes(message.id),
+                    message => !deleted.has(message.id),
                 )
                 return next.length === messages.length ? messages : next
             })
