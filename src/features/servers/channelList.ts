@@ -99,6 +99,42 @@ function isRelevantThread(
     )
 }
 
+/** Bits of a channel's `ReadFlags` entry. */
+export const ReadFlag = { MENTION: 1, UNREAD: 2, RELEVANT_THREAD: 4 } as const
+
+/** What the list reads of the read states, by channel id. Zero entries are left out. */
+export type ReadFlags = Record<string, number>
+
+const hasFlag = (reads: ReadFlags, id: string, flag: number) =>
+    ((reads[id] ?? 0) & flag) !== 0
+
+/**
+ * Reduces the read states to the flags the rows and bars depend on (`isUnread` falls back to the join date).
+ * A selector over it stays shallow-equal while messages elsewhere change `lastMessageIds`.
+ */
+export function readFlags(
+    state: ReadStatesState,
+    ids: readonly string[],
+    channels: Record<string, Channel>,
+    joinedAck: string,
+    now: number,
+): ReadFlags {
+    const flags: ReadFlags = {}
+    for (const id of ids) {
+        const channel = channels[id]
+        const flag =
+            ((state.mentions[id] ?? 0) > 0 ? ReadFlag.MENTION : 0) |
+            (isUnread(state, id, joinedAck) ? ReadFlag.UNREAD : 0) |
+            (channel &&
+            isThread(channel) &&
+            isRelevantThread(channel, state, now)
+                ? ReadFlag.RELEVANT_THREAD
+                : 0)
+        if (flag) flags[id] = flag
+    }
+    return flags
+}
+
 /**
  * Flattens a guild's channels into list rows.
  * Order: pinned channels, uncategorised channels, then each category (text before voice), joined threads under their parent.
@@ -115,10 +151,8 @@ export function buildChannelRows(
     settings: GuildSettings | undefined,
     session: Session,
     selectedChannelId: string | undefined,
-    readStates: ReadStatesState,
+    reads: ReadFlags,
 ): ChannelRow[] {
-    const { mentions } = readStates
-    const now = Date.now()
     const selected = selectedChannelId ? channels[selectedChannelId] : undefined
     const selectedThread =
         selected && isThread(selected) && selected.guild_id === guild.id
@@ -132,7 +166,7 @@ export function buildChannelRows(
         isChannelOrParentOptedIn(policy, channel) ||
         channel.id === selectedChannelId ||
         selectedThread?.parent_id === channel.id ||
-        (mentions[channel.id] ?? 0) > 0
+        hasFlag(reads, channel.id, ReadFlag.MENTION)
 
     const categories: Channel[] = []
     const pinned: Channel[] = []
@@ -142,7 +176,7 @@ export function buildChannelRows(
         const channel = channels[id]
         if (!channel) continue
         if (isThread(channel)) {
-            if (!isRelevantThread(channel, readStates, now)) continue
+            if (!hasFlag(reads, id, ReadFlag.RELEVANT_THREAD)) continue
             const list = threads.get(channel.parent_id ?? '')
             if (list) list.push(channel)
             else threads.set(channel.parent_id ?? '', [channel])
@@ -231,9 +265,8 @@ export function buildBarRows(
     rows: ChannelRow[],
     channels: Record<string, Channel>,
     guildDefault: number | undefined,
-    readStates: ReadStatesState,
+    reads: ReadFlags,
     settings: GuildSettings | undefined,
-    joinedAck: string,
     newNotifications: boolean | undefined,
 ): BarRow[] {
     const policy = {
@@ -247,9 +280,9 @@ export function buildBarRows(
         const channel = channels[row.id]
         if (!channel) continue
         // ChannelsUnreadBars uses the resolved unread setting for plain unreads.
-        const mention = (readStates.mentions[row.id] ?? 0) > 0
+        const mention = hasFlag(reads, row.id, ReadFlag.MENTION)
         const barUnread =
-            isUnread(readStates, row.id, joinedAck) &&
+            hasFlag(reads, row.id, ReadFlag.UNREAD) &&
             (row.type === 'thread'
                 ? !isThreadMuted(channel.member, now)
                 : !isVoice(channel) &&

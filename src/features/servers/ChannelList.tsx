@@ -9,6 +9,7 @@ import Animated, {
 import Svg, { Path } from 'react-native-svg'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { scheduleOnRN } from 'react-native-worklets'
+import { useShallow } from 'zustand/react/shallow'
 import { ChannelType } from '../../core/discord/channelType'
 import { GuildFeature } from '../../core/discord/guild'
 import { UnreadSetting } from '../../core/discord/notificationSettings'
@@ -32,7 +33,7 @@ import { settingsStore } from '../../stores/settings/settingsStore'
 import { isChannelMuted, resolveUnreadSetting } from '../../stores/unreadPolicy'
 import { openChannelActionSheet } from '../channelActions'
 import { channelIcon } from './channelIcon'
-import { buildBarRows, buildChannelRows } from './channelList'
+import { buildBarRows, buildChannelRows, readFlags } from './channelList'
 import { serversUiStore } from './store'
 import { UnreadBar } from './UnreadBar'
 import { useServersPanels } from './useServersPanels'
@@ -355,8 +356,23 @@ export function ChannelList({
         serversUiStore,
         state => state.selectedChannelIds[guild.id],
     )
-    // Thread rows depend on unreads, mentions and newest messages.
-    const readStates = useSessionStore(readStatesStore, state => state)
+    const joinedAck = snowflakeFromTimestamp(new Date(guild.joinedAt).getTime())
+    // Thread rows depend on unreads, mentions and newest messages. Only these flags are subscribed to, so a
+    // message that changes none of them re-renders nothing. The selected thread may not be in the guild's ids.
+    const reads = useSessionStore(
+        readStatesStore,
+        useShallow(state =>
+            readFlags(
+                state,
+                selectedChannelId
+                    ? [...(ids ?? []), selectedChannelId]
+                    : (ids ?? []),
+                channels,
+                joinedAck,
+                Date.now(),
+            ),
+        ),
+    )
     const rows = buildChannelRows(
         guild,
         ids ?? [],
@@ -364,9 +380,8 @@ export function ChannelList({
         settings,
         session,
         selectedChannelId,
-        readStates,
+        reads,
     )
-    const joinedAck = snowflakeFromTimestamp(new Date(guild.joinedAt).getTime())
 
     // ChannelsUnreadBars: the rows a bar can point at, with each channel's unread kind.
     const barRows = buildBarRows(
@@ -374,9 +389,8 @@ export function ChannelList({
         rows,
         channels,
         guild.defaultMessageNotifications,
-        readStates,
+        reads,
         settings,
-        joinedAck,
         newNotifications,
     )
     const unreadBars = useUnreadBars(barRows)
