@@ -32,6 +32,7 @@ export function useProfileMenu(
     const relationship = useRelationshipType(view.user.id)
     const ignored = useIsIgnored(view.user.id)
     const { id, username } = view.user
+    const isNotSelf = session.userId !== id
     const blocked = relationship === RelationshipType.BLOCKED
     const copy = (text: string) => {
         Clipboard.setStringAsync(text).then(() =>
@@ -72,8 +73,12 @@ export function useProfileMenu(
             icon: 'UserSquareIcon',
             action: toggleServerProfile,
         })
+    if (isNotSelf)
+        items.push({
+            label: t('userProfile.inviteToServer'),
+            icon: 'UserPlusIcon',
+        })
     items.push(
-        { label: t('userProfile.inviteToServer'), icon: 'UserPlusIcon' },
         {
             label: t('userProfile.copyUsername'),
             icon: 'CopyIcon',
@@ -100,7 +105,7 @@ export function useProfileMenu(
                 ),
         })
     // A blocked user can be neither ignored nor unignored here.
-    if (!blocked)
+    if (!blocked && isNotSelf)
         items.push({
             label: ignored
                 ? t('userProfile.unignore')
@@ -111,14 +116,15 @@ export function useProfileMenu(
                     ? unignoreUser(session, id)
                     : openRestrictionConfirmation('ignore', id, view.name),
         })
-    items.push({
-        label: blocked ? t('userProfile.unblock') : t('userProfile.block'),
-        icon: 'DenyIcon',
-        variant: 'destructive',
-        action: () =>
-            blocked
-                ? unblock()
-                : openRestrictionConfirmation('block', id, view.name),
-    })
+    if (isNotSelf)
+        items.push({
+            label: blocked ? t('userProfile.unblock') : t('userProfile.block'),
+            icon: 'DenyIcon',
+            variant: 'destructive',
+            action: () =>
+                blocked
+                    ? unblock()
+                    : openRestrictionConfirmation('block', id, view.name),
+        })
     return items
 }
