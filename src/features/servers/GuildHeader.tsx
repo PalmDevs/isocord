@@ -75,16 +75,19 @@ export function GuildBanner({
     // uncovers the list.
     const { listCovered } = useServersPanels()
     const image = useRef<Image>(null)
-    useEffect(() => {
-        if (listCovered) void image.current?.stopAnimating()
-        else void image.current?.startAnimating()
-    }, [listCovered])
     const pressed = useSharedValue(0)
     const animate =
         !reducedMotion &&
         !sheetOpen &&
         focused &&
         (guild.features?.includes('ANIMATED_BANNER') ?? false)
+    // Only an animated banner has playback to drive. A still image has nothing to pause, and its native view may not
+    // be registered yet (frozen or just mounted), which rejects the call.
+    useEffect(() => {
+        if (!animate) return
+        if (listCovered) void image.current?.stopAnimating()
+        else void image.current?.startAnimating()
+    }, [animate, listCovered])
 
     const bannerStyle = useAnimatedStyle(() => {
         const y = scrollY.get()
