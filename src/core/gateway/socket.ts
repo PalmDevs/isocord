@@ -85,11 +85,10 @@ const {
 /** GatewaySocket `expeditedHeartbeat`: how long the ack to a heartbeat sent out of turn may take before reconnecting. */
 const EXPEDITED_ACK_MS = 5_000
 
-/**
- * How long received frames are handled before yielding (ms). A resume replays dozens of payloads back to
- * back. Handled in one go they hold the JS thread for seconds and freeze every screen.
- */
+/** Time budget checked after each frame. */
 const DISPATCH_BUDGET_MS = 8
+/** DispatcherWorkScheduler._queueIdleCallback: a timer gives rendering and input a turn. */
+const DISPATCH_YIELD_MS = 1
 
 /**
  * SessionHeartbeatScheduler: the session is active while the app is in the foreground ("foregrounded"). The
@@ -156,6 +155,7 @@ export class GatewaySocket {
     /** Received payloads waiting for the drain, already decompressed by native code. */
     private queue: string[] = []
     private draining = false
+    private drainTimer: ReturnType<typeof setTimeout> | null = null
     /** The socket whose zstd frames native code decompresses, or null when compression is off. */
     private socketId: number | null = null
     /** In the background with `pauseInBackground` on: closed, the session kept to resume. */
@@ -271,14 +271,23 @@ export class GatewaySocket {
     private scheduleDrain(): void {
         if (this.draining) return
         this.draining = true
-        setImmediate(this.drain)
+        // BasicWorkScheduler.requestWorkTimeout skips idle scheduling in the background.
+        if (AppState.currentState === 'background') setImmediate(this.drain)
+        else this.drainTimer = setTimeout(this.drain, DISPATCH_YIELD_MS)
+    }
+
+    private cancelDrainTimer(): void {
+        if (this.drainTimer === null) return
+        clearTimeout(this.drainTimer)
+        this.drainTimer = null
+        this.draining = false
     }
 
     /**
-     * Handles the queued payloads in order, for DISPATCH_BUDGET_MS at most, then yields. The queue is filled
-     * by `onmessage` and stays cheap, so React renders and native events run between the slices.
+     * Handles queued payloads in order. Yields after the first frame that reaches the time budget.
      */
     private drain = (): void => {
+        this.drainTimer = null
         const started = performance.now()
         try {
             while (this.queue.length > 0) {
@@ -287,8 +296,8 @@ export class GatewaySocket {
             }
         } finally {
             // A payload that fails to parse still lets the ones behind it through.
-            if (this.queue.length > 0) setImmediate(this.drain)
-            else this.draining = false
+            this.draining = false
+            if (this.queue.length > 0) this.scheduleDrain()
         }
     }
 
@@ -466,7 +475,13 @@ export class GatewaySocket {
 
     /** Pauses for the background session, which resumes its own session when told the app has left (AppVisibility). */
     private becameInactive(): void {
-        if (this.closed || !this.pauseInBackground || this.paused) return
+        if (this.closed || this.paused) return
+        if (!this.pauseInBackground) {
+            // Android suspends timers while the activity is paused.
+            this.cancelDrainTimer()
+            if (this.queue.length > 0) this.scheduleDrain()
+            return
+        }
         this.paused = true
         this.teardown(CloseCode.RESUMABLE)
         this.setState('disconnected')
@@ -507,6 +522,7 @@ export class GatewaySocket {
     }
 
     private teardown(closeCode?: number): void {
+        this.cancelDrainTimer()
         if (this.heartbeatTimer) clearTimeout(this.heartbeatTimer)
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
         if (this.expeditedTimer) clearTimeout(this.expeditedTimer)
