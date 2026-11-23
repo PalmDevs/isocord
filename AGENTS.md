@@ -159,9 +159,12 @@ Run all of these, and fix any new errors or warnings they report:
 ```sh
 bun typecheck
 bun lint                       # `bun run format` fixes formatting and import order
-(cd android && ./gradlew :app:assembleRelease -q)
+(cd android && ./gradlew :app:assembleRelease -q -Pr8=false)
 adb install -r android/app/build/outputs/apk/release/app-release.apk
 ```
+
+`-Pr8=false` skips R8, which takes most of a release build. Drop the flag
+only when you are asked to, or when you change R8 rules or the build itself.
 
 Changes to Kotlin code or to the specs in `src/native/` need this full
 rebuild; reloading Metro doesn't pick them up. If more than one device is

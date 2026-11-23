@@ -59,9 +59,9 @@ react {
 }
 
 /**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ * R8 on release builds, from the `r8` property in gradle.properties. `-Pr8=false` turns it off.
  */
-def enableProguardInReleaseBuilds = true
+def enableProguardInReleaseBuilds = project.property("r8").toBoolean()
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
