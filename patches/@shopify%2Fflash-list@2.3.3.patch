@@ -1,0 +1,226 @@
+diff --git a/dist/FlashListProps.d.ts b/dist/FlashListProps.d.ts
+index 5e90a5c153033480bdc422de8cef017bb42f89b7..803dbc3bbca5eff109a555ef205e444782a65f45 100644
+--- a/dist/FlashListProps.d.ts
++++ b/dist/FlashListProps.d.ts
+@@ -103,6 +103,8 @@ export interface FlashListProps<TItem> extends Omit<ScrollViewProps, "maintainVi
+      * Draw distance for advanced rendering (in dp/px)
+      */
+     drawDistance?: number;
++    /** Reserves half the draw distance on both sides during offset projection. */
++    reserveDrawDistanceForReversal?: boolean;
+     /**
+      * A marker property for telling the list to re-render (since it implements PureComponent).
+      * If any of your `renderItem`, Header, Footer, etc. functions depend on anything outside of the `data` prop,
+diff --git a/dist/recyclerview/RecyclerView.js b/dist/recyclerview/RecyclerView.js
+index 6799c8a61bff4607633196097da35c7a6975f0b6..455037261ca154bf98f2288b2aea891b5359e574 100644
+--- a/dist/recyclerview/RecyclerView.js
++++ b/dist/recyclerview/RecyclerView.js
+@@ -28,7 +28,7 @@ import { RenderTimeTracker } from "./helpers/RenderTimeTracker";
+ const RecyclerViewComponent = (props, ref) => {
+     var _a, _b, _c, _d, _e;
+     // Destructure props and initialize refs
+-    const { horizontal, renderItem, data, extraData, onLoad, CellRendererComponent, overrideProps, refreshing, onRefresh, progressViewOffset, ListEmptyComponent, ListHeaderComponent, ListHeaderComponentStyle, ListFooterComponent, ListFooterComponentStyle, ItemSeparatorComponent, renderScrollComponent, style, stickyHeaderIndices, maintainVisibleContentPosition, onCommitLayoutEffect, onChangeStickyIndex, stickyHeaderConfig, inverted, ...rest } = props;
++    const { horizontal, renderItem, data, extraData, onLoad, CellRendererComponent, overrideProps, reserveDrawDistanceForReversal: _reserveDrawDistanceForReversal, refreshing, onRefresh, progressViewOffset, ListEmptyComponent, ListHeaderComponent, ListHeaderComponentStyle, ListFooterComponent, ListFooterComponentStyle, ItemSeparatorComponent, renderScrollComponent, style, stickyHeaderIndices, maintainVisibleContentPosition, onCommitLayoutEffect, onChangeStickyIndex, stickyHeaderConfig, inverted, ...rest } = props;
+     const [renderTimeTracker] = useState(() => new RenderTimeTracker());
+     renderTimeTracker.startTracking();
+     // Sticky header config
+diff --git a/dist/recyclerview/RecyclerViewManager.js b/dist/recyclerview/RecyclerViewManager.js
+index 1aa651d9d985a36d3c6ef69f20407f51ca0e3e6f..55484a261951a73c60ff6d9fc9fc664c51ce3c3f 100644
+--- a/dist/recyclerview/RecyclerViewManager.js
++++ b/dist/recyclerview/RecyclerViewManager.js
+@@ -63,6 +63,8 @@ export class RecyclerViewManager {
+         this.propsRef = props;
+         this.engagedIndicesTracker.drawDistance =
+             (_a = props.drawDistance) !== null && _a !== void 0 ? _a : this.engagedIndicesTracker.drawDistance;
++        this.engagedIndicesTracker.reserveDrawDistanceForReversal =
++            props.reserveDrawDistanceForReversal === true;
+         this.initialDrawBatchSize =
+             (_c = (_b = this.propsRef.overrideProps) === null || _b === void 0 ? void 0 : _b.initialDrawBatchSize) !== null && _c !== void 0 ? _c : this.initialDrawBatchSize;
+     }
+diff --git a/dist/recyclerview/helpers/EngagedIndicesTracker.d.ts b/dist/recyclerview/helpers/EngagedIndicesTracker.d.ts
+index 5f93a89d4aed914de08ea39c7219b26751cdd0b2..0af10203a56d1243f099798de783bdadcfd52b43 100644
+--- a/dist/recyclerview/helpers/EngagedIndicesTracker.d.ts
++++ b/dist/recyclerview/helpers/EngagedIndicesTracker.d.ts
+@@ -3,6 +3,7 @@ import { ConsecutiveNumbers } from "./ConsecutiveNumbers";
+ export interface RVEngagedIndicesTracker {
+     scrollOffset: number;
+     drawDistance: number;
++    reserveDrawDistanceForReversal: boolean;
+     enableOffsetProjection: boolean;
+     averageRenderTime: number;
+     /**
+@@ -42,6 +43,7 @@ export interface Velocity {
+ export declare class RVEngagedIndicesTrackerImpl implements RVEngagedIndicesTracker {
+     scrollOffset: number;
+     drawDistance: number;
++    reserveDrawDistanceForReversal: boolean;
+     enableOffsetProjection: boolean;
+     averageRenderTime: number;
+     private forceDisableOffsetProjection;
+diff --git a/dist/recyclerview/helpers/EngagedIndicesTracker.js b/dist/recyclerview/helpers/EngagedIndicesTracker.js
+index 083fc0470077c3d485417e2b3916a2b5d44a9c2f..101abd933d51ea5f732539cc86e1ecc4e2bb12b6 100644
+--- a/dist/recyclerview/helpers/EngagedIndicesTracker.js
++++ b/dist/recyclerview/helpers/EngagedIndicesTracker.js
+@@ -6,6 +6,7 @@ export class RVEngagedIndicesTrackerImpl {
+         this.scrollOffset = 0;
+         // Distance to pre-render items before and after the visible viewport (in pixels)
+         this.drawDistance = PlatformConfig.defaultDrawDistance;
++        this.reserveDrawDistanceForReversal = false;
+         // Whether to use offset projection to predict the next scroll offset
+         this.enableOffsetProjection = true;
+         // Average render time of the list
+@@ -41,12 +42,10 @@ export class RVEngagedIndicesTrackerImpl {
+         }
+         // Determine scroll direction to optimize buffer distribution
+         const isScrollingBackward = this.isScrollingBackward();
+-        const viewportStart = this.enableOffsetProjection && !this.forceDisableOffsetProjection
++        const projectedOffset = this.enableOffsetProjection && !this.forceDisableOffsetProjection
+             ? this.getProjectedScrollOffset(offset, this.averageRenderTime)
+             : offset;
+-        // console.log("timeMs", this.averageRenderTime, offset, viewportStart);
+         const viewportSize = isHorizontal ? windowSize.width : windowSize.height;
+-        const viewportEnd = viewportStart + viewportSize;
+         // STEP 2: Determine buffer size and distribution
+         // The total extra space where items will be pre-rendered
+         const totalBuffer = this.drawDistance * 2;
+@@ -61,17 +60,19 @@ export class RVEngagedIndicesTrackerImpl {
+             : this.largeMultiplier;
+         const bufferBefore = Math.ceil(totalBuffer * beforeRatio);
+         const bufferAfter = Math.ceil(totalBuffer * afterRatio);
++        // Reserve overscan on both sides of the real viewport for direction changes.
++        const minimumBuffer = this.reserveDrawDistanceForReversal
++            ? Math.ceil(this.drawDistance / 2)
++            : 0;
++        const viewportStart = this.reserveDrawDistanceForReversal
++            ? Math.max(offset - bufferAfter + minimumBuffer, Math.min(projectedOffset, offset + bufferBefore - minimumBuffer))
++            : projectedOffset;
+         // STEP 3: Calculate the extended viewport (visible area + buffers)
+-        // The start position with buffer (never less than 0). The window is
+-        // computed from the projected offset, so clamp it to also cover the real
+-        // viewport start; otherwise, when the trailing buffer is smaller than the
+-        // projection delta, rows that are actually on screen would be excluded.
+         let extendedStart = Math.max(0, Math.min(viewportStart - bufferBefore, offset));
+         // If we couldn't apply full buffer at start, calculate how much was unused
+         const unusedStartBuffer = Math.max(0, bufferBefore - viewportStart);
+-        // Add any unused start buffer to the end buffer. Clamp so the window also
+-        // covers the real viewport end (mirror case when scrolling backward).
+-        let extendedEnd = Math.max(viewportEnd + bufferAfter + unusedStartBuffer, offset + viewportSize);
++        // Add any unused start buffer to the end buffer.
++        let extendedEnd = Math.max(viewportStart + viewportSize + bufferAfter + unusedStartBuffer, offset + viewportSize);
+         // STEP 4: Handle end boundary adjustments
+         // Get the total content size to check for end boundary
+         const layoutSize = layoutManager.getLayoutSize();
+diff --git a/src/FlashListProps.ts b/src/FlashListProps.ts
+index 1dba06cdc60e69be63119fc26fcb6c5f00a50dc4..1062cf7e5015fa82d37d125dc316ffe57d7ca175 100644
+--- a/src/FlashListProps.ts
++++ b/src/FlashListProps.ts
+@@ -165,6 +165,9 @@ export interface FlashListProps<TItem>
+    */
+   drawDistance?: number;
+ 
++  /** Reserves half the draw distance on both sides during offset projection. */
++  reserveDrawDistanceForReversal?: boolean;
++
+   /**
+    * A marker property for telling the list to re-render (since it implements PureComponent).
+    * If any of your `renderItem`, Header, Footer, etc. functions depend on anything outside of the `data` prop,
+diff --git a/src/recyclerview/RecyclerView.tsx b/src/recyclerview/RecyclerView.tsx
+index 3c25e7e893004932b8a13072e01fe2a940d365d4..a05905a88ad99fb2fefa3b181cf9a587d4573a9e 100644
+--- a/src/recyclerview/RecyclerView.tsx
++++ b/src/recyclerview/RecyclerView.tsx
+@@ -71,6 +71,7 @@ const RecyclerViewComponent = <T,>(
+     onLoad,
+     CellRendererComponent,
+     overrideProps,
++    reserveDrawDistanceForReversal: _reserveDrawDistanceForReversal,
+     refreshing,
+     onRefresh,
+     progressViewOffset,
+diff --git a/src/recyclerview/RecyclerViewManager.ts b/src/recyclerview/RecyclerViewManager.ts
+index 41704d03e807f962c17ca8d008738c7a387d9b2a..4372d6ae2a5d135eb0aa5e2573f0cd7b70e8d0b4 100644
+--- a/src/recyclerview/RecyclerViewManager.ts
++++ b/src/recyclerview/RecyclerViewManager.ts
+@@ -98,6 +98,8 @@ export class RecyclerViewManager<T> {
+     this.propsRef = props;
+     this.engagedIndicesTracker.drawDistance =
+       props.drawDistance ?? this.engagedIndicesTracker.drawDistance;
++    this.engagedIndicesTracker.reserveDrawDistanceForReversal =
++      props.reserveDrawDistanceForReversal === true;
+     this.initialDrawBatchSize =
+       this.propsRef.overrideProps?.initialDrawBatchSize ??
+       this.initialDrawBatchSize;
+diff --git a/src/recyclerview/helpers/EngagedIndicesTracker.ts b/src/recyclerview/helpers/EngagedIndicesTracker.ts
+index 8029ed611ee45d0c6354ff48f21aaa3ca0599d82..33f4d29be4ff681a2492fd35a70cd530d383c1e4 100644
+--- a/src/recyclerview/helpers/EngagedIndicesTracker.ts
++++ b/src/recyclerview/helpers/EngagedIndicesTracker.ts
+@@ -8,6 +8,7 @@ export interface RVEngagedIndicesTracker {
+   scrollOffset: number;
+   // Total distance (in pixels) to pre-render items before and after the visible viewport
+   drawDistance: number;
++  reserveDrawDistanceForReversal: boolean;
+   // Whether to use offset projection to predict the next scroll offset
+   enableOffsetProjection: boolean;
+   // Average render time of the list
+@@ -62,6 +63,7 @@ export class RVEngagedIndicesTrackerImpl implements RVEngagedIndicesTracker {
+   public scrollOffset = 0;
+   // Distance to pre-render items before and after the visible viewport (in pixels)
+   public drawDistance = PlatformConfig.defaultDrawDistance;
++  public reserveDrawDistanceForReversal = false;
+ 
+   // Whether to use offset projection to predict the next scroll offset
+   public enableOffsetProjection = true;
+@@ -110,15 +112,12 @@ export class RVEngagedIndicesTrackerImpl implements RVEngagedIndicesTracker {
+ 
+     // Determine scroll direction to optimize buffer distribution
+     const isScrollingBackward = this.isScrollingBackward();
+-    const viewportStart =
++    const projectedOffset =
+       this.enableOffsetProjection && !this.forceDisableOffsetProjection
+         ? this.getProjectedScrollOffset(offset, this.averageRenderTime)
+         : offset;
+ 
+-    // console.log("timeMs", this.averageRenderTime, offset, viewportStart);
+-
+     const viewportSize = isHorizontal ? windowSize.width : windowSize.height;
+-    const viewportEnd = viewportStart + viewportSize;
+ 
+     // STEP 2: Determine buffer size and distribution
+     // The total extra space where items will be pre-rendered
+@@ -137,23 +136,26 @@ export class RVEngagedIndicesTrackerImpl implements RVEngagedIndicesTracker {
+     const bufferBefore = Math.ceil(totalBuffer * beforeRatio);
+     const bufferAfter = Math.ceil(totalBuffer * afterRatio);
+ 
++    // Reserve overscan on both sides of the real viewport for direction changes.
++    const minimumBuffer = this.reserveDrawDistanceForReversal
++      ? Math.ceil(this.drawDistance / 2)
++      : 0;
++    const viewportStart = this.reserveDrawDistanceForReversal
++      ? Math.max(
++          offset - bufferAfter + minimumBuffer,
++          Math.min(projectedOffset, offset + bufferBefore - minimumBuffer)
++        )
++      : projectedOffset;
++
+     // STEP 3: Calculate the extended viewport (visible area + buffers)
+-    // The start position with buffer (never less than 0). The window is
+-    // computed from the projected offset, so clamp it to also cover the real
+-    // viewport start; otherwise, when the trailing buffer is smaller than the
+-    // projection delta, rows that are actually on screen would be excluded.
+-    let extendedStart = Math.max(
+-      0,
+-      Math.min(viewportStart - bufferBefore, offset)
+-    );
++    let extendedStart = Math.max(0, Math.min(viewportStart - bufferBefore, offset));
+ 
+     // If we couldn't apply full buffer at start, calculate how much was unused
+     const unusedStartBuffer = Math.max(0, bufferBefore - viewportStart);
+ 
+-    // Add any unused start buffer to the end buffer. Clamp so the window also
+-    // covers the real viewport end (mirror case when scrolling backward).
++    // Add any unused start buffer to the end buffer.
+     let extendedEnd = Math.max(
+-      viewportEnd + bufferAfter + unusedStartBuffer,
++      viewportStart + viewportSize + bufferAfter + unusedStartBuffer,
+       offset + viewportSize
+     );
+ 

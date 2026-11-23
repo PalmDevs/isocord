@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list'
 import { useEffect, useMemo, useState } from 'react'
-import { useWindowDimensions } from 'react-native'
+import { ScrollView, useWindowDimensions } from 'react-native'
 import { memberCanView } from '../../../core/discord/permissions'
 import { useSession, useSessionStore } from '../../../core/react'
 import { Text } from '../../../design/components/Text'
@@ -13,14 +13,14 @@ import {
     searchGuildMembers,
 } from '../../../stores/members'
 import { displayName, usersStore } from '../../../stores/users'
-import { MemberPlaceholderRow, MemberRow } from './MemberRow'
+import { MemberPlaceholderRows } from './MemberListLoading'
+import { MEMBER_PLACEHOLDER_ROW_HEIGHT, MemberRow } from './MemberRow'
 import { matchRank } from './matchRank'
 import { styles } from './styles'
 import type { SearchTabPageProps } from '../types'
 
 /** How long to wait for the gateway's answer before showing what is known. */
 const FETCH_TIMEOUT_MS = 5000
-const ROW_HEIGHT = 56
 
 let nonceCounter = 0
 
@@ -53,13 +53,14 @@ export function GuildMemberSearch({
 
     // MembersPage passes the settled query.
     const needle = query.toLowerCase()
-    const [fetching, setFetching] = useState(false)
+    const [completedNeedle, setCompletedNeedle] = useState<string | null>(null)
+    const fetching = active && needle !== '' && completedNeedle !== needle
     useEffect(() => {
-        if (!active || needle === '') return setFetching(false)
+        if (!active || needle === '') return
+        const done = () => setCompletedNeedle(needle)
         const nonce = `ms${++nonceCounter}`
-        if (!searchGuildMembers(session, guildId, needle, nonce)) return
-        setFetching(true)
-        const done = () => setFetching(false)
+        if (!searchGuildMembers(session, guildId, needle, nonce)) return done()
+        setCompletedNeedle(null)
         const off = session.gateway.dispatch.on(
             'GUILD_MEMBERS_CHUNK',
             chunk => {
@@ -74,7 +75,7 @@ export function GuildMemberSearch({
     }, [active, session, guildId, needle])
 
     const ids = useMemo(() => {
-        if (needle === '' || !guild || !members) return []
+        if (fetching || needle === '' || !guild || !members) return []
         const matches: Array<{ id: string; rank: number; name: string }> = []
         for (const [id, member] of Object.entries(members)) {
             const user = users[id]
@@ -95,46 +96,42 @@ export function GuildMemberSearch({
         }
         matches.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
         return matches.slice(0, MEMBER_SEARCH_LIMIT).map(match => match.id)
-    }, [needle, guild, members, users, channel])
+    }, [fetching, needle, guild, members, users, channel])
 
-    const placeholders = Array.from(
-        { length: Math.ceil(height / ROW_HEIGHT) },
-        (_, i) => `placeholder-${i}`,
-    )
-    const data = fetching ? placeholders : ids
+    if (fetching)
+        return (
+            <ScrollView
+                contentContainerStyle={styles.searchContent}
+                scrollEnabled={false}
+            >
+                <MemberPlaceholderRows
+                    count={Math.ceil(height / MEMBER_PLACEHOLDER_ROW_HEIGHT)}
+                />
+            </ScrollView>
+        )
 
     return (
-        // Placeholders and results are separate lists: FlashList keeps cells scrolled off mounted for reuse, and the
-        // placeholders would stay pulsing behind the results.
         <FlashList
-            key={fetching ? 'loading' : 'results'}
-            data={data}
+            data={ids}
             keyExtractor={id => id}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.searchContent}
             ListEmptyComponent={
-                needle === '' || fetching ? null : (
+                needle === '' ? null : (
                     <Text color="TEXT_MUTED" style={styles.empty}>
                         {t('members.noResults')}
                     </Text>
                 )
             }
-            renderItem={({ item: id, index }) =>
-                fetching ? (
-                    <MemberPlaceholderRow
-                        start={index === 0}
-                        end={index === data.length - 1}
-                    />
-                ) : (
-                    <MemberRow
-                        userId={id}
-                        guildId={guildId}
-                        ownerId={guild?.ownerId}
-                        start={index === 0}
-                        end={index === data.length - 1}
-                    />
-                )
-            }
+            renderItem={({ item: id, index }) => (
+                <MemberRow
+                    userId={id}
+                    guildId={guildId}
+                    ownerId={guild?.ownerId}
+                    start={index === 0}
+                    end={index === ids.length - 1}
+                />
+            )}
         />
     )
 }

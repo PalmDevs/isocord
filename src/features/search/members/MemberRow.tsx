@@ -19,7 +19,7 @@ import { openUserProfile } from '../../chat/headerActions'
 import { activityLine } from './activityLine'
 
 const AVATAR_SIZE = 32
-const PLACEHOLDER_ROW_HEIGHT = 56
+export const MEMBER_PLACEHOLDER_ROW_HEIGHT = 56
 
 export interface MemberRowProps {
     userId: string
@@ -114,15 +114,24 @@ export const MemberRow = memo(function MemberRow({
 
 /** placeholders/MemberRowPlaceholder: a FormRowPlaceholder, an avatar and two lines, in the card of a row. */
 export function MemberPlaceholderRow({
+    animate = true,
     start,
     end,
 }: {
+    animate?: boolean
     start?: boolean
     end?: boolean
 }) {
+    // UsersFastList.Placeholder uses static shapes for unloaded member slots.
+    const Content = animate ? SkeletonPulse : View
     return (
-        <View style={styles.placeholder(start, end)}>
-            <SkeletonPulse style={styles.placeholderContent}>
+        <View
+            style={styles.placeholder(start, end)}
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+        >
+            <Content style={styles.placeholderContent}>
                 <Skeleton
                     width={AVATAR_SIZE}
                     height={AVATAR_SIZE}
@@ -131,7 +140,7 @@ export function MemberPlaceholderRow({
                 <View style={styles.placeholderLines}>
                     <Skeleton width="45%" height={14} radius={4} />
                 </View>
-            </SkeletonPulse>
+            </Content>
         </View>
     )
 }
@@ -179,7 +188,7 @@ const styles = StyleSheet.create(theme => ({
         justifyContent: 'center',
     },
     placeholder: (start?: boolean, end?: boolean) => ({
-        height: PLACEHOLDER_ROW_HEIGHT,
+        height: MEMBER_PLACEHOLDER_ROW_HEIGHT,
         backgroundColor: theme.colors.CARD_MUTED_BG,
         borderTopLeftRadius: start
             ? theme.modules.mobile.TABLE_ROW_BORDER_RADIUS

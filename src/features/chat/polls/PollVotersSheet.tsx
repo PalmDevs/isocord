@@ -1,32 +1,26 @@
-import { Image } from 'expo-image'
 import { useEffect, useRef, useState } from 'react'
 import { ScrollView, View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { Endpoint } from '../../../core/api/paths'
 import { useSession, useSessionStore } from '../../../core/react'
-import { ActivityIndicator } from '../../../design/components/ActivityIndicator'
-import { cdnSize } from '../../../design/components/avatars/avatarUrl'
 import { RipplePressable } from '../../../design/components/buttons/RipplePressable'
 import { Emoji } from '../../../design/components/Emoji'
 import { BottomSheet } from '../../../design/components/sheets/Sheet'
 import { openActionSheet } from '../../../design/components/sheets/sheetStore'
 import { Text } from '../../../design/components/Text'
-import { TableRow } from '../../../design/components/table/TableRow'
 import { t } from '../../../i18n'
 import { channelsStore } from '../../../stores/channels/channels'
-import { membersStore } from '../../../stores/members'
 import { findMessage, messagesStore } from '../../../stores/messages/messages'
-import { displayName, usersStore } from '../../../stores/users'
-import { authorAvatarUrl } from '../author'
-import { openUserProfile } from '../headerActions'
+import { usersStore } from '../../../stores/users'
+import { MemberPlaceholderRows } from '../../search/members/MemberListLoading'
+import { MemberRow } from '../../search/members/MemberRow'
 import type { MessagePoll } from '../../../stores/messages/messageTypes'
 import type { User } from '../../../stores/users'
 
 /** DEFAULT_NUM_REACTION_USERS: voters one request lists. More are not paged in yet. */
 const VOTERS_LIMIT = 100
-/** The voter rows (TableRow) and their avatar (AvatarSizes.SMALL), as the reactions sheet's. */
-const ROW_HEIGHT = 48
-const AVATAR_SIZE = 30
+/** Placeholder rows shown while the voters load, as the reactions sheet's. */
+const PLACEHOLDER_COUNT = 4
 const EMOJI_SIZE = 20
 
 type Answer = MessagePoll['answers'][number]
@@ -87,48 +81,6 @@ function AnswerTab({
                 </Text>
             ) : null}
         </RipplePressable>
-    )
-}
-
-/** VotersList's row: the avatar (the server one if set) and the nickname; a tap opens the profile. */
-function VoterRow({
-    user,
-    guildId,
-    start,
-    end,
-}: {
-    user: User
-    guildId: string | undefined
-    start: boolean
-    end: boolean
-}) {
-    const session = useSession()
-    const member = useSessionStore(membersStore, state =>
-        guildId ? state.members[guildId]?.[user.id] : undefined,
-    )
-    const name = member?.nick ?? displayName(user)
-    return (
-        <TableRow
-            start={start}
-            end={end}
-            height={ROW_HEIGHT}
-            onPress={() => openUserProfile(session, user.id, guildId)}
-            accessibilityLabel={name}
-            icon={
-                <Image
-                    source={authorAvatarUrl(
-                        user,
-                        member,
-                        guildId,
-                        cdnSize(AVATAR_SIZE),
-                    )}
-                    recyclingKey={user.id}
-                    style={styles.avatar}
-                />
-            }
-            label={name}
-            labelLineClamp={1}
-        />
     )
 }
 
@@ -227,7 +179,8 @@ function PollVotersSheet({
                 )}
             </Text>
             {voters === undefined ? (
-                <ActivityIndicator style={styles.spinner} />
+                // The members tab's placeholder rows (GuildMemberList) until the voters are in.
+                <MemberPlaceholderRows count={PLACEHOLDER_COUNT} />
             ) : voters === null ? (
                 <Text
                     variant="text-md/medium"
@@ -251,9 +204,10 @@ function PollVotersSheet({
                 </View>
             ) : (
                 voters.map((user, index) => (
-                    <VoterRow
+                    // MemberRow: avatar with status, the role colour and the app tag, as the members tab.
+                    <MemberRow
                         key={user.id}
-                        user={user}
+                        userId={user.id}
                         guildId={guildId}
                         start={index === 0}
                         end={index === voters.length - 1}
@@ -279,13 +233,6 @@ const styles = StyleSheet.create(theme => ({
     }),
     emoji: { width: EMOJI_SIZE, height: EMOJI_SIZE },
     title: { marginBottom: theme.space.PX_12 },
-    avatar: {
-        width: AVATAR_SIZE,
-        height: AVATAR_SIZE,
-        borderRadius: AVATAR_SIZE / 2,
-        backgroundColor: theme.colors.BACKGROUND_BASE_LOWER,
-    },
-    spinner: { height: ROW_HEIGHT },
     empty: { padding: theme.space.PX_32, gap: theme.space.PX_8 },
     center: { textAlign: 'center' },
 }))

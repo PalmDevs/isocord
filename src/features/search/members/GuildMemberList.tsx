@@ -1,5 +1,6 @@
 import { FlashList } from '@shopify/flash-list'
 import { useEffect } from 'react'
+import { useWindowDimensions } from 'react-native'
 import { useSession, useSessionStore } from '../../../core/react'
 import { t } from '../../../i18n'
 import { channelsStore } from '../../../stores/channels/channels'
@@ -14,9 +15,9 @@ import {
     rangesFor,
     subscribeMemberList,
 } from '../../../stores/memberList'
+import { MemberListLoading } from './MemberListLoading'
 import {
     MemberPlaceholderRow,
-    MemberPlaceholderSection,
     MemberRow,
     MemberSectionHeader,
 } from './MemberRow'
@@ -25,12 +26,6 @@ import { useHeldWhileReloading } from './useHeldWhileReloading'
 import type { ViewToken } from '@shopify/flash-list'
 import type { MemberListRow } from '../../../stores/memberList'
 import type { SearchTabPageProps } from '../types'
-
-/** useFullscreenPlaceholderCount at the 56 dp row height: enough to fill a phone. */
-// Two groups (section strip, then rows): 4 rows, then 8.
-const PLACEHOLDER_COUNT = 14
-const PLACEHOLDER_SECTION_AT = 5
-const PLACEHOLDERS = Array.from({ length: PLACEHOLDER_COUNT }, (_, i) => i)
 
 /**
  * The member list of the channel (GuildChannelUserList with sections that do not stick): the hoisted roles, then
@@ -46,6 +41,7 @@ export function GuildMemberList({
     guildId: string
 }) {
     const session = useSession()
+    const { height: windowHeight } = useWindowDimensions()
     const listChannel = useSessionStore(channelsStore, state =>
         memberListChannel(state.channels, channelId),
     )
@@ -88,34 +84,7 @@ export function GuildMemberList({
         )
     }
 
-    if (!rows || groupsKey === undefined)
-        return (
-            // Its own list, not the loaded one with other data: FlashList reads maxItemsInRecyclePool only when it
-            // mounts, and these placeholders would stay pulsing in the loaded list's recycle pool.
-            <FlashList
-                key="loading"
-                data={PLACEHOLDERS}
-                keyExtractor={index => `placeholder-${index}`}
-                contentContainerStyle={styles.content}
-                scrollEnabled={false}
-                renderItem={({ index }) =>
-                    index === 0 || index === PLACEHOLDER_SECTION_AT ? (
-                        <MemberPlaceholderSection />
-                    ) : (
-                        <MemberPlaceholderRow
-                            start={
-                                index === 1 ||
-                                index === PLACEHOLDER_SECTION_AT + 1
-                            }
-                            end={
-                                index === PLACEHOLDER_SECTION_AT - 1 ||
-                                index === PLACEHOLDER_COUNT - 1
-                            }
-                        />
-                    )
-                }
-            />
-        )
+    if (!rows || groupsKey === undefined) return <MemberListLoading />
 
     // Everything renderItem reads besides the row comes from the groups, so it stays the same function between
     // updates that leave the groups alone.
@@ -133,6 +102,8 @@ export function GuildMemberList({
         <FlashList
             key="rows"
             data={rows}
+            drawDistance={windowHeight}
+            reserveDrawDistanceForReversal
             keyExtractor={(_, index) => String(index)}
             getItemType={(row, index) =>
                 headers[index]
@@ -141,9 +112,7 @@ export function GuildMemberList({
                       ? 'member'
                       : 'placeholder'
             }
-            // Cells scrolled past stay mounted in the recycle pool, which has no limit by default: placeholders
-            // among them pulse on every frame until the list unmounts, and every cell renders on each update.
-            // Cells are still reused as they scroll; the ones left over unmount.
+            // Discard idle cells once they leave the render window.
             maxItemsInRecyclePool={0}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.content}
@@ -161,6 +130,7 @@ export function GuildMemberList({
                 if (row?.type !== 'member')
                     return (
                         <MemberPlaceholderRow
+                            animate={false}
                             start={edge(index - 1)}
                             end={edge(index + 1)}
                         />

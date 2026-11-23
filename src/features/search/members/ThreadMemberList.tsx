@@ -15,21 +15,12 @@ import {
 import { membersStore } from '../../../stores/members'
 import { presencesStore } from '../../../stores/presences'
 import { usersStore } from '../../../stores/users'
-import {
-    MemberPlaceholderRow,
-    MemberPlaceholderSection,
-    MemberRow,
-    MemberSectionHeader,
-} from './MemberRow'
+import { MemberListLoading } from './MemberListLoading'
+import { MemberRow, MemberSectionHeader } from './MemberRow'
 import { styles } from './styles'
 import { useHeldWhileReloading } from './useHeldWhileReloading'
 import type { SearchTabPageProps } from '../types'
 
-/** useFullscreenPlaceholderCount at the 56 dp row height: enough to fill a phone. */
-// Two groups (section strip, then rows): 4 rows, then 8.
-const PLACEHOLDER_COUNT = 14
-const PLACEHOLDER_SECTION_AT = 5
-const PLACEHOLDERS = Array.from({ length: PLACEHOLDER_COUNT }, (_, i) => i)
 const NO_IDS: string[] = []
 
 type Item =
@@ -94,34 +85,7 @@ export function ThreadMemberList({
     }, [active, session, channelId])
 
     // useThreadMemberListSections: without a list the sections are empty. Only a list on its way shimmers.
-    if (!userIds && subscribed)
-        return (
-            // Its own list, not the loaded one with other data: these placeholders would stay pulsing in the loaded
-            // list's recycle pool.
-            <FlashList
-                key="loading"
-                data={PLACEHOLDERS}
-                keyExtractor={index => `placeholder-${index}`}
-                contentContainerStyle={styles.content}
-                scrollEnabled={false}
-                renderItem={({ index }) =>
-                    index === 0 || index === PLACEHOLDER_SECTION_AT ? (
-                        <MemberPlaceholderSection />
-                    ) : (
-                        <MemberPlaceholderRow
-                            start={
-                                index === 1 ||
-                                index === PLACEHOLDER_SECTION_AT + 1
-                            }
-                            end={
-                                index === PLACEHOLDER_SECTION_AT - 1 ||
-                                index === PLACEHOLDER_COUNT - 1
-                            }
-                        />
-                    )
-                }
-            />
-        )
+    if (!userIds && subscribed) return <MemberListLoading />
 
     const items: Item[] = []
     for (const section of threadMemberSections(

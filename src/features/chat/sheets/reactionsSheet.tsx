@@ -1,5 +1,4 @@
 import { FlashList } from '@shopify/flash-list'
-import { Image } from 'expo-image'
 import { useEffect, useRef, useState } from 'react'
 import { ScrollView, useWindowDimensions, View } from 'react-native'
 import { useSharedValue } from 'react-native-reanimated'
@@ -9,23 +8,20 @@ import { Endpoint } from '../../../core/api/paths'
 import { ReactionType } from '../../../core/discord/messages'
 import { useSession, useSessionStore } from '../../../core/react'
 import { ActivityIndicator } from '../../../design/components/ActivityIndicator'
-import { cdnSize } from '../../../design/components/avatars/avatarUrl'
 import { RipplePressable } from '../../../design/components/buttons/RipplePressable'
 import { Emoji } from '../../../design/components/Emoji'
 import { BottomSheet } from '../../../design/components/sheets/Sheet'
 import { SheetDrag } from '../../../design/components/sheets/SheetDrag'
 import { openActionSheet } from '../../../design/components/sheets/sheetStore'
 import { Text } from '../../../design/components/Text'
-import { TableRow } from '../../../design/components/table/TableRow'
 import { t } from '../../../i18n'
 import { channelsStore } from '../../../stores/channels/channels'
-import { membersStore } from '../../../stores/members'
 import { findMessage, messagesStore } from '../../../stores/messages/messages'
 import { reactionCounts } from '../../../stores/messages/reactionEdits'
-import { displayName, usersStore } from '../../../stores/users'
+import { usersStore } from '../../../stores/users'
 import { getUnicodeEmojiBySurrogates } from '../../expressions'
-import { authorAvatarUrl } from '../author'
-import { openUserProfile } from '../headerActions'
+import { MemberPlaceholderRows } from '../../search/members/MemberListLoading'
+import { MemberRow } from '../../search/members/MemberRow'
 import { keyOf } from '../reactions'
 import type {
     LayoutChangeEvent,
@@ -50,9 +46,8 @@ const TABS_HEIGHT = 56
 const NAME_HEIGHT = 48
 /** Bottom padding BottomSheet gives a footer: the larger of the inset and 16, plus 4. */
 const MIN_BOTTOM_PADDING = 16 + 4
-/** MessageReactionsContent: rows (listRow), the footer spinner and the avatar (AvatarSizes.SMALL). */
-const ROW_HEIGHT = 48
-const AVATAR_SIZE = 30
+/** Placeholder rows shown while a tab's first page loads. */
+const PLACEHOLDER_COUNT = 8
 
 /** The `type` of the reactors request. */
 type ReactionKind = (typeof ReactionType)[keyof typeof ReactionType]
@@ -180,49 +175,6 @@ function ReactionTabButton({
     )
 }
 
-/** MessageReactionsContent's useRenderItem: the avatar (the server one if set) and the nickname. */
-function ReactorRow({
-    user,
-    guildId,
-    start,
-    end,
-}: {
-    user: User
-    guildId: string | undefined
-    start: boolean
-    end: boolean
-}) {
-    const session = useSession()
-    const member = useSessionStore(membersStore, state =>
-        guildId ? state.members[guildId]?.[user.id] : undefined,
-    )
-    const name = member?.nick ?? displayName(user)
-    return (
-        <TableRow
-            start={start}
-            end={end}
-            height={ROW_HEIGHT}
-            onPress={() => openUserProfile(session, user.id, guildId)}
-            accessibilityLabel={name}
-            icon={
-                <Image
-                    source={authorAvatarUrl(
-                        user,
-                        member,
-                        guildId,
-                        cdnSize(AVATAR_SIZE),
-                    )}
-                    recyclingKey={user.id}
-                    cachePolicy="memory-disk"
-                    style={styles.avatar}
-                />
-            }
-            label={name}
-            labelLineClamp={1}
-        />
-    )
-}
-
 /** MessageReactionsEmpty: a message whose reactions are all gone. */
 function ReactionsEmpty() {
     return (
@@ -343,12 +295,15 @@ function ReactionsSheet({
     const selectedTabId = selected?.id
     // biome-ignore lint/correctness/useExhaustiveDependencies: loads the first page when a tab is first shown.
     useEffect(() => {
+        atTop.set(true)
         if (selected && !reactors[selected.id]) load(selected)
     }, [selectedTabId])
 
     if (!selected) return <ReactionsEmpty />
 
     const list = reactors[selected.id] ?? NO_REACTORS
+    // The first page is not in yet: placeholder rows, as the members list shows (GuildMemberList).
+    const firstPage = list.users.length === 0 && !list.failed && !list.done
     const hasMore = !list.done && list.users.length < selected.count
     const height = Math.round(windowHeight * HEIGHT_RATIO)
     const listHeight =
@@ -409,38 +364,54 @@ function ReactionsSheet({
             footer={
                 <View style={{ height: listHeight }}>
                     <SheetDrag scrollAtTop={atTop} style={styles.fill}>
-                        <FlashList
-                            // A list per tab, as the reference keys it by the emoji.
-                            key={selected.id}
-                            data={list.users}
-                            keyExtractor={user => user.id}
-                            onScroll={onScroll}
-                            scrollEventThrottle={16}
-                            onEndReached={() => load(selected)}
-                            onEndReachedThreshold={0.25}
-                            contentContainerStyle={styles.listContent}
-                            renderItem={({ item, index }) => (
-                                <ReactorRow
-                                    user={item}
-                                    guildId={guildId}
-                                    start={index === 0}
-                                    end={index === list.users.length - 1}
+                        {firstPage ? (
+                            <ScrollView
+                                scrollEnabled={false}
+                                contentContainerStyle={styles.listContent}
+                            >
+                                <MemberPlaceholderRows
+                                    count={PLACEHOLDER_COUNT}
                                 />
-                            )}
-                            ListFooterComponent={
-                                list.failed ? (
-                                    <Text
-                                        variant="text-md/medium"
-                                        color="TEXT_MUTED"
-                                        style={styles.failed}
-                                    >
-                                        {t('chat.actions.failed')}
-                                    </Text>
-                                ) : hasMore ? (
+                                {hasMore && (
                                     <ActivityIndicator style={styles.spinner} />
-                                ) : null
-                            }
-                        />
+                                )}
+                            </ScrollView>
+                        ) : (
+                            <FlashList
+                                // A list per tab, as the reference keys it by the emoji.
+                                key={selected.id}
+                                data={list.users}
+                                keyExtractor={item => item.id}
+                                onScroll={onScroll}
+                                scrollEventThrottle={16}
+                                onEndReached={() => load(selected)}
+                                onEndReachedThreshold={0.25}
+                                contentContainerStyle={styles.listContent}
+                                renderItem={({ item, index }) => (
+                                    <MemberRow
+                                        userId={item.id}
+                                        guildId={guildId}
+                                        start={index === 0}
+                                        end={index === list.users.length - 1}
+                                    />
+                                )}
+                                ListFooterComponent={
+                                    list.failed ? (
+                                        <Text
+                                            variant="text-md/medium"
+                                            color="TEXT_MUTED"
+                                            style={styles.failed}
+                                        >
+                                            {t('chat.actions.failed')}
+                                        </Text>
+                                    ) : hasMore ? (
+                                        <ActivityIndicator
+                                            style={styles.spinner}
+                                        />
+                                    ) : null
+                                }
+                            />
+                        )}
                     </SheetDrag>
                 </View>
             }
@@ -475,13 +446,10 @@ const styles = StyleSheet.create(theme => ({
         paddingHorizontal: theme.space.PX_16,
     },
     listContent: { paddingHorizontal: theme.space.PX_16 },
-    avatar: {
-        width: AVATAR_SIZE,
-        height: AVATAR_SIZE,
-        borderRadius: AVATAR_SIZE / 2,
-        backgroundColor: theme.colors.BACKGROUND_BASE_LOWER,
+    spinner: {
+        height: theme.modules.mobile.TABLE_ROW_HEIGHT,
+        padding: theme.space.PX_6,
     },
-    spinner: { height: ROW_HEIGHT, padding: theme.space.PX_6 },
     failed: { padding: theme.space.PX_16, textAlign: 'center' },
     // containerEmpty, with RefreshEmptyState's title and body centred.
     empty: { padding: theme.space.PX_32, gap: theme.space.PX_8 },
