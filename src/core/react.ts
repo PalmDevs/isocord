@@ -43,10 +43,10 @@ export function useSessionReady(): boolean {
     return useStore(useSession().connection, state => state.ready)
 }
 
-/** Subscribes to a slice of a per-session zustand store. */
+/** Subscribes to a slice of a per-session zustand store. Re-renders at most once per gateway slice. */
 export function useSessionStore<State, Slice>(
     definition: StoreDefinition<StoreApi<State>>,
     selector: (state: State) => Slice,
 ): Slice {
-    return useStore(useSession().get(definition), selector)
+    return useStore(useSession().view(definition), selector)
 }

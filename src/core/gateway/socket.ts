@@ -154,6 +154,8 @@ export class GatewaySocket {
     private closed = true
     /** Received payloads waiting for the drain, already decompressed by native code. */
     private queue: string[] = []
+    /** Index of the next payload to handle. Avoids `shift()`, which copies the queue. */
+    private head = 0
     private draining = false
     private drainTimer: ReturnType<typeof setTimeout> | null = null
     /** The socket whose zstd frames native code decompresses, or null when compression is off. */
@@ -173,6 +175,8 @@ export class GatewaySocket {
         private readonly getClientState: () => ClientState,
         /** READY's last `qos_token` for this account (DerivedQosDataStore). */
         private readonly getDerivedQos: () => string | undefined,
+        /** Runs one drain slice. GatewaySocketDispatcher `dispatchMultiple` batches store changes here. */
+        private readonly runSlice: (slice: () => void) => void,
     ) {}
 
     /** READY's session id (AuthenticationStore.getSessionId), sent with interactions. Null before READY. */
@@ -242,6 +246,7 @@ export class GatewaySocket {
         }
         this.setState('connecting')
         this.queue = []
+        this.head = 0
 
         // The frames are only queued here. Handling them in the drain lets the JS thread yield between
         // payloads, so a resume burst does not freeze React and native events.
@@ -290,14 +295,24 @@ export class GatewaySocket {
         this.drainTimer = null
         const started = performance.now()
         try {
-            while (this.queue.length > 0) {
-                this.handleText(this.queue.shift() as string)
-                if (performance.now() - started >= DISPATCH_BUDGET_MS) break
-            }
+            this.runSlice(() => {
+                // A handler can reconnect, which swaps the queue. Read it fresh each time.
+                while (this.head < this.queue.length) {
+                    const text = this.queue[this.head] as string
+                    // Frees a handled payload (READY is megabytes) while the rest of a burst drains.
+                    this.queue[this.head++] = ''
+                    this.handleText(text)
+                    if (performance.now() - started >= DISPATCH_BUDGET_MS) break
+                }
+            })
         } finally {
             // A payload that fails to parse still lets the ones behind it through.
             this.draining = false
-            if (this.queue.length > 0) this.scheduleDrain()
+            if (this.head < this.queue.length) this.scheduleDrain()
+            else {
+                this.queue = []
+                this.head = 0
+            }
         }
     }
 
@@ -479,7 +494,7 @@ export class GatewaySocket {
         if (!this.pauseInBackground) {
             // Android suspends timers while the activity is paused.
             this.cancelDrainTimer()
-            if (this.queue.length > 0) this.scheduleDrain()
+            if (this.head < this.queue.length) this.scheduleDrain()
             return
         }
         this.paused = true
@@ -531,6 +546,7 @@ export class GatewaySocket {
         this.ws = null
         this.disableCompression()
         this.queue = []
+        this.head = 0
         if (ws && closeCode !== undefined) {
             ws.onmessage = ws.onclose = ws.onerror = null
             ws.close(closeCode)

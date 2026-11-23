@@ -7,6 +7,7 @@ import { solveCaptcha } from './captcha'
 import { features } from './feature'
 import { GatewaySocket } from './gateway/socket'
 import { logger } from './log'
+import { NotifyBatch } from './notifyBatch'
 import { accountStorage, readJson, writeJson } from './storage'
 import { beginSection, endSection } from './trace'
 import type { MMKV } from 'react-native-mmkv'
@@ -75,6 +76,8 @@ const API_CODE_VERSION_KEY = 'apiCodeVersion'
 const RESTORE_SETTLE_MS = 3000
 /** Saving waits for the burst of events after READY (previews, member chunks) to settle. */
 const CACHE_SAVE_DELAY_MS = 5000
+/** GatewaySocketDispatcher `dispatchMultiple`: how long UI notifications wait while resuming. */
+const RESUME_NOTIFY_PAUSE_MS = 150
 
 /** Returns the version a store's cache is saved under. */
 function cacheVersion(definition: StoreDefinition<unknown>): string {
@@ -103,6 +106,8 @@ export class Session {
     private readonly useCache: boolean
     /** How many stores got their state from the cache this launch. */
     private restoredStores = 0
+    /** Holds UI notifications during a gateway slice. */
+    private readonly notify = new NotifyBatch()
     private clientStateProviders: Array<
         () => Partial<ClientState> | undefined
     > = []
@@ -134,6 +139,11 @@ export class Session {
             this.rest.identity,
             () => this.clientState(),
             () => this.storage.getString(QOS_KEY),
+            slice => {
+                if (this.gateway.state === 'resuming')
+                    this.notify.pause(RESUME_NOTIFY_PAUSE_MS)
+                this.notify.batched(slice)
+            },
         )
         this.cleanups.push(
             this.gateway.events.on('authenticationFailed', () =>
@@ -242,6 +252,11 @@ export class Session {
         return this.stores.get(definition) as T
     }
 
+    /** Returns a store whose listeners hear once per gateway slice. For React subscriptions. */
+    view<State>(definition: StoreDefinition<StoreApi<State>>): StoreApi<State> {
+        return this.notify.view(this.get(definition))
+    }
+
     private restore(
         definition: StoreDefinition<unknown>,
         store: StoreApi<object>,
@@ -332,6 +347,7 @@ export class Session {
     dispose(): void {
         log.info('Ended')
         clearTimeout(this.cacheTimer)
+        this.notify.dispose()
         this.endRestoreGuard()
         for (const cleanup of this.cleanups) cleanup()
         this.gateway.close()
