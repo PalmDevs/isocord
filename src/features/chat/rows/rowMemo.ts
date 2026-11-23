@@ -44,7 +44,8 @@ interface Entry {
 }
 
 // Messages are replaced when edited, so rows can be cached on the message object.
-// shortcut: rows live as long as their message, and the messages store never evicts. Evict with it once it does.
+// A row lives as long as its message. A trimmed message stays reachable through the next row's `older` until that
+// row is rebuilt, which the next build of the chat does.
 const entries = new WeakMap<Message, Entry>()
 const lines = new WeakMap<ChatRow, string>()
 

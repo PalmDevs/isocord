@@ -184,6 +184,11 @@ export async function loadMessages(
             set({ ...merged, hasMoreAfter: false, stale: false })
             return
         }
+        // A new message trimmed the oldest meanwhile: the page no longer joins up. The list asks again.
+        if (known.at(-1)?.id !== before) {
+            set({})
+            return
+        }
         // Messages that arrived over the gateway while the request was in flight are already in `known`.
         const ids = new Set(known.map(message => message.id))
         const merged = [

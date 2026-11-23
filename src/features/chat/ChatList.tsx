@@ -5,6 +5,7 @@ import { Button } from '../../design/components/buttons/Button'
 import { Text } from '../../design/components/Text'
 import { t } from '../../i18n'
 import ChatView from '../../native/ChatViewNativeComponent'
+import { setAtBottom } from '../../stores/messages/messages'
 import {
     jumpToPresent,
     loadMessages,
@@ -105,12 +106,13 @@ export function ChatList({
                 onRowsDrawn={event =>
                     onRowsDrawn?.(event.nativeEvent.scrollKey)
                 }
-                onAtBottomChange={event =>
-                    read.onAtBottomChange(
-                        event.nativeEvent.scrollKey,
-                        event.nativeEvent.atBottom,
-                    )
-                }
+                onAtBottomChange={({
+                    nativeEvent: { scrollKey, atBottom },
+                }) => {
+                    // MESSAGE_CREATE trims a chat only while it rests at the bottom.
+                    setAtBottom(session, scrollKey, atBottom)
+                    read.onAtBottomChange(scrollKey, atBottom)
+                }}
                 onMessageLongPress={event => {
                     if (!acceptsActions) return
                     handleMessageLongPress(

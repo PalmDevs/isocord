@@ -8,6 +8,7 @@ import {
     withReactionBatchAdded,
     withReactionRemoved,
 } from './reactionEdits'
+import type { StoreApi } from 'zustand/vanilla'
 import type { Session } from '../../core/session'
 import type { Message } from '../readStates'
 import type { User } from '../users'
@@ -105,7 +106,62 @@ export function messagesAround(
 /** Messages one history request asks for: getMessageLimit, MAX_MESSAGES_PER_CHANNEL on mobile. */
 export const PAGE_SIZE = 25
 
+/** MAX_LOADED_MESSAGES: a chat at the bottom keeps this many when new messages arrive. */
+export const MAX_LOADED_MESSAGES = 100
+
 const CACHED_CHANNELS = 10
+
+/** Channels whose list last reported resting above the newest message (DimensionStore). */
+const awayFromBottom = new WeakMap<Session, Set<string>>()
+
+/** DimensionActionCreators.updateChannelDimensions: where a chat's list rests, for trimming. */
+export function setAtBottom(
+    session: Session,
+    channelId: string,
+    atBottom: boolean,
+): void {
+    let away = awayFromBottom.get(session)
+    if (!away) {
+        away = new Set()
+        awayFromBottom.set(session, away)
+    }
+    if (atBottom) away.delete(channelId)
+    else away.add(channelId)
+}
+
+/**
+ * ChannelMessages.receiveMessage: adds a new message with `change`. In a chat at the bottom, the oldest past
+ * MAX_LOADED_MESSAGES are dropped (truncateTop) and scrolling up loads them again. Away from the bottom nothing is
+ * dropped: truncateBottom is a no-op on mobile. A chat whose list never reported counts as at the bottom.
+ */
+function receive(
+    store: StoreApi<MessagesState>,
+    session: Session,
+    channelId: string,
+    change: (messages: Message[]) => Message[],
+): void {
+    store.setState(state => {
+        const channel = state.channels[channelId]
+        if (!channel) return state
+        const messages = change(channel.messages)
+        if (messages === channel.messages) return state
+        const trim =
+            messages.length > MAX_LOADED_MESSAGES &&
+            !awayFromBottom.get(session)?.has(channelId)
+        return {
+            channels: {
+                ...state.channels,
+                [channelId]: trim
+                    ? {
+                          ...channel,
+                          messages: messages.slice(0, MAX_LOADED_MESSAGES),
+                          hasMore: true,
+                      }
+                    : { ...channel, messages },
+            },
+        }
+    })
+}
 
 /** Channels whose newest page is saved to the cache. */
 function cachedChannels(state: MessagesState): Array<[string, Message[]]> {
@@ -160,11 +216,10 @@ export const messagesStore = defineStore(
         }))
         const { dispatch } = session.gateway
 
-        /** Changes a channel's loaded messages, and the preview's when it shows the channel (`preview`). */
+        /** Changes a channel's loaded messages, and the preview's when it shows the channel. */
         const edit = (
             channelId: string,
             change: (messages: Message[]) => Message[],
-            preview = true,
         ) =>
             store.setState(state => {
                 let next: Partial<MessagesState> | undefined
@@ -178,7 +233,7 @@ export const messagesStore = defineStore(
                         },
                     }
                 const shown = state.preview
-                if (preview && shown?.channelId === channelId) {
+                if (shown?.channelId === channelId) {
                     const changed = change(shown.messages)
                     if (changed !== shown.messages)
                         next = {
@@ -205,16 +260,13 @@ export const messagesStore = defineStore(
             })
 
         // A detached window does not reach the present: the message is picked up when the user returns to it.
-        dispatch.on('MESSAGE_CREATE', message =>
-            edit(
-                message.channel_id,
-                messages =>
-                    store.getState().channels[message.channel_id]?.hasMoreAfter
-                        ? messages
-                        : confirmPending(messages, message),
-                false,
-            ),
-        )
+        dispatch.on('MESSAGE_CREATE', message => {
+            if (store.getState().channels[message.channel_id]?.hasMoreAfter)
+                return
+            receive(store, session, message.channel_id, messages =>
+                confirmPending(messages, message),
+            )
+        })
         dispatch.on('MESSAGE_UPDATE', update =>
             editOne(update.channel_id, update.id, message => ({
                 ...message,
@@ -407,10 +459,12 @@ function setRevealed(
 
 /** Shows a message the user is sending at the bottom of the chat. Its id is its nonce until the server answers. */
 export function addPendingMessage(session: Session, message: Message): void {
-    editChannel(session, message.channel_id, messages => [
-        { ...message, state: 'sending' },
-        ...messages,
-    ])
+    receive(
+        session.get(messagesStore),
+        session,
+        message.channel_id,
+        messages => [{ ...message, state: 'sending' }, ...messages],
+    )
 }
 
 /** Replaces a pending message with what the server answered (the gateway echo may already have done so). */
