@@ -47,6 +47,7 @@ import { calendarTimestamp, formatLongDate, sameDay } from '../timestamp'
 import { isJumbo, parseEmbedTitle, parseMarkdown, toSpans } from './markdown'
 import { messagePreview } from './messagePreview'
 import { richParts } from './rich'
+import { rowMemo } from './rowMemo'
 import { threadEmbedRow } from './threadEmbed'
 import type { Session } from '../../../core/session'
 import type { Channel } from '../../../stores/channels/channels'
@@ -338,6 +339,8 @@ interface RowEnv {
     threadSources: ThreadEmbedSources
     /** The user who ran a command, as the interaction line draws them. */
     author: (user: NonNullable<InteractionMeta['user']>) => InteractionAuthor
+    /** Whether the user can see a channel, for a forward's source. */
+    canView: (channelId: string) => boolean
 }
 
 /** What mentions resolve against: the viewed guild, its members and the known users and channels. */
@@ -375,7 +378,7 @@ export function mentionResolver(source: MentionSource): MentionResolver {
     }
 }
 
-function makeEnv(context: RowContext): RowEnv {
+function makeEnv(context: RowContext, canView: RowEnv['canView']): RowEnv {
     const { guild, members, users } = context
     const nameOf = (user: User) =>
         members?.[user.id]?.nick ?? displayName(users[user.id] ?? user)
@@ -392,6 +395,7 @@ function makeEnv(context: RowContext): RowEnv {
         context,
         resolver,
         nameOf,
+        canView,
         system: {
             name: nameOf,
             userLink: user => ({
@@ -642,7 +646,7 @@ function messageRow(
             author: env.author,
             channels: context.channels,
             users,
-            session: context.session,
+            canView: env.canView,
             guild: id => (id === guild?.id ? guild : context.guilds?.[id]),
             nameOf: env.nameOf,
             chatGuild: guild,
@@ -944,7 +948,8 @@ export function* buildRowsIncrementally(
 ): Generator<void, ChatRow[]> {
     if (!state)
         return [{ type: 'loading', key: 'loading-initial', placeholder: true }]
-    const env = makeEnv(context)
+    const memo = rowMemo(context)
+    const env = makeEnv(memo.context, memo.canView)
     const rows: ChatRow[] = []
     const addDividers = dividerAdder(rows, state, context.ackedId)
     const post = forumPostOf(context)
@@ -962,24 +967,29 @@ export function* buildRowsIncrementally(
         // The id encodes the send time, which avoids parsing the API's microsecond timestamps.
         const date = new Date(snowflakeTimestamp(message.id))
         const olderDate = older && new Date(snowflakeTimestamp(older.id))
-        const built =
-            threadStarterRow(message, env) ??
-            systemRow(message, env.system, {
-                timestamp: calendarTimestamp(date),
-                reactions: reactionRows(message.reactions),
-                addReaction: canAddReaction(message, context),
-                thread: threadEmbedRow(
+        // Keyed by the stored message: the post's first message is a copy.
+        const built = memo.row(
+            held,
+            older,
+            () =>
+                threadStarterRow(message, env) ??
+                systemRow(message, env.system, {
+                    timestamp: calendarTimestamp(date),
+                    reactions: reactionRows(message.reactions),
+                    addReaction: canAddReaction(message, env.context),
+                    thread: threadEmbedRow(
+                        message,
+                        context.guild?.id,
+                        env.threadSources,
+                    ),
+                }) ??
+                messageRow(
                     message,
-                    context.guild?.id,
-                    env.threadSources,
+                    date,
+                    isGrouped(message, date, older, olderDate),
+                    env,
                 ),
-            }) ??
-            messageRow(
-                message,
-                date,
-                isGrouped(message, date, older, olderDate),
-                env,
-            )
+        )
         const reason = context.hiddenReason?.(message.author.id)
         if (reason)
             hidden = addHidden(rows, hidden, built, reason, state.revealedId)

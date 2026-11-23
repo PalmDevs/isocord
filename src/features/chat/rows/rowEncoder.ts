@@ -7,6 +7,7 @@ import { usersStore } from '../../../stores/users'
 import { argb } from '../color'
 import { chatTheme } from '../theme'
 import { buildRows } from './buildRows'
+import { rowLine } from './rowMemo'
 import type { Session } from '../../../core/session'
 import type { Message } from '../../../stores/readStates'
 import type { User } from '../../../stores/users'
@@ -65,7 +66,7 @@ export function useChatTheme(variant: ThemeVariant = 'chat'): string {
  * The renderer keeps the previous update's lines and parses only the changed ones (`parseRows` in ChatRows.kt).
  */
 export const encodeRows = (rows: ChatRow[]): string =>
-    `[${rows.map(row => JSON.stringify(row)).join(',\n')}]`
+    `[${rows.map(rowLine).join(',\n')}]`
 
 /** What a message outside the chat is drawn with. The session's stores when not given. */
 type RowSources = Pick<RowContext, 'guild' | 'members' | 'users' | 'channels'>

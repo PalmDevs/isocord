@@ -3,19 +3,16 @@ import {
     MESSAGE_REFERENCE_FORWARD,
     MessageFlag,
 } from '../../../core/discord/messages'
-import { Permission } from '../../../core/discord/permissions'
 import { snowflakeTimestamp } from '../../../core/discord/snowflake'
 import { DAY } from '../../../core/time'
 import { t } from '../../../i18n'
 import { computeChannelName } from '../../../stores/channels/channelName'
-import { can } from '../../../stores/permissions'
 import { chatLink } from '../links/chatLink'
 import { attachmentRows } from '../media'
 import { componentRows } from '../messageComponents/componentRow'
 import { pollRow } from '../polls/pollRow'
 import { formatShortDate, formatTime, formatWeekday } from '../timestamp'
 import { ephemeralIndication, executedCommand } from './interaction'
-import type { Session } from '../../../core/session'
 import type { Channel } from '../../../stores/channels/channels'
 import type { Guild } from '../../../stores/guilds'
 import type { MessagePoll } from '../../../stores/messages/messageTypes'
@@ -58,7 +55,8 @@ interface RichHelpers {
     /** What a forward's footer looks up: where the original was sent. */
     channels: Record<string, Channel>
     users: Record<string, User>
-    session: Session
+    /** Whether the user can see a channel, for a forward's source. */
+    canView: (channelId: string) => boolean
     guild: (id: string) => Guild | undefined
     /** The user's state of the message's poll; undefined where the poll cannot be used. */
     pollState: (messageId: string) => PollState | undefined
@@ -111,8 +109,7 @@ function forwardOrigin(
         if (!source) return byGuild(parent.guild_id)
         if (
             source.guild_id &&
-            (!helpers.guild(source.guild_id) ||
-                !can(helpers.session, source.id, Permission.VIEW_CHANNEL))
+            (!helpers.guild(source.guild_id) || !helpers.canView(source.id))
         )
             return undefined
         return { origin: computeChannelName(source, helpers.users, true) }
