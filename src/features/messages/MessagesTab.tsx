@@ -219,7 +219,7 @@ function ConversationSkeleton() {
 
 export function MessagesTab() {
     const focused = useTabSelected()
-    const navigation = useNavigation<{ navigate: (route: string) => void }>()
+    const navigation = useNavigation()
     const { setTabFocused } = useMessagesPanels()
     // The chat panel only takes swipes and counts as visible while this tab is the selected one.
     useEffect(() => {

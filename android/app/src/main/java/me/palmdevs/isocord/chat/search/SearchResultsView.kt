@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -21,6 +20,7 @@ import com.facebook.react.uimanager.events.Event
 import me.palmdevs.isocord.chat.ChatFonts
 import me.palmdevs.isocord.chat.media.buildImageLoader
 import me.palmdevs.isocord.chat.rows.ChatTheme
+import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /**
  * The Android view behind `IsocordSearchResultsView`: a Compose list of search results fed by the `rows` and `theme`
@@ -90,7 +90,7 @@ class SearchResultsView(context: Context) : FrameLayout(context) {
     val fonts = ChatFonts(context.assets)
     swipeRefresh.addView(
       ComposeView(context).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
           SearchResultsList(
             rows = rows,

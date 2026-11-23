@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -43,6 +42,7 @@ import me.palmdevs.isocord.chat.media.rememberGifvPool
 import me.palmdevs.isocord.chat.rows.ChatRow
 import me.palmdevs.isocord.chat.rows.ChatTheme
 import me.palmdevs.isocord.chat.search.MessageBody
+import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /** How far up from a cut preview's bottom edge it fades out (the reference's useTruncatedGradientColors). */
 private val FADE = 24.dp
@@ -101,7 +101,7 @@ class MessagePreviewView(context: Context) : FrameLayout(context) {
     val fonts = ChatFonts(context.assets)
     addView(
       ComposeView(context).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
           val message = row ?: return@setContent
           val gifvPool = rememberGifvPool()

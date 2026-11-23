@@ -5,7 +5,7 @@ import { GalleryScaffold } from './GalleryPage'
 import { galleryGroups } from './registry'
 
 export function GalleryScreen() {
-    const navigation = useNavigation<any>()
+    const navigation = useNavigation()
     return (
         <GalleryScaffold title="Design System">
             {galleryGroups.map(group => (

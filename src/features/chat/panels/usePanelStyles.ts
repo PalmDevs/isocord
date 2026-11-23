@@ -6,7 +6,9 @@ import {
     useAnimatedStyle,
 } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
+import { panelBackStyle } from '../../../design/components/overlays/usePanelBackPreview'
 import type { SharedValue } from 'react-native-reanimated'
+import type { PanelBackPreview } from '../../../design/components/overlays/usePanelBackPreview'
 
 const SCRIM_OPACITY = 0.5
 
@@ -35,46 +37,71 @@ interface PanelXs {
 export function usePanelStyles(
     width: number,
     dragging: SharedValue<boolean>,
+    { layer, offset }: PanelBackPreview,
     xs: PanelXs,
 ) {
     const { chat, details, stack, create } = xs
     // The tab under the chat, or under the details opened over it (the server header's search).
     const children = useAnimatedStyle(() => ({
         opacity:
-            !dragging.get() && (chat.get() === 0 || details.get() === 0)
+            !dragging.get() &&
+            offset.get() === 0 &&
+            (chat.get() === 0 || details.get() === 0)
                 ? 0
                 : 1,
     }))
     // Copied to React state for the tab's own animations (the animated server banner).
     const [listCovered, setListCovered] = useState(false)
     useAnimatedReaction(
-        () => !dragging.get() && (chat.get() === 0 || details.get() === 0),
+        () =>
+            !dragging.get() &&
+            offset.get() === 0 &&
+            (chat.get() === 0 || details.get() === 0),
         (covered, previous) => {
             if (covered !== previous) scheduleOnRN(setListCovered, covered)
         },
     )
     // The chat under the details, the stacked chat or the thread creation.
     const chatStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: chat.get() }],
+        ...panelBackStyle(
+            chat.get(),
+            layer.get() === 'chat' ? offset.get() : 0,
+        ),
         opacity:
             !dragging.get() &&
+            offset.get() === 0 &&
             (details.get() === 0 || stack.get() === 0 || create.get() === 0)
                 ? 0
                 : 1,
     }))
-    const detailsStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: details.get() }],
-    }))
+    const detailsStyle = useAnimatedStyle(() =>
+        panelBackStyle(
+            details.get(),
+            layer.get() === 'details' ? offset.get() : 0,
+        ),
+    )
     // The stacked chat under the details.
     const stackStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: stack.get() }],
-        opacity: !dragging.get() && details.get() === 0 ? 0 : 1,
+        ...panelBackStyle(
+            stack.get(),
+            layer.get() === 'stack' ? offset.get() : 0,
+        ),
+        opacity:
+            !dragging.get() && offset.get() === 0 && details.get() === 0
+                ? 0
+                : 1,
     }))
     // The thread creation under the details. The stacked chat under it keeps drawing: a created thread's chat draws
     // there before the creation panel goes.
     const createStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: create.get() }],
-        opacity: !dragging.get() && details.get() === 0 ? 0 : 1,
+        ...panelBackStyle(
+            create.get(),
+            layer.get() === 'create' ? offset.get() : 0,
+        ),
+        opacity:
+            !dragging.get() && offset.get() === 0 && details.get() === 0
+                ? 0
+                : 1,
     }))
     const chatScrim = useAnimatedStyle(() => ({
         opacity: scrimOpacity(chat, width),

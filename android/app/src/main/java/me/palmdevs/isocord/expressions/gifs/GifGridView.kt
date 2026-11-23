@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import com.facebook.react.bridge.Arguments
@@ -18,6 +17,7 @@ import com.facebook.react.uimanager.events.Event
 import me.palmdevs.isocord.chat.ChatFonts
 import me.palmdevs.isocord.chat.media.buildImageLoader
 import me.palmdevs.isocord.chat.rows.ChatTheme
+import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /**
  * The Android view behind `IsocordGifGridView`: a Compose [GifGrid] fed by the props. Hosted under React Native
@@ -45,7 +45,7 @@ class GifGridView(context: Context) : FrameLayout(context) {
     val fonts = ChatFonts(context.assets)
     addView(
       ComposeView(context).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
           GifGrid(
             tiles = tiles,

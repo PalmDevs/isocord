@@ -15,7 +15,7 @@ import { useProfileView } from '../userProfile/useProfileView'
 /** The current user's main profile, as the profile sheet draws it, with a way into settings. */
 export function YouTab() {
     const session = useSession()
-    const navigation = useNavigation<{ navigate: (route: string) => void }>()
+    const navigation = useNavigation()
     const isFocused = useIsFocused()
     const { theme } = useUnistyles()
     const themeColors = useProfileView(session.userId, undefined)?.themeColors

@@ -117,6 +117,7 @@ export function PanelLayers({
                             onBack={details.close}
                             onReady={details.startSlide}
                             deferPages={details.waiting}
+                            active={active && details.open}
                         />
                     </PanelLayer>
                 )}

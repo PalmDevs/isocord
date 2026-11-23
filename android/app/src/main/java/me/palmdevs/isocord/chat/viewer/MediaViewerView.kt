@@ -13,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import com.facebook.react.bridge.Arguments
@@ -32,6 +31,7 @@ import me.palmdevs.isocord.chat.media.buildImageLoader
 import me.palmdevs.isocord.chat.media.rememberGifvPool
 import me.palmdevs.isocord.chat.rows.ChatRow
 import me.palmdevs.isocord.chat.rows.ChatTheme
+import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /**
  * The Android view behind `IsocordMediaViewerView` (src/native/MediaViewerViewNativeComponent.ts): the media
@@ -77,7 +77,7 @@ class MediaViewerView(context: Context) : FrameLayout(context) {
     )
     addView(
       ComposeView(context).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
           val gifvPool = rememberGifvPool()
           CompositionLocalProvider(

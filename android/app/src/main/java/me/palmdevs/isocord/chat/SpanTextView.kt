@@ -25,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +39,7 @@ import me.palmdevs.isocord.chat.rows.SpanText
 import me.palmdevs.isocord.chat.rows.MessageText
 import me.palmdevs.isocord.chat.list.ChatActions
 import me.palmdevs.isocord.chat.list.LocalChatActions
+import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /**
  * The Android view behind `IsocordSpanTextView`. Inline, spans are one line of text ([SpanText]) and the trailing
@@ -88,7 +88,7 @@ class SpanTextView(context: Context) : FrameLayout(context) {
     val fonts = ChatFonts(context.assets)
     addView(
       ComposeView(context).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
           // The cached measure of this view and its inner AndroidComposeView misses Compose's own size changes.
           Box(Modifier.onSizeChanged { remeasure() }) { Content(fonts) }

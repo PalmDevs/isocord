@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import coil3.SingletonImageLoader
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
@@ -25,6 +24,7 @@ import me.palmdevs.isocord.chat.media.buildImageLoader
 import me.palmdevs.isocord.chat.rows.ChatTheme
 import me.palmdevs.isocord.chat.rows.Reaction
 import me.palmdevs.isocord.chat.rows.Reactions
+import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /**
  * The Android view behind `IsocordReactionsView`: one message's reaction chips, drawn by the chat's [Reactions].
@@ -57,7 +57,7 @@ class ReactionsView(context: Context) : FrameLayout(context) {
     val fonts = ChatFonts(context.assets)
     addView(
       ComposeView(context).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
           CompositionLocalProvider(
             LocalChatTheme provides theme,

@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native'
 import { useEffect, useState } from 'react'
 import { BackHandler, Keyboard, useWindowDimensions, View } from 'react-native'
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler'
@@ -10,6 +11,14 @@ import Animated, {
 } from 'react-native-reanimated'
 import { StyleSheet } from 'react-native-unistyles'
 import { scheduleOnRN } from 'react-native-worklets'
+import {
+    useModalOpen,
+    useNativeDismissGuard,
+} from '../../design/components/overlays/ModalStack'
+import {
+    panelBackStyle,
+    usePanelBackPreview,
+} from '../../design/components/overlays/usePanelBackPreview'
 import {
     DECELERATED_EASING,
     PANEL_CLOSE_MS,
@@ -34,11 +43,15 @@ const SCRIM_OPACITY = 0.5
 export function SearchPreviewHost({
     onDismiss,
     closeOnJump = false,
+    stackPicker,
+    active = true,
     children,
 }: {
     onDismiss: () => void
     /** The host stays on screen after a jump (the Notifications tab): the preview is put away at once. */
     closeOnJump?: boolean
+    stackPicker?: { open: boolean; close: () => void }
+    active?: boolean
     children: ReactNode
 }) {
     const { width } = useWindowDimensions()
@@ -82,6 +95,21 @@ export function SearchPreviewHost({
         slideAway(false)
     }
 
+    const modalOpen = useModalOpen()
+    const focused = useIsFocused()
+    const { offset } = usePanelBackPreview(
+        open && active && focused && !modalOpen ? 'searchPreview' : undefined,
+        width,
+        true,
+    )
+    useNativeDismissGuard(
+        stackPicker !== undefined && (open || stackPicker.open) && !modalOpen,
+        () => {
+            if (open) close()
+            else stackPicker?.close()
+        },
+    )
+
     // Only a rightward drag activates; a leftward one is left to the list inside.
     const pan = usePanGesture({
         enabled: open,
@@ -122,7 +150,7 @@ export function SearchPreviewHost({
     // Back closes the preview before anything under it (the last listener added runs first).
     // biome-ignore lint/correctness/useExhaustiveDependencies: close only uses setters and the shared value
     useEffect(() => {
-        if (!open) return
+        if (!open || !active || !focused) return
         const subscription = BackHandler.addEventListener(
             'hardwareBackPress',
             () => {
@@ -131,11 +159,11 @@ export function SearchPreviewHost({
             },
         )
         return () => subscription.remove()
-    }, [open])
+    }, [open, active, focused])
 
-    const panelStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: x.get() }],
-    }))
+    const panelStyle = useAnimatedStyle(() =>
+        panelBackStyle(x.get(), offset.get()),
+    )
     const scrimStyle = useAnimatedStyle(() => ({
         opacity: interpolate(
             x.get(),

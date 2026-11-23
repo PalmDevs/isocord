@@ -71,6 +71,7 @@ interface ChannelDetailsProps {
     onReady?: () => void
     /** The pages beside the selected tab are not built yet: the panel is still sliding in. */
     deferPages?: boolean
+    active?: boolean
 }
 
 /**
@@ -86,6 +87,7 @@ export function ChannelDetails({
     onBack,
     onReady,
     deferPages = false,
+    active,
 }: ChannelDetailsProps) {
     const channel = useSessionStore(
         channelsStore,
@@ -232,7 +234,7 @@ export function ChannelDetails({
     )
 
     return (
-        <SearchPreviewHost onDismiss={onBack}>
+        <SearchPreviewHost onDismiss={onBack} active={active}>
             <View style={styles.container}>
                 <SearchTabsLayout
                     context={context}

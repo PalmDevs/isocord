@@ -3,7 +3,7 @@ import { GalleryScaffold } from './GalleryPage'
 import { galleryPages } from './registry'
 
 export function GalleryPageScreen() {
-    const { id } = useRoute<any>().params
+    const { id } = useRoute().params as { id: string }
     const entry = galleryPages.find(page => page.id === id)
     if (!entry) return null
     return (

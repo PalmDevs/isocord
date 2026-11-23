@@ -6,6 +6,8 @@ import Animated from 'react-native-reanimated'
 import { StyleSheet } from 'react-native-unistyles'
 import { logger } from '../../core/log'
 import { useSessionStore } from '../../core/react'
+import { useModalOpen } from '../../design/components/overlays/ModalStack'
+import { usePanelBackPreview } from '../../design/components/overlays/usePanelBackPreview'
 import {
     settingsStore,
     swipeOpensDetails,
@@ -84,6 +86,20 @@ export function ChatPanels({
         },
     })
     const panels = { chat, details, stack, create }
+    const modalOpen = useModalOpen()
+    const topPanel = details.open
+        ? 'details'
+        : create.open
+          ? 'create'
+          : stack.open
+            ? 'stack'
+            : chat.open
+              ? 'chat'
+              : undefined
+    const backPreview = usePanelBackPreview(
+        active && !modalOpen ? topPanel : undefined,
+        width,
+    )
     // The details are those of the chat on top: the stacked one while it shows.
     const detailsChannelId =
         stack.stack && stack.open ? stack.stack.channelId : chat.channelId
@@ -99,7 +115,7 @@ export function ChatPanels({
         detailsOnSwipe,
         ...panels,
     })
-    const animated = usePanelStyles(width, dragging, {
+    const animated = usePanelStyles(width, dragging, backPreview, {
         chat: chat.x,
         details: details.x,
         stack: stack.x,

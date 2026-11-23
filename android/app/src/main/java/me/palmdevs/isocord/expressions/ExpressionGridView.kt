@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import com.facebook.react.bridge.Arguments
@@ -22,6 +21,7 @@ import kotlinx.coroutines.launch
 import me.palmdevs.isocord.chat.ChatFonts
 import me.palmdevs.isocord.chat.media.buildImageLoader
 import me.palmdevs.isocord.chat.rows.ChatTheme
+import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /** Parses the grids' sections off the main thread: an emoji grid is thousands of items. */
 private val parser = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
@@ -73,7 +73,7 @@ class ExpressionGridView(context: Context) : FrameLayout(context) {
     val fonts = ChatFonts(context.assets)
     addView(
       ComposeView(context).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
           ExpressionGrid(
             sections = sections,

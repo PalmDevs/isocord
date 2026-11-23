@@ -237,9 +237,7 @@ function ChannelItem({ guildId, id, joinedAck, thread }: ChannelRowProps) {
 
 /** GuildRolesAndChannelsRow: opens Channels & Roles, or Browse Channels where the server has no questions. */
 function BrowseChannelsRow({ guild }: { guild: Guild }) {
-    const navigation = useNavigation<{
-        navigate: (route: 'channelBrowser', params: { guildId: string }) => void
-    }>()
+    const navigation = useNavigation()
     const label = guild.features?.includes(
         GuildFeature.GUILD_ONBOARDING_HAS_PROMPTS,
     )

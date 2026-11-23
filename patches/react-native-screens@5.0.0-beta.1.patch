@@ -1,0 +1,451 @@
+diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionContext.kt b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionContext.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionContext.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionContext.kt
+@@ -1,5 +1,7 @@
+ package com.swmansion.rnscreens.core.containers.stack.animation
+ 
++import android.animation.Animator
++import com.swmansion.rnscreens.core.containers.stack.animation.engine.PredictiveBackCard
+ import com.swmansion.rnscreens.core.containers.stack.screen.StackScreenFragment
+ 
+ internal enum class StackTransitionKind {
+@@ -17,4 +19,6 @@
+     internal val outgoing: StackScreenFragment,
+     /** The top after the operation. */
+     internal val incoming: StackScreenFragment,
++    internal val backPreview: PredictiveBackCard? = null,
++    internal val pushAnimators: MutableSet<Animator>? = null,
+ )
+diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionResolver.kt b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionResolver.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionResolver.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionResolver.kt
+@@ -32,7 +32,13 @@
+     }
+     val timeline = timelineOf(context)
+     val screenTimeline = if (slot.isAppearing) timeline.enter else timeline.exit
+-    return ScreenTransition(screenTimeline, slot.isAppearing, timeline.exitZOrder)
++    return ScreenTransition(
++        screenTimeline,
++        slot.isAppearing,
++        timeline.exitZOrder,
++        context.backPreview,
++        context.pushAnimators,
++    )
+ }
+ 
+ private fun timelineOf(context: StackTransitionContext): TransitionTimeline =
+diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/PredictiveBackCard.kt b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/PredictiveBackCard.kt
+new file mode 100644
+--- /dev/null
++++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/PredictiveBackCard.kt
+@@ -0,0 +1,178 @@
++package com.swmansion.rnscreens.core.containers.stack.animation.engine
++
++import android.graphics.Outline
++import android.os.Build
++import android.view.RoundedCorner
++import android.view.View
++import android.view.ViewOutlineProvider
++import android.view.animation.PathInterpolator
++import androidx.activity.BackEventCompat
++import com.swmansion.rnscreens.core.containers.stack.animation.engine.binding.TrackBinding
++import com.swmansion.rnscreens.core.containers.stack.animation.engine.binding.bindTrack
++import com.swmansion.rnscreens.core.containers.stack.animation.timeline.Track
++import kotlin.math.abs
++import kotlin.math.sign
++
++private const val CARD_SCALE = 0.9f
++private const val EDGE_MARGIN_DP = 8f
++private const val INCOMING_PARALLAX_DP = 16f
++private const val FALLBACK_RADIUS_DP = 24f
++private const val COMMIT_SEEK_PORTION = 0.8f
++
++/** Android predictive back design: rounded surface, swipe edge, and bounded Y drag. */
++internal class PredictiveBackCard {
++    private val gestureCurve = PathInterpolator(0f, 0f, 0f, 1f)
++    private val frames = mutableSetOf<() -> Unit>()
++    private var firstTouchX: Float? = null
++    private var firstTouchY: Float? = null
++    private var dragX = 0f
++    private var dragY = 0f
++    private var edgeDirection = 1f
++    private var lastProgress = 0f
++    private var commitProgress: Float? = null
++    private var cancelProgress: Float? = null
++    private var settleProgress = 0f
++
++    fun update(event: BackEventCompat) {
++        val originX = firstTouchX ?: event.touchX.also { firstTouchX = it }
++        dragX = event.touchX - originX
++        val originY = firstTouchY ?: event.touchY.also { firstTouchY = it }
++        dragY = event.touchY - originY
++        lastProgress = event.progress
++        edgeDirection = if (event.swipeEdge == BackEventCompat.EDGE_RIGHT) -1f else 1f
++        frames.forEach { it() }
++    }
++
++    fun commit() {
++        if (firstTouchX != null) commitProgress = lastProgress
++    }
++
++    fun cancel() {
++        cancelProgress = lastProgress
++    }
++
++    fun bindIncoming(
++        track: Track.Translate,
++        view: View,
++        metrics: LayoutMetrics,
++        durationMs: Long,
++    ): TrackBinding {
++        val stock = bindTrack(track, view, metrics)
++        val from = track.from.toPx(track.axis, metrics)
++        val to = track.to.toPx(track.axis, metrics)
++        val maxParallax = minOf(INCOMING_PARALLAX_DP * metrics.density, abs(to - from)) * sign(to - from)
++        // DefaultPreset.slide easing for the remaining distance after commit.
++        val easing = Interpolators.of(track.timing.easing, view.context)
++        return object : TrackBinding {
++            private var fraction = 0f
++            private val draw = { drawFrame() }
++
++            override fun apply(timeMs: Float, eased: Boolean) {
++                fraction = (timeMs / durationMs).coerceIn(0f, 1f)
++                frames.add(draw)
++                if (firstTouchX == null) {
++                    stock.apply(timeMs, eased)
++                } else {
++                    drawFrame()
++                }
++            }
++
++            private fun drawFrame() {
++                val width = metrics.containerWidth.coerceAtLeast(1)
++                val touchRatio = (dragX * edgeDirection / width).coerceIn(0f, 1f)
++                val preview = from + maxParallax * touchRatio
++                view.translationX =
++                    if (commitProgress != null) {
++                        val progress = easing.getInterpolation(committedFraction(fraction))
++                        preview + (to - preview) * progress
++                    } else {
++                        // FragmentTransitionSupport: return the parallax as the cancel seek rewinds.
++                        val remaining = cancelProgress?.let {
++                            if (it > 0f) (fraction / it).coerceIn(0f, 1f) else 0f
++                        } ?: 1f
++                        from + (preview - from) * remaining
++                    }
++            }
++
++            override fun restore() {
++                frames.remove(draw)
++                stock.restore()
++            }
++        }
++    }
++
++    fun bind(view: View, durationMs: Long): TrackBinding =
++        object : TrackBinding {
++            private val originalOutline = view.outlineProvider
++            private val originalClipping = view.clipToOutline
++            private var changed = false
++            private var fraction = 0f
++            private val draw = { drawFrame() }
++
++            override fun apply(timeMs: Float, eased: Boolean) {
++                fraction = (timeMs / durationMs).coerceIn(0f, 1f)
++                frames.add(draw)
++                drawFrame()
++            }
++
++            private fun drawFrame() {
++                if (firstTouchY == null) return
++                val settle = committedFraction(fraction)
++                val visualFraction = commitProgress?.let { it + (1f - it) * settle } ?: fraction
++                val progress = gestureCurve.getInterpolation(visualFraction)
++                val scale = 1f - (1f - CARD_SCALE) * progress
++                val margin = EDGE_MARGIN_DP * view.resources.displayMetrics.density
++                val horizontalRoom = (view.width * (1f - CARD_SCALE) / 2f - margin).coerceAtLeast(0f)
++                val verticalRoom = (view.height * (1f - scale) / 2f - margin).coerceAtLeast(0f)
++                val halfHeight = (view.height / 2f).coerceAtLeast(1f)
++                val verticalProgress = (dragY / halfHeight).coerceIn(-1f, 1f)
++
++                view.translationX = horizontalRoom * progress * edgeDirection
++                view.translationY = verticalRoom * verticalProgress
++                view.scaleX = scale
++                view.scaleY = scale
++                view.alpha = 1f - settle
++                if (!changed) {
++                    view.outlineProvider = cardOutline(view)
++                    view.clipToOutline = true
++                }
++                changed = true
++            }
++
++            override fun restore() {
++                frames.remove(draw)
++                if (!changed) return
++                view.translationX = 0f
++                view.translationY = 0f
++                view.scaleX = 1f
++                view.scaleY = 1f
++                view.alpha = 1f
++                view.outlineProvider = originalOutline
++                view.clipToOutline = originalClipping
++                changed = false
++            }
++        }
++
++    private fun committedFraction(fraction: Float): Float {
++        val start = commitProgress ?: return 0f
++        // TransitionSeekController: finish before the spring's slow tail.
++        val end = start + (1f - start) * COMMIT_SEEK_PORTION
++        val progress = if (fraction >= end) 1f else ((fraction - start) / (end - start)).coerceAtLeast(0f)
++        settleProgress = maxOf(settleProgress, progress)
++        return settleProgress
++    }
++}
++
++private fun cardOutline(view: View): ViewOutlineProvider {
++    val deviceRadius =
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++            view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.radius ?: 0
++        } else {
++            0
++        }
++    val radius = if (deviceRadius > 0) deviceRadius.toFloat() else FALLBACK_RADIUS_DP * view.resources.displayMetrics.density
++    return object : ViewOutlineProvider() {
++        override fun getOutline(view: View, outline: Outline) =
++            outline.setRoundRect(0, 0, view.width, view.height, radius)
++    }
++}
+diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/ScreenTransition.kt b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/ScreenTransition.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/ScreenTransition.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/ScreenTransition.kt
+@@ -1,6 +1,7 @@
+ package com.swmansion.rnscreens.core.containers.stack.animation.engine
+ 
+ import android.animation.Animator
++import android.animation.AnimatorListenerAdapter
+ import android.view.View
+ import android.view.ViewGroup
+ import androidx.transition.TransitionValues
+@@ -15,8 +16,10 @@
+  */
+ internal class ScreenTransition(
+     internal val timeline: ScreenTimeline,
+-    isAppearing: Boolean,
++    private val isAppearing: Boolean,
+     internal val exitZOrder: ZOrder,
++    private val backPreview: PredictiveBackCard?,
++    private val pushAnimators: MutableSet<Animator>?,
+ ) : Visibility() {
+     init {
+         mode = if (isAppearing) MODE_IN else MODE_OUT
+@@ -63,7 +66,27 @@
+     private fun animate(
+         view: View,
+         sceneRoot: ViewGroup,
+-    ): Animator = createTimelineAnimator(view, timeline, LayoutMetrics.of(view, sceneRoot.containerOrSelf()), rootTransition)
++    ): Animator =
++        createTimelineAnimator(
++            view,
++            timeline,
++            LayoutMetrics.of(view, sceneRoot.containerOrSelf()),
++            rootTransition,
++            backPreview,
++            isAppearing,
++        ).also { animator ->
++            pushAnimators?.let { active ->
++                animator.addListener(object : AnimatorListenerAdapter() {
++                    override fun onAnimationStart(animation: Animator) {
++                        active.add(animation)
++                    }
++
++                    override fun onAnimationEnd(animation: Animator) {
++                        active.remove(animation)
++                    }
++                })
++            }
++        }
+ 
+     /**
+      * The metrics come from the real container also when the scene root is its underlay.
+diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/TimelineAnimator.kt b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/TimelineAnimator.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/TimelineAnimator.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/TimelineAnimator.kt
+@@ -8,7 +8,9 @@
+ import androidx.transition.Transition
+ import com.swmansion.rnscreens.core.containers.stack.animation.engine.binding.TrackBinding
+ import com.swmansion.rnscreens.core.containers.stack.animation.engine.binding.bindTrack
++import com.swmansion.rnscreens.core.containers.stack.animation.timeline.Axis
+ import com.swmansion.rnscreens.core.containers.stack.animation.timeline.ScreenTimeline
++import com.swmansion.rnscreens.core.containers.stack.animation.timeline.Track
+ 
+ /**
+  * One linear master animator per screen; every track is a pure function of the master time,
+@@ -21,8 +23,19 @@
+     timeline: ScreenTimeline,
+     metrics: LayoutMetrics,
+     rootTransition: Transition,
++    backPreview: PredictiveBackCard?,
++    isAppearing: Boolean,
+ ): Animator {
+-    val bindings = Array(timeline.tracks.size) { bindTrack(timeline.tracks[it], view, metrics) }
++    val outgoingCard = if (isAppearing) null else backPreview?.bind(view, timeline.durationMs)
++    val screenBindings = Array(timeline.tracks.size) { index ->
++        val track = timeline.tracks[index]
++        if (isAppearing && backPreview != null && track is Track.Translate && track.axis == Axis.LOGICAL_X) {
++            backPreview.bindIncoming(track, view, metrics, timeline.durationMs)
++        } else {
++            bindTrack(track, view, metrics)
++        }
++    }
++    val bindings = if (outgoingCard == null) screenBindings else screenBindings + outgoingCard
+     val listener = TimelineAnimatorListener(bindings)
+ 
+     return ValueAnimator.ofFloat(0f, 1f).apply {
+diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/host/StackContainer.kt b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/host/StackContainer.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/host/StackContainer.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/host/StackContainer.kt
+@@ -1,5 +1,6 @@
+ package com.swmansion.rnscreens.core.containers.stack.host
+ 
++import android.animation.Animator
+ import android.annotation.SuppressLint
+ import android.content.Context
+ import android.content.res.Configuration
+@@ -7,6 +8,7 @@
+ import android.view.View
+ import android.view.ViewGroup
+ import android.widget.FrameLayout
++import androidx.activity.BackEventCompat
+ import androidx.fragment.app.Fragment
+ import androidx.fragment.app.FragmentManager
+ import androidx.transition.Transition
+@@ -20,8 +22,10 @@
+ import com.swmansion.rnscreens.core.containers.stack.animation.ScreenTransitionProviding
+ import com.swmansion.rnscreens.core.containers.stack.animation.StackTransitionContext
+ import com.swmansion.rnscreens.core.containers.stack.animation.StackTransitionKind
++import com.swmansion.rnscreens.core.containers.stack.animation.engine.PredictiveBackCard
+ import com.swmansion.rnscreens.core.containers.stack.animation.engine.TransitionSlot
+ import com.swmansion.rnscreens.core.containers.stack.animation.engine.UnderlayProviding
++import com.swmansion.rnscreens.core.containers.stack.animation.model.StackAnimationConfig
+ import com.swmansion.rnscreens.core.containers.stack.animation.resolveStackTransition
+ import com.swmansion.rnscreens.core.containers.stack.header.StackHeaderBackPressHandler
+ import com.swmansion.rnscreens.core.containers.stack.screen.StackContainerItem
+@@ -66,6 +70,7 @@
+     private val stackModel: MutableList<StackScreenFragment> = arrayListOf()
+ 
+     private val pendingPopOperations: MutableList<PopOperation> = arrayListOf()
++    private val runningPushAnimators = mutableSetOf<Animator>()
+     private val pendingPushOperations: MutableList<PushOperation> = arrayListOf()
+     private val hasPendingOperations: Boolean
+         get() = pendingPushOperations.isNotEmpty() || pendingPopOperations.isNotEmpty()
+@@ -129,6 +134,8 @@
+         super.onDetachedFromWindow()
+         requireFragmentManager().removeOnBackStackChangedListener(this)
+         transitionContext = null
++        backPreview = null
++        runningPushAnimators.clear()
+         fragmentManager = null
+         parentContainerRegistry.detach(this)
+         colorSchemeCoordinator.teardown()
+@@ -196,6 +203,9 @@
+     }
+ 
+     private fun performOperations(fragmentManager: FragmentManager) {
++        if (pendingPopOperations.isNotEmpty() && pendingPushOperations.isEmpty()) {
++            finishRunningPush()
++        }
+         applyOperationsAndComputeFragmentManagerOperations()
+         fragmentOpExecutor.executeOperations(fragmentManager, fragmentOps, flushSync = false)
+ 
+@@ -285,6 +295,7 @@
+      * too: neither the commit nor the cancel (the record re-executed forward) resolves a transition.
+      */
+     private var transitionContext: StackTransitionContext? = null
++    private var backPreview: PredictiveBackCard? = null
+ 
+     /**
+      * A batch computed while an earlier one is still pending in FragmentManager executes together
+@@ -307,7 +318,20 @@
+                 modelBeforeBatch.contains(incoming) -> StackTransitionKind.POP
+                 else -> StackTransitionKind.REPLACE
+             }
+-        transitionContext = kind?.let { StackTransitionContext(it, checkNotNull(outgoing), incoming) }
++        transitionContext =
++            kind?.let {
++                StackTransitionContext(
++                    it,
++                    checkNotNull(outgoing),
++                    incoming,
++                    pushAnimators = runningPushAnimators.takeIf { kind == StackTransitionKind.PUSH },
++                )
++            }
++    }
++
++    // Visibility: finish the enter overlay before capturing the pop.
++    private fun finishRunningPush() {
++        runningPushAnimators.toList().forEach { it.end() }
+     }
+ 
+     override fun transitionFor(
+@@ -409,13 +433,25 @@
+         // A JS push and pop executed together also gets here without a context, but FragmentManager
+         // starts no transition for it, so this context is never read.
+         if (pop && transitionContext == null && stackModel.size > 1) {
++            val outgoing = stackModel.last()
++            backPreview = if (outgoing.item.animation == StackAnimationConfig.DEFAULT) PredictiveBackCard() else null
+             transitionContext =
+                 StackTransitionContext(
+                     StackTransitionKind.POP,
+-                    outgoing = stackModel.last(),
++                    outgoing = outgoing,
+                     incoming = stackModel[stackModel.lastIndex - 1],
++                    backPreview = backPreview,
+                 )
+         }
++    }
++
++    override fun onBackStackChangeProgressed(backEventCompat: BackEventCompat) {
++        backPreview?.update(backEventCompat)
++    }
++
++    override fun onBackStackChangeCancelled() {
++        backPreview?.cancel()
++        backPreview = null
+     }
+ 
+     // This is called before the special effects (animations) are dispatched, however mid transaction!
+@@ -436,6 +472,10 @@
+         // I avoid using `pop` parameter here, because transaction might not be classified as `pop`
+         // and still include fragment removal operations.
+         if (fragment.isRemoving) {
++            if (fragment === stackModel.lastOrNull()) {
++                backPreview?.commit()
++                backPreview = null
++            }
+             delegate.get()?.onItemDismissCommitted(fragment.item)
+             if (stackModel.contains(fragment)) {
+                 onNativeFragmentPop(fragment)
+@@ -519,6 +559,7 @@
+         // popBackStackImmediate. The synchronous pop makes the top-screen guard above
+         // reliable against double taps: onBackStackChangeCommitted -> onNativeFragmentPop
+         // updates stackModel before this call returns.
++        finishRunningPush()
+         fragmentManager.popBackStackImmediate(
+             // key MUST BE present, otherwise the navigation action will be delegated to child primary navigation
+             // fragment.
+diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/screen/StackScreen.kt b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/screen/StackScreen.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/screen/StackScreen.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/screen/StackScreen.kt
+@@ -70,8 +70,9 @@
+ 
+     var screenKey: String? = null
+         set(value) {
++            // Fabric can resend the screen key with the full prop set.
+             require(
+-                field == null,
++                field == null || field == value,
+             ) { "[RNScreens] StackScreen can't change its screenKey." }
+             field = value
+         }

@@ -37,8 +37,6 @@ type NodeOf<Type extends SettingNode['type']> = Extract<
     { type: Type }
 >
 
-export type Navigation = { navigate: (route: string) => void }
-
 const iconOf = (node: SettingNode) =>
     node.icon ? (
         <TableRowIcon
@@ -89,7 +87,7 @@ function SettingRow({
     node: SettingNode
     context: SettingContext
 }) {
-    const navigation = useNavigation<Navigation>()
+    const navigation = useNavigation()
     switch (node.type) {
         case 'route':
             return (

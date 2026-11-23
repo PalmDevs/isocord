@@ -19,6 +19,7 @@ class CorePackage : BaseReactPackage() {
       NetworkModule.NAME -> NetworkModule(reactContext)
       CompressionModule.NAME -> CompressionModule(reactContext)
       ShareModule.NAME -> ShareModule(reactContext)
+      BackModule.NAME -> BackModule(reactContext)
       else -> null
     }
 
@@ -30,6 +31,7 @@ class CorePackage : BaseReactPackage() {
       NetworkModule::class.java to NetworkModule.NAME,
       CompressionModule::class.java to CompressionModule.NAME,
       ShareModule::class.java to ShareModule.NAME,
+      BackModule::class.java to BackModule.NAME,
     ).entries.associate { (type, name) ->
       name to
         ReactModuleInfo(

@@ -305,6 +305,14 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [ ] Raw spacing numbers in non-theme `StyleSheet.create` blocks (Button, Badge, Sheet, Checkbox, SegmentedControl, TableControlRows, ButtonGroup, gallery Layout).
 
 ### Patches and dependencies
+- [x] Opt into Android predictive back with the Native Stack `/next` preview and Screens v5.
+- [ ] Verify commit and cancel gestures on the emulator. Replace the vendored Native Stack package when `/next` is published on npm.
+- Android 16 hosts the app's stacks in a child fragment so they receive Back progress ahead of ReactActivity.
+- [x] Check rounded predictive Back from both edges and with cancellation. The previous page tracks the finger up to 16 dp and finishes the Screens slide on commit.
+- [x] Check that system Back closes the media viewer from chat and from a pushed screen.
+- [x] Check Compose views during a push and after tapping Back before enter finishes, including the chat list and You-tab bio.
+- [x] Check predictive Back on swipeable chat panels and search previews. The first 20% tracks the finger, then travel interpolates to the 25% cap.
+- Screens 5.0.0-beta.1 is patched to accept repeated Android `screenKey` assignments from Fabric. Re-check when upgrading Screens.
 - Unistyles 3.8.1 is patched (top inset in multi-window). Drop the patch when upstream fixes it; re-check on upgrade.
 - OkHttp is held at 4.11.0, the version in the official 353.11 APK (TLS handshake). Re-check when moving to a newer reference build, together with `CLIENT` and `IsocordNetwork.USER_AGENT`.
 

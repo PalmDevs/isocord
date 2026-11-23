@@ -23,7 +23,6 @@ import {
 } from './search'
 import { trailingText } from './settingRowUtils'
 import type { SettingContext, SettingKey } from './config'
-import type { Navigation } from './settingRows'
 
 // SettingRenderer's SettingSearchResultIcon: the group's first result shows its top-level setting's icon.
 function SearchResultIcon({ setting }: { setting: SettingKey | null }) {
@@ -54,7 +53,7 @@ function SearchResult({
     iconSetting: SettingKey | null
     context: SettingContext
 }) {
-    const navigation = useNavigation<Navigation>()
+    const navigation = useNavigation()
     const node = SETTING_RENDERER_CONFIG[setting]
     const data = node.parent
         ? SETTING_RENDERER_CONFIG[getNearestRouteAncestorOrSelf(setting)]

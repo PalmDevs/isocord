@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import com.facebook.react.bridge.Arguments
@@ -24,6 +23,7 @@ import me.palmdevs.isocord.chat.media.buildImageLoader
 import me.palmdevs.isocord.chat.rows.ChatRow
 import me.palmdevs.isocord.chat.rows.ChatTheme
 import me.palmdevs.isocord.chat.rows.parseRows
+import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /** The Android view behind `IsocordChatView`: a Compose message list fed by the `rows` and `theme` props. */
 class ChatView(context: Context) : FrameLayout(context) {
@@ -99,7 +99,7 @@ class ChatView(context: Context) : FrameLayout(context) {
     val fonts = ChatFonts(context.assets)
     addView(
       ComposeView(context).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
           ChatList(
             scrollKey = scrollKey,

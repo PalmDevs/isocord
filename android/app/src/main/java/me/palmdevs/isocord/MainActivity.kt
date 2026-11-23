@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import androidx.activity.OnBackPressedCallback
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -16,6 +17,18 @@ import me.palmdevs.isocord.notifications.gateway.AppVisibility
 import me.palmdevs.isocord.share.SharedContentInbox
 
 class MainActivity : ReactActivity() {
+  internal var panelBackCallback: OnBackPressedCallback? = null
+
+  override fun invokeDefaultOnBackPressed() {
+    val panelCallback = panelBackCallback
+    val wasEnabled = panelCallback?.isEnabled == true
+    panelCallback?.isEnabled = false
+    try {
+      super.invokeDefaultOnBackPressed()
+    } finally {
+      panelCallback?.isEnabled = wasEnabled
+    }
+  }
 
   /**
    * Returns the name of the main component registered from JavaScript. This is used to schedule

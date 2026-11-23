@@ -1,4 +1,4 @@
-import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { createNativeStackNavigator } from '@react-navigation/native-stack/next'
 import { useState } from 'react'
 import { LoginFlow } from '../../core/api/auth'
 import { Login } from '../auth/Login'
@@ -16,7 +16,7 @@ export function AddAccount() {
         <LoginFlowContext value={flow}>
             <Stack.Navigator
                 initialRouteName="login"
-                screenOptions={{ headerShown: false }}
+                screenOptions={{ headerShown: false, inactiveBehavior: 'none' }}
             >
                 <Stack.Screen name="login" component={Login} />
                 <Stack.Screen name="tokenLogin" component={TokenLogin} />

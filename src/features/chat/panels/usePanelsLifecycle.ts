@@ -64,7 +64,11 @@ export function usePanelsBackHandler(active: boolean, panels: Panels) {
     // biome-ignore lint/correctness/useExhaustiveDependencies: the handlers only use refs and setters
     useEffect(() => {
         // The details can also be open over the tab alone (the server header's search).
-        if (!(chat.open || details.open || create.open) || !active) return
+        if (
+            !(chat.open || details.open || stack.open || create.open) ||
+            !active
+        )
+            return
         const subscription = BackHandler.addEventListener(
             'hardwareBackPress',
             () => {
@@ -76,7 +80,7 @@ export function usePanelsBackHandler(active: boolean, panels: Panels) {
             },
         )
         return () => subscription.remove()
-    }, [chat.open, details.open, create.open, active])
+    }, [chat.open, details.open, stack.open, create.open, active])
 }
 
 /** Registers what the chat on screen can open: stacked channels, thread creation, a channel from the details. */

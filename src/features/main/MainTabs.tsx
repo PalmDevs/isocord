@@ -1,5 +1,9 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { useNavigation } from '@react-navigation/native'
+import {
+    CommonActions,
+    StackActions,
+    useNavigation,
+} from '@react-navigation/native'
 import { useEffect } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
@@ -184,13 +188,20 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
                     route={route.name}
                     focused={state.index === index}
                     onPress={() => {
+                        const focused = state.index === index
                         const event = navigation.emit({
                             type: 'tabPress',
                             target: route.key,
                             canPreventDefault: true,
+                            data: {
+                                behavior: {
+                                    scrollToTop: focused,
+                                    popToTop: focused,
+                                },
+                            },
                         })
-                        if (state.index !== index && !event.defaultPrevented)
-                            navigation.navigate(route.name)
+                        if (!focused && !event.defaultPrevented)
+                            navigation.navigate(route.name, route.params)
                     }}
                 />
             ))}
@@ -210,24 +221,14 @@ const diag = logger('PanelsDiag')
 
 function ChannelOpener() {
     const session = useSession()
-    // Rendered beside the tab navigator, so this is the root stack's navigation: React Navigation 7 no longer passes a
-    // bare tab name down to the tabs, the tab has to be named inside `main`.
-    const navigation = useNavigation<{
-        navigate: ((route: 'main', params: { screen: string }) => void) &
-            ((
-                route: 'channelBrowser',
-                params: { guildId: string; tab: 'customize' | 'browse' },
-            ) => void) &
-            ((
-                route: 'plaintextFilePreview',
-                params: { url: string; fileName: string },
-            ) => void) &
-            ((route: {
-                name: 'share'
-                key: string
-                params: ShareParams
-            }) => void)
-    }>()
+    // Root stack navigation from beside the tab navigator.
+    const navigation = useNavigation()
+    // External openers use the focused screen's history when main is covered.
+    const navigate = (name: string, params: object) =>
+        navigation.dispatch({
+            ...CommonActions.navigate(name, params),
+            source: undefined,
+        })
     const servers = useServersPanels()
     const messages = useMessagesPanels()
     useEffect(() =>
@@ -240,7 +241,7 @@ function ChannelOpener() {
             )
             if (!channel) return
             if (isPrivate(channel)) {
-                navigation.navigate('main', { screen: 'messages' })
+                navigate('main', { screen: 'messages' })
                 messages.openChat(channelId, messageId)
             } else if (channel.guild_id) {
                 const guildId = channel.guild_id
@@ -251,28 +252,24 @@ function ChannelOpener() {
                         [guildId]: channelId,
                     },
                 }))
-                navigation.navigate('main', { screen: 'servers' })
+                navigate('main', { screen: 'servers' })
                 servers.openChat(channelId, messageId)
             }
         }),
     )
     useEffect(() =>
         setOpener('channelBrowser', (guildId, tab) =>
-            navigation.navigate('channelBrowser', { guildId, tab }),
+            navigate('channelBrowser', { guildId, tab }),
         ),
     )
     useEffect(() =>
         setOpener('plaintextFilePreview', (url, fileName) =>
-            navigation.navigate('plaintextFilePreview', { url, fileName }),
+            navigate('plaintextFilePreview', { url, fileName }),
         ),
     )
-    // A key of its own: a second share opens a fresh screen instead of reusing the open one.
+    // A fresh screen for each share, above the currently focused screen.
     const openShareScreen = (params: ShareParams) =>
-        navigation.navigate({
-            name: 'share',
-            key: `share-${Date.now()}`,
-            params,
-        })
+        navigation.dispatch(StackActions.push('share', params))
     useEffect(() => setOpener('share', openShareScreen))
     // Another app shared something: the share screen opens over whatever is on screen.
     useSharedContent(content => openShareScreen({ kind: 'share', content }))
@@ -309,9 +306,13 @@ export function MainTabs() {
                 <SearchPreviewHost onDismiss={NOOP} closeOnJump>
                     <Tab.Navigator
                         key={session.userId}
+                        implementation="custom"
                         initialRouteName={resolveInitialTab(session.storage)}
                         tabBar={renderTabBar}
-                        screenOptions={{ headerShown: false }}
+                        screenOptions={{
+                            headerShown: false,
+                            inactiveBehavior: 'none',
+                        }}
                     >
                         <Tab.Screen name="servers" component={ServersTab} />
                         <Tab.Screen name="messages" component={MessagesTab} />

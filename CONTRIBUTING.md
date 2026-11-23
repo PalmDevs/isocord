@@ -110,8 +110,7 @@ API, so add to it rather than wiring things into `App.tsx`.
 The root native stack holds `main` (`MainTabs`) and the feature screens. The
 tabs are Servers, Messages, Notifications and You.
 
-React Navigation 7 doesn't pass a bare tab name down from the root stack. To
-switch tabs from outside the tab navigator, use
+To switch tabs from outside the tab navigator, use
 `navigate('main', { screen: 'messages' })`.
 
 Servers and Messages each host a `ChatPanels` (`src/features/chat/ChatPanels.tsx`):

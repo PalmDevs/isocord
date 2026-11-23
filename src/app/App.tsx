@@ -6,9 +6,9 @@ import {
     NavigationContainer,
     useNavigationContainerRef,
 } from '@react-navigation/native'
-import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { createNativeStackNavigator } from '@react-navigation/native-stack/next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AppState } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import { SystemBars } from 'react-native-edge-to-edge'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
@@ -16,21 +16,29 @@ import {
     initialWindowMetrics,
     SafeAreaProvider,
 } from 'react-native-safe-area-context'
+import { Stack as NativeScreensStack } from 'react-native-screens'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { features } from '../core/feature'
 import { logger } from '../core/log'
 import { startCurrentSession } from '../core/react'
 import { SessionProvider } from '../core/SessionProvider'
 import { hideSplashAfterFrame } from '../core/startup'
+import { ModalDismissGuard } from '../design/components/overlays/ModalStack'
 import { AuthNavigator } from '../features/auth/AuthNavigator'
 import { MainTabs } from '../features/main/MainTabs'
 import { beginMainWait } from './startupTrace'
+import type { ReactNode } from 'react'
 
 // Connecting is the slowest part of startup, so it begins before the first render.
 startCurrentSession()
 
 const queryClient = new QueryClient()
 const Stack = createNativeStackNavigator()
+type RootStack = typeof Stack
+
+declare module '@react-navigation/native' {
+    interface RootNavigator extends RootStack {}
+}
 
 const log = logger('App')
 AppState.addEventListener('change', state => log.info(`State: ${state}`))
@@ -40,7 +48,35 @@ function LoggedOut() {
     return <AuthNavigator />
 }
 
+const ANDROID_16_API = 36
+const APP_HOST_SCREEN = 'app'
+
+function AndroidBackHost({ children }: { children: ReactNode }) {
+    if (Platform.OS !== 'android' || Platform.Version < ANDROID_16_API) {
+        return children
+    }
+
+    // Child FragmentManager registered after ReactActivity's Android 16 back callback.
+    return (
+        <NativeScreensStack.Host>
+            <NativeScreensStack.Screen
+                activityMode="attached"
+                screenKey={APP_HOST_SCREEN}
+            >
+                {children}
+            </NativeScreensStack.Screen>
+        </NativeScreensStack.Host>
+    )
+}
+
 let renderTraced: 'pending' | 'open' | 'done' = 'pending'
+
+const renderStackScreen = ({ children }: { children: ReactNode }) => (
+    <>
+        <ModalDismissGuard />
+        {children}
+    </>
+)
 
 export function App() {
     // Rendering is synchronous, so the section spans React's first render of the whole tree.
@@ -66,47 +102,55 @@ export function App() {
              */}
             <SystemBars style={theme.isDark ? 'light' : 'dark'} />
             {/* Without initial metrics the provider renders nothing until the first native insets event. */}
-            <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-                <KeyboardProvider>
-                    <QueryClientProvider client={queryClient}>
-                        <SessionProvider fallback={<LoggedOut />}>
-                            <NavigationContainer
-                                ref={navigation}
-                                onStateChange={() =>
-                                    log.debug(
-                                        `Screen: ${navigation.getCurrentRoute()?.name}`,
-                                    )
-                                }
-                            >
-                                <Stack.Navigator
-                                    screenOptions={{ headerShown: false }}
+            <AndroidBackHost>
+                <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+                    <KeyboardProvider>
+                        <QueryClientProvider client={queryClient}>
+                            <SessionProvider fallback={<LoggedOut />}>
+                                <NavigationContainer
+                                    ref={navigation}
+                                    onStateChange={() =>
+                                        log.debug(
+                                            `Screen: ${navigation.getCurrentRoute()?.name}`,
+                                        )
+                                    }
                                 >
-                                    <Stack.Screen
-                                        name="main"
-                                        component={MainTabs}
-                                    />
-                                    {features.flatMap(feature =>
-                                        Object.entries(
-                                            feature.screens ?? {},
-                                        ).map(([name, component]) => (
-                                            <Stack.Screen
-                                                key={name}
-                                                name={name}
-                                                component={component}
-                                            />
-                                        )),
-                                    )}
-                                </Stack.Navigator>
-                            </NavigationContainer>
-                            {features.flatMap(feature =>
-                                Object.entries(feature.overlays ?? {}).map(
-                                    ([key, Overlay]) => <Overlay key={key} />,
-                                ),
-                            )}
-                        </SessionProvider>
-                    </QueryClientProvider>
-                </KeyboardProvider>
-            </SafeAreaProvider>
+                                    <Stack.Navigator
+                                        screenLayout={renderStackScreen}
+                                        screenOptions={{
+                                            headerShown: false,
+                                            inactiveBehavior: 'none',
+                                        }}
+                                    >
+                                        <Stack.Screen
+                                            name="main"
+                                            component={MainTabs}
+                                        />
+                                        {features.flatMap(feature =>
+                                            Object.entries(
+                                                feature.screens ?? {},
+                                            ).map(([name, component]) => (
+                                                <Stack.Screen
+                                                    key={name}
+                                                    name={name}
+                                                    component={component}
+                                                />
+                                            )),
+                                        )}
+                                    </Stack.Navigator>
+                                </NavigationContainer>
+                                {features.flatMap(feature =>
+                                    Object.entries(feature.overlays ?? {}).map(
+                                        ([key, Overlay]) => (
+                                            <Overlay key={key} />
+                                        ),
+                                    ),
+                                )}
+                            </SessionProvider>
+                        </QueryClientProvider>
+                    </KeyboardProvider>
+                </SafeAreaProvider>
+            </AndroidBackHost>
         </GestureHandlerRootView>
     )
 }

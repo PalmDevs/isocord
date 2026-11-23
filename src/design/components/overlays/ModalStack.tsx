@@ -1,3 +1,8 @@
+import {
+    useNavigation,
+    useNavigationState,
+    usePreventRemove,
+} from '@react-navigation/native'
 import { useEffect } from 'react'
 import { BackHandler, StyleSheet as NativeStyleSheet, View } from 'react-native'
 import { AlertPile } from '../modals/AlertPile'
@@ -43,6 +48,28 @@ function closeFrontModal(): boolean {
         return true
     }
     return dismissTopAlert()
+}
+
+export function useModalOpen() {
+    const sheetsOpen = useSheetStore(state => state.sheets.length > 0)
+    const alertsOpen = useAlertStore(state => state.alerts.length > 0)
+    return sheetsOpen || alertsOpen
+}
+
+/** Handles the preview stack's native dismiss action while an overlay owns Back. */
+export function useNativeDismissGuard(enabled: boolean, close: () => void) {
+    const navigation = useNavigation()
+    // StackRouter.dismiss requires a second screen. BackHandler owns Back at the root.
+    const canDismiss = useNavigationState(state => state.index > 0)
+    usePreventRemove(enabled && canDismiss, ({ data }) => {
+        if (data.action.type === 'DISMISS') close()
+        else navigation.dispatch(data.action)
+    })
+}
+
+export function ModalDismissGuard() {
+    useNativeDismissGuard(useModalOpen(), closeFrontModal)
+    return null
 }
 
 /**

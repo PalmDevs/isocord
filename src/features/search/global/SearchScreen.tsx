@@ -39,7 +39,13 @@ export function GlobalSearchScreen() {
 
     return (
         <SearchQueryContext value={search.setText}>
-            <SearchPreviewHost onDismiss={dismiss}>
+            <SearchPreviewHost
+                onDismiss={dismiss}
+                stackPicker={{
+                    open: search.picking !== null,
+                    close: search.closePicker,
+                }}
+            >
                 <View style={styles.container}>
                     <SearchBar
                         search={search}

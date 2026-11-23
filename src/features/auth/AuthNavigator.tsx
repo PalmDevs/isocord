@@ -1,5 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native'
-import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { createNativeStackNavigator } from '@react-navigation/native-stack/next'
 import { useState } from 'react'
 import { LoginFlow } from '../../core/api/auth'
 import { Login } from './Login'
@@ -17,7 +17,12 @@ export function AuthNavigator() {
     return (
         <LoginFlowContext value={flow}>
             <NavigationContainer>
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                <Stack.Navigator
+                    screenOptions={{
+                        headerShown: false,
+                        inactiveBehavior: 'none',
+                    }}
+                >
                     <Stack.Screen name="welcome" component={Welcome} />
                     <Stack.Screen name="login" component={Login} />
                     <Stack.Screen name="tokenLogin" component={TokenLogin} />
