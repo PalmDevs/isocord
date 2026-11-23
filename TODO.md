@@ -330,7 +330,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [ ] `launch_signature` (libdiscore, native) is unverified: the nanosecond timestamp is a guess.
 - [ ] `/experiments` `X-Context-Properties` location is assumed `/` (getFingerprintLocation with the router at its initial path). Confirm.
 - [ ] Super property key order for `device_model_name` and `install_source` is unverified: the datamine (350.2.3) predates them.
-- [ ] IDENTIFY always takes the non-fast-connect path (`is_fast_connect: false`); the reference fast-connects natively on cold start with an empty `client_state`.
+- [x] IDENTIFY fast-connects natively on cold start (`is_fast_connect: true`, 2026-11-24), with the real `client_state` from the restored cache. Not yet seen on a device (Performance batch 2).
 - [ ] Refresh the phone list new accounts claim (`src/core/api/devices.ts`) as models age, and raise the SDK cap past 36 once Android 17 is common.
 - [ ] No analytics (`/science`) are sent; the reference sends many. Decide whether silence or fakes is the lesser signal.
 
@@ -714,10 +714,21 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
   - Measure whether `me.palmdevs.isocord.chat.rows.ChatRow` belongs in `compose-stability.conf`. Compose treats the `row: ChatRow` interface parameter as unstable.
   - Measure `js:notify:forward` with a busy server. If it's still hot, send channel and parent only when they change.
   - Measure the row memo on Hermes. Its map reads go through a Proxy, and the timings so far are from Bun/JSC.
-  - The row memo keeps a row and JSON line per built message, and the messages store never evicts. Evict both with the message once history is capped.
   - Cache parts compare by identity. A store that mutates a cached object in place isn't rewritten until something else in that part changes.
   - Parts written before a skipped or outdated cache stay on disk until the same key is written again.
   - Move `readFlags` and the channel row builders out of the store import chain, so `bun test` can cover them.
+- [ ] Performance batch 2 (2026-11-24). Not yet seen working on a device.
+  - Fast connect: compare logcat `IsocordFastConnect` "HELLO received" with Debug Logs "HELLO handled" to measure the wait for the JS thread. Check that READY still comes back partial.
+  - The session's slice hook restores every deferred store before HELLO is handled (about 160 ms). Fast connect hides it on cold start, but a JS IDENTIFY still waits for it.
+  - Presences are written in place. Check that status dots update live in DMs, the member list, profiles and the tab bar. A selector that returns the whole `presences` map would never re-render.
+  - users, members, readStates and memberList still copy their whole map per changing event. On JSC: users about 2 ms at 20k, members about 0.8 ms for a 10k-member guild, lastMessageIds about 0.1 ms at 2k channels. Revisit with device numbers.
+  - Gateway logs record only payloads over 100 KB, so there are no per-event rates for `PRESENCE_UPDATE` or `MESSAGE_CREATE`.
+  - Chats load 25 messages per page with no page-2 prefetch, and a chat at the bottom keeps at most 100 (`MAX_LOADED_MESSAGES`). Check that the list holds its position when the oldest rows are trimmed, and how soon page 2 arrives on scroll.
+  - Trimmed messages are refetched from the network. The reference keeps up to 125 in ChannelMessages `_before` (`MAX_MESSAGE_CACHE_SIZE`) and reloads them with `loadFromCache`.
+  - Scrolling far up grows a chat without a cap until a new message arrives at the bottom. The reference does the same on mobile.
+  - A jump's `hasMoreAfter` skips the reference's check that the page's newest message is the channel's `lastMessageId`.
+  - Row changesets to native were measured and skipped. With the cap, a rebuild costs under 1 ms of JS and a rows string of about 45 KiB (Bun/JSC).
+  - `PAGE_RETRY = 5.seconds` in ChatListEffects.kt duplicates `FAILURE_BACKOFF_MS = 5000` in messageWindows.ts. Keep it in Kotlin and read it through `getConstants()`.
 
 ## Cleanup
 
