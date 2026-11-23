@@ -1,4 +1,6 @@
+import { ChannelType } from '../../../core/discord/channelType'
 import { logger } from '../../../core/log'
+import { channelsStore } from '../../../stores/channels/channels'
 import { unparseMessage } from './parsing/parse'
 import { parseContext } from './parsing/parseContext'
 import { useComposerSlots } from './parsing/slots'
@@ -97,7 +99,13 @@ function messageApi({ session, input, drafts, channelId }: ApiParts) {
                 message && {
                     messageId: message.id,
                     authorId: message.author.id,
-                    shouldMention: options?.mention ?? true,
+                    // Replies in 1-to-1 DMs and to your own messages don't ping by default.
+                    shouldMention:
+                        options?.mention ??
+                        (message.author.id !== session.userId &&
+                            session.get(channelsStore).getState().channels[
+                                channelId
+                            ]?.type !== ChannelType.DM),
                 },
             )
             if (message) input.focus()
