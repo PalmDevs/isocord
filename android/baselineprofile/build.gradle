@@ -1,0 +1,31 @@
+apply plugin: "com.android.test"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "androidx.baselineprofile"
+
+// Generates the app's baseline and startup profiles on a connected device (BaselineProfileGenerator).
+android {
+    namespace "me.palmdevs.isocord.baselineprofile"
+    compileSdk = rootProject.ext.compileSdkVersion
+    // React Native aligns only app and library modules on Java 17. Kotlin is already on 17.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    defaultConfig {
+        // Profile collection needs Android 9 without root.
+        minSdkVersion 28
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    targetProjectPath = ":app"
+}
+
+baselineProfile {
+    useConnectedDevices = true
+}
+
+dependencies {
+    implementation "androidx.test.ext:junit:1.2.1"
+    implementation "androidx.test.uiautomator:uiautomator:2.3.0"
+    implementation "androidx.benchmark:benchmark-macro-junit4:1.4.1"
+}

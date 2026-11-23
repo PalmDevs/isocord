@@ -18,6 +18,8 @@ buildscript {
         // Jetpack Compose, used by the native chat list.
         classpath("org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlinVersion")
         classpath("org.jetbrains.kotlin:kotlin-serialization:$kotlinVersion")
+        // Baseline profile generation (:baselineprofile).
+        classpath("androidx.benchmark:benchmark-baseline-profile-gradle-plugin:1.4.1")
     }
 }
 
