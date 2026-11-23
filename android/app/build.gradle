@@ -93,6 +93,10 @@ android {
     }
 
     namespace "me.palmdevs.isocord"
+    // Font.Builder maps stored fonts in place. Deflated ones (Twemoji is 4.4 MB) are inflated into memory first.
+    androidResources {
+        noCompress "ttf"
+    }
     testOptions {
         unitTests.returnDefaultValues = true
     }

@@ -6,6 +6,11 @@ import android.graphics.fonts.Font
 import android.graphics.fonts.FontFamily
 import android.os.Build
 import com.facebook.react.common.assets.ReactFontManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * The app fonts with the bundled Twemoji font (scripts/fetch-twemoji.sh) as first fallback.
@@ -37,9 +42,19 @@ object TwemojiFonts {
     }
   }
 
-  /** Puts the React Native families in its font cache before any text is laid out. */
+  private var reactFonts: Job? = null
+
+  /** Starts putting the React Native families in its font cache, off the main thread. */
   fun registerReactFonts(assets: AssetManager) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-    for (name in REACT_FAMILIES) ReactFontManager.getInstance().setTypeface(name, Typeface.NORMAL, typeface(assets, name))
+    reactFonts = CoroutineScope(Dispatchers.IO).launch {
+      for (name in REACT_FAMILIES) ReactFontManager.getInstance().setTypeface(name, Typeface.NORMAL, typeface(assets, name))
+    }
+  }
+
+  /** Waits for [registerReactFonts]. Call before React Native can lay out text. */
+  fun awaitReactFonts() {
+    val job = reactFonts ?: return
+    runBlocking { job.join() }
   }
 }

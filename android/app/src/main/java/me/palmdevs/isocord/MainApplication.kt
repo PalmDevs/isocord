@@ -27,6 +27,8 @@ import me.palmdevs.isocord.upload.UploaderPackage
 class MainApplication : Application(), ReactApplication {
 
   override val reactHost: ReactHost by lazy {
+    // Every React Native text layout needs this host, so ReactFontManager has the fonts before any.
+    TwemojiFonts.awaitReactFonts()
     ExpoReactHostFactory.getDefaultReactHost(
       context = applicationContext,
       packageList =
