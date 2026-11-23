@@ -311,6 +311,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - Android 16 hosts the app's stacks in a child fragment so they receive Back progress ahead of ReactActivity.
 - [x] Check rounded predictive Back from both edges and with cancellation. On commit, the previous page finishes its slide using the full 450 ms Screens preset.
 - [x] Verify a quick predictive Back from Settings to You. The outgoing frame now stays visible until the commit fade ends.
+- [x] Verify opening another screen immediately after the Android Back gesture and the in-app Back button.
 - [x] Verify chat text, the You bio and the revealed page corners during predictive Back.
 - [x] Verify the sheet background reaches the bottom during predictive Back on both edges, including cancellation and dismissal.
 - [x] Verify profile roles draw to the bottom during predictive Back and the fixed-height dismissal slide.

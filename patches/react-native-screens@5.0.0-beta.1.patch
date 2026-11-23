@@ -496,7 +496,23 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
          fragmentManager = null
          parentContainerRegistry.detach(this)
          colorSchemeCoordinator.teardown()
-@@ -196,6 +205,10 @@
+@@ -188,14 +197,24 @@
+     }
+
+     internal fun enqueuePushOperation(item: StackContainerItem) {
+-        pendingPushOperations.add(PushOperation(item))
++        pendingPopOperations.removeAll { it.item === item }
++        if (stackModel.none { it.item === item } && pendingPushOperations.none { it.item === item }) {
++            pendingPushOperations.add(PushOperation(item))
++        }
+     }
+
+     internal fun enqueuePopOperation(item: StackContainerItem) {
+-        pendingPopOperations.add(PopOperation(item))
++        pendingPushOperations.removeAll { it.item === item }
++        if (stackModel.any { it.item === item } && pendingPopOperations.none { it.item === item }) {
++            pendingPopOperations.add(PopOperation(item))
++        }
      }
  
      private fun performOperations(fragmentManager: FragmentManager) {
@@ -507,7 +523,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
          applyOperationsAndComputeFragmentManagerOperations()
          fragmentOpExecutor.executeOperations(fragmentManager, fragmentOps, flushSync = false)
  
-@@ -285,6 +298,8 @@
+@@ -285,6 +304,8 @@
       * too: neither the commit nor the cancel (the record re-executed forward) resolves a transition.
       */
      private var transitionContext: StackTransitionContext? = null
@@ -516,7 +532,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  
      /**
       * A batch computed while an earlier one is still pending in FragmentManager executes together
-@@ -307,7 +322,31 @@
+@@ -307,7 +328,31 @@
                  modelBeforeBatch.contains(incoming) -> StackTransitionKind.POP
                  else -> StackTransitionKind.REPLACE
              }
@@ -549,7 +565,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
      }
  
      override fun transitionFor(
-@@ -409,13 +448,26 @@
+@@ -409,13 +454,26 @@
          // A JS push and pop executed together also gets here without a context, but FragmentManager
          // starts no transition for it, so this context is never read.
          if (pop && transitionContext == null && stackModel.size > 1) {
@@ -577,7 +593,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
      }
  
      // This is called before the special effects (animations) are dispatched, however mid transaction!
-@@ -436,6 +488,10 @@
+@@ -436,6 +494,10 @@
          // I avoid using `pop` parameter here, because transaction might not be classified as `pop`
          // and still include fragment removal operations.
          if (fragment.isRemoving) {
@@ -588,7 +604,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
              delegate.get()?.onItemDismissCommitted(fragment.item)
              if (stackModel.contains(fragment)) {
                  onNativeFragmentPop(fragment)
-@@ -519,6 +575,7 @@
+@@ -519,6 +581,7 @@
          // popBackStackImmediate. The synchronous pop makes the top-screen guard above
          // reliable against double taps: onBackStackChangeCommitted -> onNativeFragmentPop
          // updates stackModel before this call returns.
@@ -610,3 +626,77 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stac
              ) { "[RNScreens] StackScreen can't change its screenKey." }
              field = value
          }
+diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackHost.kt b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackHost.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackHost.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackHost.kt
+@@ -93,6 +93,10 @@
+     }
+
+     internal fun stackScreenChangedActivityMode(stackScreen: StackScreen) {
++        // A late React update can follow FragmentManager's native dismiss.
++        if (stackScreen.isNativelyDismissed) {
++            return
++        }
+         when (stackScreen.activityMode) {
+             StackScreen.ActivityMode.DETACHED -> containerUpdateCoordinator.addPopOperation(stackScreen)
+             StackScreen.ActivityMode.ATTACHED -> containerUpdateCoordinator.addPushOperation(stackScreen)
+diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackContainerUpdateCoordinator.kt b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackContainerUpdateCoordinator.kt
+--- a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackContainerUpdateCoordinator.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackContainerUpdateCoordinator.kt
+@@ -3,20 +3,20 @@
+ import com.swmansion.rnscreens.core.containers.stack.host.PopOperation
+ import com.swmansion.rnscreens.core.containers.stack.host.PushOperation
+ import com.swmansion.rnscreens.core.containers.stack.host.StackContainer
++import com.swmansion.rnscreens.core.containers.stack.host.StackOperation
+ import com.swmansion.rnscreens.core.containers.stack.screen.StackContainerItem
+
+ internal class StackContainerUpdateCoordinator {
+-    private val pendingPushOperations: MutableList<PushOperation> = arrayListOf()
+-    private val pendingPopOperations: MutableList<PopOperation> = arrayListOf()
+-    private val hasPendingOperations: Boolean
+-        get() = pendingPushOperations.isNotEmpty() || pendingPopOperations.isNotEmpty()
++    private val pendingOperations = linkedMapOf<StackContainerItem, StackOperation>()
+
+     internal fun addPushOperation(item: StackContainerItem) {
+-        pendingPushOperations.add(PushOperation(item))
++        pendingOperations.remove(item)
++        pendingOperations[item] = PushOperation(item)
+     }
+
+     internal fun addPopOperation(item: StackContainerItem) {
+-        pendingPopOperations.add(PopOperation(item))
++        pendingOperations.remove(item)
++        pendingOperations[item] = PopOperation(item)
+     }
+
+     /**
+@@ -27,22 +27,24 @@
+         container: StackContainer,
+         renderedItems: List<StackContainerItem>,
+     ) {
+-        if (!hasPendingOperations) {
++        if (pendingOperations.isEmpty()) {
+             return
+         }
+
+-        pendingPopOperations
++        // Use each item's final attachment state in the Fabric batch.
++        pendingOperations.values
++            .filterIsInstance<PopOperation>()
+             .map { Pair(renderedItems.indexOf(it.item), it) }
+             .sortedBy { it.first }
+             .asReversed()
+             .forEach { (_, operation) -> container.enqueuePopOperation(operation.item) }
+
+-        pendingPushOperations
++        pendingOperations.values
++            .filterIsInstance<PushOperation>()
+             .map { Pair(renderedItems.indexOf(it.item), it) }
+             .sortedBy { it.first }
+             .forEach { (_, operation) -> container.enqueuePushOperation(operation.item) }
+
+-        pendingPopOperations.clear()
+-        pendingPushOperations.clear()
++        pendingOperations.clear()
+     }
+ }
