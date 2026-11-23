@@ -16,7 +16,7 @@ import { ChannelList, ChannelListSkeleton } from './ChannelList'
 import { GuildBanner, GuildHeader } from './GuildHeader'
 import { GuildsBar } from './GuildsBar'
 import { buildGuildList } from './guildList'
-import { serversUiStore } from './store'
+import { selectGuild, serversUiStore } from './store'
 import { useServersPanels } from './useServersPanels'
 
 // DIAG: stuck Servers chat panel. Remove once found.
@@ -75,7 +75,7 @@ export function ServersTab() {
             if (selected && session.gateway.state !== 'connected')
                 return setFallbackId(firstId)
             setFallbackId(undefined)
-            session.get(serversUiStore).setState({ selectedGuildId: firstId })
+            selectGuild(session, firstId)
         }
         resolve()
         const offState = session.gateway.events.on('state', resolve)

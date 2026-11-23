@@ -21,7 +21,7 @@ import { readStatesStore } from '../../stores/readStates'
 import { useFolderColors } from './guildsBarColors'
 import { styles } from './guildsBarStyles'
 import { RowsContext } from './rowsContext'
-import { serversUiStore } from './store'
+import { selectGuild, serversUiStore } from './store'
 import type { GuildBarRow, GuildFolderItem } from './guildList'
 
 /** GuildIconSizes.XXSMALL, the mini icons in a closed folder. */
@@ -65,11 +65,7 @@ function GuildItem({
             accessibilityRole="button"
             accessibilityLabel={guild.name}
             accessibilityState={{ selected }}
-            onPress={() =>
-                session
-                    .get(serversUiStore)
-                    .setState({ selectedGuildId: guildId })
-            }
+            onPress={() => selectGuild(session, guildId)}
             style={[styles.item, hidden && styles.hidden]}
         >
             {(selected || badge?.unread) && (
