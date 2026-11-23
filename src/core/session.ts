@@ -275,8 +275,12 @@ export class Session {
         return this.notify.view(this.get(definition))
     }
 
-    /** Restores the deferred stores in idle time. Call after the first commit. */
-    restoreWhenIdle(): void {
+    /**
+     * Starts the work kept off the first frame: hands IDENTIFY to native code and restores the
+     * deferred stores in idle time. Call after the first commit.
+     */
+    afterFirstCommit(): void {
+        this.gateway.prepareIdentify()
         this.cache.restoreWhenIdle()
     }
 

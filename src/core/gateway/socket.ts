@@ -9,6 +9,7 @@ import {
 } from '../constants'
 import { Emitter } from '../events'
 import { logger } from '../log'
+import { isRecording, recordSpan } from '../trace'
 import { CloseCode, Opcode } from './opcodes'
 import { buildQosToken } from './qos'
 import type { ClientIdentity } from '../api/identity'
@@ -160,6 +161,10 @@ export class GatewaySocket {
     private drainTimer: ReturnType<typeof setTimeout> | null = null
     /** The socket whose zstd frames native code decompresses, or null when compression is off. */
     private socketId: number | null = null
+    /** `performance.now()` when the current socket was created. */
+    private openedAt = 0
+    /** Native code sends this socket's IDENTIFY (FastConnect `state.identify`), so HELLO must not. */
+    private preIdentified = false
     /** In the background with `pauseInBackground` on: closed, the session kept to resume. */
     private paused = false
     /**
@@ -239,6 +244,8 @@ export class GatewaySocket {
             },
         )
         this.ws = ws
+        this.openedAt = performance.now()
+        this.preIdentified = false
         // The frames are decompressed on the socket's reader thread and reach JS as text, so JS only parses them.
         if (supportsZstd) {
             this.socketId = (ws as WebSocket & { _socketId: number })._socketId
@@ -344,9 +351,14 @@ export class GatewaySocket {
     private handlePayload(payload: GatewayPayload): void {
         switch (payload.op) {
             case Opcode.HELLO:
+                this.logHello()
                 this.startHeartbeat(payload.d.heartbeat_interval)
                 if (this.sessionId) this.resume()
-                else this.identify()
+                else if (this.preIdentified) {
+                    // GatewaySocket `_doFastConnectIdentify`: native code already sent IDENTIFY.
+                    this.seq = 0
+                    this.setState('identifying')
+                } else this.identify()
                 break
             case Opcode.DISPATCH:
                 this.seq = payload.s
@@ -383,9 +395,49 @@ export class GatewaySocket {
         this.events.emit('raw', { type: frame.t, data: frame.d })
     }
 
+    /**
+     * Hands this socket's IDENTIFY to native code, which sends it on HELLO (fast_connect `identifyWebSocket`).
+     * Only before the first HELLO of a new session. RESUME and reconnects stay in JS.
+     */
+    prepareIdentify(): void {
+        if (
+            this.preIdentified ||
+            this.sessionId ||
+            this.socketId === null ||
+            this.state !== 'connecting'
+        )
+            return
+        this.preIdentified = compression.prepareIdentify(
+            this.socketId,
+            JSON.stringify({
+                op: Opcode.IDENTIFY,
+                d: this.identifyPayload(true),
+            }),
+        )
+        log.info(`IDENTIFY prepared for native code: ${this.preIdentified}`)
+    }
+
+    /** Logs how long HELLO took since opening. Network plus any wait for the JS thread. */
+    private logHello(): void {
+        const waited = performance.now() - this.openedAt
+        log.info(`HELLO handled ${Math.round(waited)} ms after opening`)
+        if (isRecording())
+            recordSpan({
+                name: 'gateway:hello handled',
+                start: this.openedAt,
+                duration: waited,
+                thread: 'js',
+            })
+    }
+
     private identify(): void {
         this.seq = 0
         this.setState('identifying')
+        this.send(Opcode.IDENTIFY, this.identifyPayload(false))
+    }
+
+    /** Returns IDENTIFY's `d`, with `client_state` as the stores are now. */
+    private identifyPayload(isFastConnect: boolean) {
         const clientState = this.getClientState()
         log.debug(
             `client_state: ${Object.keys(clientState.guild_versions).length} guild versions, ` +
@@ -397,12 +449,12 @@ export class GatewaySocket {
         // GatewaySocketSingleton `handleIdentify` and GatewaySocket's IDENTIFY, in their key order. The
         // installation id is left out: the reference sends it only with analytics consent.
         const active = AppState.currentState === 'active'
-        this.send(Opcode.IDENTIFY, {
+        return {
             token: this.token,
             capabilities: GATEWAY_CAPABILITIES,
             properties: {
                 ...this.identity.superProperties(),
-                is_fast_connect: false,
+                is_fast_connect: isFastConnect,
                 gateway_connect_reasons: connectionReasons(),
             },
             presence: {
@@ -415,7 +467,7 @@ export class GatewaySocket {
             compress: false,
             client_state: clientState,
             qos_token: buildQosToken(this.getDerivedQos(), active),
-        })
+        }
     }
 
     private resume(): void {
