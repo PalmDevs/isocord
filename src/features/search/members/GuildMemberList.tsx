@@ -1,6 +1,5 @@
 import { FlashList } from '@shopify/flash-list'
 import { useEffect } from 'react'
-import { useWindowDimensions } from 'react-native'
 import { useSession, useSessionStore } from '../../../core/react'
 import { t } from '../../../i18n'
 import { channelsStore } from '../../../stores/channels/channels'
@@ -16,6 +15,7 @@ import {
     subscribeMemberList,
 } from '../../../stores/memberList'
 import { MemberListLoading } from './MemberListLoading'
+import { MemberPlaceholders } from './MemberPlaceholders'
 import {
     MemberPlaceholderRow,
     MemberRow,
@@ -41,7 +41,6 @@ export function GuildMemberList({
     guildId: string
 }) {
     const session = useSession()
-    const { height: windowHeight } = useWindowDimensions()
     const listChannel = useSessionStore(channelsStore, state =>
         memberListChannel(state.channels, channelId),
     )
@@ -99,54 +98,56 @@ export function GuildMemberList({
               : (guild?.roles[id]?.name ?? '')
 
     return (
-        <FlashList
-            key="rows"
-            data={rows}
-            drawDistance={windowHeight}
-            reserveDrawDistanceForReversal
-            keyExtractor={(_, index) => String(index)}
-            getItemType={(row, index) =>
-                headers[index]
-                    ? 'group'
-                    : row?.type === 'member'
-                      ? 'member'
-                      : 'placeholder'
-            }
-            // Discard idle cells once they leave the render window.
-            maxItemsInRecyclePool={0}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.content}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={VIEWABILITY}
-            renderItem={({ item: row, index }) => {
-                const header = headers[index]
-                if (header)
-                    // A group without members shows nothing (GuildChannelUserList hides it).
-                    return header.count === 0 ? null : (
-                        <MemberSectionHeader
-                            title={`${titleOf(header.id)} — ${header.count}`}
-                        />
-                    )
-                if (row?.type !== 'member')
+        <MemberPlaceholders>
+            <FlashList
+                key="rows"
+                data={rows}
+                // The default draw distance. Native placeholders cover rows not mounted yet.
+                reserveDrawDistanceForReversal
+                keyExtractor={(_, index) => String(index)}
+                getItemType={(row, index) =>
+                    headers[index]
+                        ? 'group'
+                        : row?.type === 'member'
+                          ? 'member'
+                          : 'placeholder'
+                }
+                // Discard idle cells once they leave the render window.
+                maxItemsInRecyclePool={0}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.content}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={VIEWABILITY}
+                renderItem={({ item: row, index }) => {
+                    const header = headers[index]
+                    if (header)
+                        // A group without members shows nothing (GuildChannelUserList hides it).
+                        return header.count === 0 ? null : (
+                            <MemberSectionHeader
+                                title={`${titleOf(header.id)} — ${header.count}`}
+                            />
+                        )
+                    if (row?.type !== 'member')
+                        return (
+                            <MemberPlaceholderRow
+                                animate={false}
+                                start={edge(index - 1)}
+                                end={edge(index + 1)}
+                            />
+                        )
                     return (
-                        <MemberPlaceholderRow
-                            animate={false}
+                        <MemberRow
+                            userId={row.userId}
+                            guildId={guildId}
+                            ownerId={guild?.ownerId}
+                            offline={index >= offline[0] && index <= offline[1]}
                             start={edge(index - 1)}
                             end={edge(index + 1)}
                         />
                     )
-                return (
-                    <MemberRow
-                        userId={row.userId}
-                        guildId={guildId}
-                        ownerId={guild?.ownerId}
-                        offline={index >= offline[0] && index <= offline[1]}
-                        start={edge(index - 1)}
-                        end={edge(index + 1)}
-                    />
-                )
-            }}
-        />
+                }}
+            />
+        </MemberPlaceholders>
     )
 }
 

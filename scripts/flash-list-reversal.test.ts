@@ -92,7 +92,6 @@ test('FlashList keeps the projected lead by default during a sustained fling', (
 
 test('The guild buffer covers a short scroll before the next render', () => {
     const tracker = new RVEngagedIndicesTrackerImpl()
-    tracker.drawDistance = VIEWPORT.height
     tracker.reserveDrawDistanceForReversal = true
     tracker.updateScrollOffset(MID_LIST_OFFSET, undefined, layout)
 

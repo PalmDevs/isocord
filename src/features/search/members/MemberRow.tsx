@@ -18,8 +18,10 @@ import { hexColor } from '../../chat/color'
 import { openUserProfile } from '../../chat/headerActions'
 import { activityLine } from './activityLine'
 
-const AVATAR_SIZE = 32
+export const MEMBER_AVATAR_SIZE = 32
 export const MEMBER_PLACEHOLDER_ROW_HEIGHT = 56
+/** The name bar of a placeholder row. MemberPlaceholders draws the same bar natively. */
+export const PLACEHOLDER_LABEL = { height: 14, radius: 4, widthRatio: 0.45 }
 
 export interface MemberRowProps {
     userId: string
@@ -76,7 +78,7 @@ export const MemberRow = memo(function MemberRow({
             icon={
                 <StatusAvatar
                     user={user}
-                    size={AVATAR_SIZE}
+                    size={MEMBER_AVATAR_SIZE}
                     status={status === 'offline' ? undefined : status}
                     mobile={!offline && presence?.mobile}
                     streaming={!offline && presence?.streaming}
@@ -133,12 +135,16 @@ export function MemberPlaceholderRow({
         >
             <Content style={styles.placeholderContent}>
                 <Skeleton
-                    width={AVATAR_SIZE}
-                    height={AVATAR_SIZE}
-                    radius={AVATAR_SIZE / 2}
+                    width={MEMBER_AVATAR_SIZE}
+                    height={MEMBER_AVATAR_SIZE}
+                    radius={MEMBER_AVATAR_SIZE / 2}
                 />
                 <View style={styles.placeholderLines}>
-                    <Skeleton width="45%" height={14} radius={4} />
+                    <Skeleton
+                        width={`${PLACEHOLDER_LABEL.widthRatio * 100}%`}
+                        height={PLACEHOLDER_LABEL.height}
+                        radius={PLACEHOLDER_LABEL.radius}
+                    />
                 </View>
             </Content>
         </View>

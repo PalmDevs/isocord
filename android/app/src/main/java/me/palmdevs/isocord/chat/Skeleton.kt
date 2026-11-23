@@ -44,7 +44,7 @@ private val LINE_GAP = 12.dp
 private const val ROWS = 12
 
 /** Deterministic stand-in for the reference's Math.random(): a fraction in [0, 1) from a seed. */
-private fun fraction(seed: Int): Float {
+internal fun fraction(seed: Int): Float {
   val x = 10000.0 * sin(seed.toDouble())
   return (x - floor(x)).toFloat()
 }

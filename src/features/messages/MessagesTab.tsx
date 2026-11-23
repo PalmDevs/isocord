@@ -13,6 +13,7 @@ import { MINUTE } from '../../core/time'
 import { StatusAvatar } from '../../design/components/avatars/StatusAvatar'
 import { Badge } from '../../design/components/Badge'
 import { Ellipsis } from '../../design/components/Ellipsis'
+import { ListPlaceholders } from '../../design/components/ListPlaceholders'
 import { Skeleton, SkeletonPulse } from '../../design/components/Skeleton'
 import {
     skeletonKeys,
@@ -41,8 +42,16 @@ import { useDm } from './useDm'
 import { useMessagesPanels } from './useMessagesPanels'
 import { useMinute } from './useMinute'
 import type { FlashListRef } from '@shopify/flash-list'
+import type { ComponentProps } from 'react'
 
 const AVATAR_SIZE = 40
+/** UserPlaceholderRow: the avatar's corners and the name bar. */
+const SKELETON_AVATAR_RADIUS = 16
+const SKELETON_LABEL_HEIGHT = 20
+const SKELETON_LABEL_RADIUS = 8
+const SKELETON_LABEL_WIDTH = { min: 40, max: 80 }
+/** A conversation row without a preview line (styles.row). */
+const ROW_MIN_HEIGHT = 56
 
 /** Compact age of the last message, as shown at the end of a conversation row. */
 function relativeTime(timestamp: number, now: number): string {
@@ -204,17 +213,56 @@ function ConversationSkeleton() {
                     <Skeleton
                         width={AVATAR_SIZE}
                         height={AVATAR_SIZE}
-                        radius={16}
+                        radius={SKELETON_AVATAR_RADIUS}
                     />
                     <View style={styles.label}>
                         <Skeleton
-                            width={skeletonWidth(index + 1, 40, 80)}
-                            height={20}
+                            width={skeletonWidth(
+                                index + 1,
+                                SKELETON_LABEL_WIDTH.min,
+                                SKELETON_LABEL_WIDTH.max,
+                            )}
+                            height={SKELETON_LABEL_HEIGHT}
+                            radius={SKELETON_LABEL_RADIUS}
                         />
                     </View>
                 </View>
             ))}
         </SkeletonPulse>
+    )
+}
+
+/**
+ * MessagesFastestList's placeholderConfig (a FEED_ITEM sectionItem), drawn as ConversationSkeleton: static rows where
+ * the list has not rendered one yet.
+ */
+function ConversationPlaceholders({
+    children,
+}: Omit<ComponentProps<typeof ListPlaceholders>, 'config'>) {
+    const { theme } = useUnistyles()
+    return (
+        <ListPlaceholders
+            config={{
+                shapeColor: theme.colors.BORDER_SUBTLE,
+                rowHeight: ROW_MIN_HEIGHT,
+                sideInset: 0,
+                // styles.content's paddingBottom.
+                endInset: theme.space.PX_24,
+                rowPaddingStart: theme.space.PX_16,
+                labelGap:
+                    theme.modules.mobile
+                        .MESSAGES_ITEM_CHANNEL_AVATAR_MARGIN_END,
+                rowPaddingEnd: theme.space.PX_16 + theme.space.PX_8,
+                avatarSize: AVATAR_SIZE,
+                avatarRadius: SKELETON_AVATAR_RADIUS,
+                labelHeight: SKELETON_LABEL_HEIGHT,
+                labelRadius: SKELETON_LABEL_RADIUS,
+                labelWidthMin: SKELETON_LABEL_WIDTH.min / 100,
+                labelWidthMax: SKELETON_LABEL_WIDTH.max / 100,
+            }}
+        >
+            {children}
+        </ListPlaceholders>
     )
 }
 
@@ -308,24 +356,28 @@ export function MessagesTab() {
                 </Text>
             </Pressable>
             <View style={styles.listContainer}>
-                <FlashList
-                    ref={listRef}
-                    data={ids}
-                    renderItem={renderItem}
-                    keyExtractor={id => id}
-                    contentContainerStyle={styles.content}
-                    onViewableItemsChanged={unreadBars.onViewableItemsChanged}
-                    viewabilityConfig={unreadBars.viewabilityConfig}
-                    ListEmptyComponent={
-                        ready ? (
-                            <Text color="TEXT_MUTED" style={styles.empty}>
-                                {t('messages.empty')}
-                            </Text>
-                        ) : (
-                            <ConversationSkeleton />
-                        )
-                    }
-                />
+                <ConversationPlaceholders>
+                    <FlashList
+                        ref={listRef}
+                        data={ids}
+                        renderItem={renderItem}
+                        keyExtractor={id => id}
+                        contentContainerStyle={styles.content}
+                        onViewableItemsChanged={
+                            unreadBars.onViewableItemsChanged
+                        }
+                        viewabilityConfig={unreadBars.viewabilityConfig}
+                        ListEmptyComponent={
+                            ready ? (
+                                <Text color="TEXT_MUTED" style={styles.empty}>
+                                    {t('messages.empty')}
+                                </Text>
+                            ) : (
+                                <ConversationSkeleton />
+                            )
+                        }
+                    />
+                </ConversationPlaceholders>
                 <UnreadBar
                     position="top"
                     mention={unreadBars.target?.row.mention === true}
@@ -408,7 +460,7 @@ const styles = StyleSheet.create((theme, runtime) => ({
         alignItems: 'center',
         paddingHorizontal: theme.space.PX_16,
         paddingVertical: theme.space.PX_8,
-        minHeight: 56,
+        minHeight: ROW_MIN_HEIGHT,
     },
     ripple: { color: theme.colors.MOBILE_ANDROID_BUTTON_BACKGROUND_RIPPLE },
     label: {

@@ -20,5 +20,6 @@ class ChatPackage : ReactPackage {
       ProxyImageViewManager(),
       me.palmdevs.isocord.expressions.ExpressionGridViewManager(),
       me.palmdevs.isocord.expressions.gifs.GifGridViewManager(),
+      ListPlaceholdersViewManager(),
     )
 }
