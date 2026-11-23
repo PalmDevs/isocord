@@ -9,6 +9,13 @@ import { AlertPile } from '../modals/AlertPile'
 import { dismissTopAlert, useAlertStore } from '../modals/alertStore'
 import { SheetLayer } from '../sheets/SheetLayer'
 import { hideActionSheet, useSheetStore } from '../sheets/sheetStore'
+import {
+    closeLayerPopover,
+    PopoverBackground,
+    PopoverLayer,
+} from './PopoverLayer'
+import type { ReactNode } from 'react'
+import type { StyleProp, ViewStyle } from 'react-native'
 import type { AlertEntry } from '../modals/alertStore'
 import type { SheetEntry } from '../sheets/sheetStore'
 
@@ -41,6 +48,7 @@ function stackLayers(sheets: SheetEntry[], alerts: AlertEntry[]): ModalLayer[] {
  * the front sheet animates out.
  */
 function closeFrontModal(): boolean {
+    if (closeLayerPopover()) return true
     const alert = useAlertStore.getState().alerts[0]
     const sheet = useSheetStore.getState().sheets.at(-1)
     if (sheet && (!alert || sheet.order > alert.order)) {
@@ -67,9 +75,21 @@ export function useNativeDismissGuard(enabled: boolean, close: () => void) {
     })
 }
 
-export function ModalDismissGuard() {
+/** AccessibilityView: keeps the navigator out of TalkBack while an alert is open. */
+export function ModalScreen({
+    children,
+    style,
+}: {
+    children: ReactNode
+    style: StyleProp<ViewStyle>
+}) {
     useNativeDismissGuard(useModalOpen(), closeFrontModal)
-    return null
+    const alertOpen = useAlertStore(state => state.alerts.length > 0)
+    return (
+        <PopoverBackground accessibilityHidden={alertOpen} style={style}>
+            {children}
+        </PopoverBackground>
+    )
 }
 
 /**
@@ -94,23 +114,26 @@ export function ModalStack() {
 
     return (
         <View pointerEvents="box-none" style={NativeStyleSheet.absoluteFill}>
-            {layers.map((layer, index) => {
-                const front = index === layers.length - 1
-                return layer.kind === 'sheet' ? (
-                    <SheetLayer
-                        key={layer.sheet.key}
-                        sheet={layer.sheet}
-                        front={front}
-                    />
-                ) : (
-                    // Keyed by the back-most alert, which stays while the pile grows.
-                    <AlertPile
-                        key={layer.alerts.at(-1)?.key}
-                        alerts={layer.alerts}
-                        front={front}
-                    />
-                )
-            })}
+            <PopoverBackground style={NativeStyleSheet.absoluteFill}>
+                {layers.map((layer, index) => {
+                    const front = index === layers.length - 1
+                    return layer.kind === 'sheet' ? (
+                        <SheetLayer
+                            key={layer.sheet.key}
+                            sheet={layer.sheet}
+                            front={front}
+                        />
+                    ) : (
+                        // Keyed by the back-most alert, which stays while the pile grows.
+                        <AlertPile
+                            key={layer.alerts.at(-1)?.key}
+                            alerts={layer.alerts}
+                            front={front}
+                        />
+                    )
+                })}
+            </PopoverBackground>
+            <PopoverLayer />
         </View>
     )
 }

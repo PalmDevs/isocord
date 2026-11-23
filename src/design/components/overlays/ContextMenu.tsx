@@ -5,6 +5,7 @@ import { Icon } from '../../icons/Icon'
 import { useSurfaceColor } from '../../surfaceTint'
 import { ButtonThemeContext } from '../buttons/buttonTheme'
 import { dismissKeyboard } from '../keyboard'
+import { NOOP, SheetContext } from '../sheets/sheetContext'
 import { Text } from '../Text'
 import { AnchoredPopover } from './Popover'
 import { useAnchor, usePopoverClose } from './popoverHooks'
@@ -112,6 +113,7 @@ export function ContextMenu({
     theme,
     buttonTheme,
 }: ContextMenuProps) {
+    const inSheet = useContext(SheetContext).close !== NOOP
     const { ref, anchor, open, clear } = useAnchor()
     const { capture, resolvedTheme, resolvedButtonTheme } = useMenuTheme(
         theme,
@@ -141,6 +143,7 @@ export function ContextMenu({
             {anchor && (
                 <AnchoredPopover
                     dim
+                    inSheet={inSheet}
                     anchor={anchor}
                     align={align}
                     minWidth={MIN_WIDTH}

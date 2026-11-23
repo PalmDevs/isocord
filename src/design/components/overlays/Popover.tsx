@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
     Modal,
     StyleSheet as NativeStyleSheet,
+    Platform,
     Pressable,
     useWindowDimensions,
 } from 'react-native'
@@ -15,7 +16,9 @@ import { StyleSheet } from 'react-native-unistyles'
 import { scheduleOnRN } from 'react-native-worklets'
 import { t } from '../../../i18n'
 import { CONTEXT_MENU_SPRING } from '../../tokens/motion'
+import { LayerPopover } from './PopoverLayer'
 import { PopoverContext } from './popoverHooks'
+import { ScopedThemeScope, useScopedTheme } from './scopedTheme'
 import type { ReactNode } from 'react'
 import type { StyleProp, ViewStyle } from 'react-native'
 import type { AnchorRect } from './popoverHooks'
@@ -84,6 +87,8 @@ export interface AnchoredPopoverProps {
     minWidth?: number
     /** Dim the screen behind the popover (the context menu backdrop). */
     dim?: boolean
+    /** Draws above the sheet stack within the activity window on Android. */
+    inSheet?: boolean
     /** Called once the exit animation has finished. Clear the anchor here. */
     onClose: () => void
     children?: ReactNode
@@ -99,11 +104,13 @@ export function AnchoredPopover({
     align = 'auto',
     minWidth = 220,
     dim = false,
+    inSheet = false,
     onClose,
     children,
     style,
 }: AnchoredPopoverProps) {
     const screen = useWindowDimensions()
+    const enclosingTheme = useScopedTheme()
     const reducedMotion = useReducedMotion()
     const progress = useSharedValue(0)
     const closing = useRef(false)
@@ -115,7 +122,8 @@ export function AnchoredPopover({
     const placed = placement !== null
 
     useEffect(() => {
-        if (placed) progress.set(withSpring(1, CONTEXT_MENU_SPRING))
+        if (placed && !closing.current)
+            progress.set(withSpring(1, CONTEXT_MENU_SPRING))
     }, [placed, progress])
 
     const close = (then?: () => void) => {
@@ -144,6 +152,52 @@ export function AnchoredPopover({
     })
     const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.get() }))
 
+    const content = (
+        <PopoverContext value={{ close }}>
+            {dim && (
+                <Animated.View
+                    pointerEvents="none"
+                    style={[styles.dim, backdropStyle]}
+                />
+            )}
+            <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
+                onPress={() => close()}
+                style={NativeStyleSheet.absoluteFill}
+            />
+            <Animated.View
+                accessibilityViewIsModal
+                onLayout={event => {
+                    const { width, height } = event.nativeEvent.layout
+                    setSize(previous =>
+                        previous?.width === width && previous.height === height
+                            ? previous
+                            : { width, height },
+                    )
+                }}
+                style={[
+                    styles.popover,
+                    placement?.style,
+                    { transformOrigin: placement?.origin ?? 'top left' },
+                    popoverStyle,
+                    style,
+                ]}
+            >
+                {children}
+            </Animated.View>
+        </PopoverContext>
+    )
+
+    if (Platform.OS === 'android' && inSheet) {
+        return (
+            <LayerPopover close={close}>
+                <ScopedThemeScope name={enclosingTheme} active={false}>
+                    {content}
+                </ScopedThemeScope>
+            </LayerPopover>
+        )
+    }
     return (
         <Modal
             visible
@@ -153,41 +207,7 @@ export function AnchoredPopover({
             navigationBarTranslucent
             onRequestClose={() => close()}
         >
-            <PopoverContext value={{ close }}>
-                {dim && (
-                    <Animated.View
-                        pointerEvents="none"
-                        style={[styles.dim, backdropStyle]}
-                    />
-                )}
-                <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t('common.close')}
-                    onPress={() => close()}
-                    style={NativeStyleSheet.absoluteFill}
-                />
-                <Animated.View
-                    accessibilityViewIsModal
-                    onLayout={event => {
-                        const { width, height } = event.nativeEvent.layout
-                        setSize(previous =>
-                            previous?.width === width &&
-                            previous.height === height
-                                ? previous
-                                : { width, height },
-                        )
-                    }}
-                    style={[
-                        styles.popover,
-                        placement?.style,
-                        { transformOrigin: placement?.origin ?? 'top left' },
-                        popoverStyle,
-                        style,
-                    ]}
-                >
-                    {children}
-                </Animated.View>
-            </PopoverContext>
+            {content}
         </Modal>
     )
 }

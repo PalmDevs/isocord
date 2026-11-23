@@ -23,8 +23,7 @@ import { logger } from '../core/log'
 import { startCurrentSession } from '../core/react'
 import { SessionProvider } from '../core/SessionProvider'
 import { hideSplashAfterFrame } from '../core/startup'
-import { ModalDismissGuard } from '../design/components/overlays/ModalStack'
-import { PopoverBackground } from '../design/components/overlays/PopoverLayer'
+import { ModalScreen } from '../design/components/overlays/ModalStack'
 import { usePanelBackEvents } from '../design/components/overlays/usePanelBackPreview'
 import { AuthNavigator } from '../features/auth/AuthNavigator'
 import { MainTabs } from '../features/main/MainTabs'
@@ -74,10 +73,7 @@ function AndroidBackHost({ children }: { children: ReactNode }) {
 let renderTraced: 'pending' | 'open' | 'done' = 'pending'
 
 const renderStackScreen = ({ children }: { children: ReactNode }) => (
-    <>
-        <ModalDismissGuard />
-        <PopoverBackground style={styles.screen}>{children}</PopoverBackground>
-    </>
+    <ModalScreen style={styles.screen}>{children}</ModalScreen>
 )
 
 export function App() {
