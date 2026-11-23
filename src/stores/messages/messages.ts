@@ -5,13 +5,14 @@ import {
     sameEmoji,
     withPollVote,
     withReactionAdded,
+    withReactionBatchAdded,
     withReactionRemoved,
 } from './reactionEdits'
 import type { Session } from '../../core/session'
 import type { Message } from '../readStates'
 import type { User } from '../users'
 import type { MessagesState, Reaction } from './messageTypes'
-import type { ReactionChange } from './reactionEdits'
+import type { DebouncedReaction, ReactionChange } from './reactionEdits'
 
 export type ReactionEvent = {
     channel_id: string
@@ -55,6 +56,11 @@ declare module '../../core/gateway/events' {
         MESSAGE_DELETE: { id: string; channel_id: string }
         MESSAGE_DELETE_BULK: { ids: string[]; channel_id: string }
         MESSAGE_REACTION_ADD: ReactionEvent
+        MESSAGE_REACTION_ADD_MANY: {
+            channel_id: string
+            message_id: string
+            reactions: DebouncedReaction[]
+        }
         MESSAGE_REACTION_REMOVE: ReactionEvent
         MESSAGE_REACTION_REMOVE_ALL: { channel_id: string; message_id: string }
         MESSAGE_REACTION_REMOVE_EMOJI: {
@@ -258,6 +264,15 @@ export const messagesStore = defineStore(
         dispatch.on('MESSAGE_REACTION_ADD', event =>
             editOne(event.channel_id, event.message_id, message =>
                 withReactionAdded(message, reactionChange(event)),
+            ),
+        )
+        dispatch.on('MESSAGE_REACTION_ADD_MANY', event =>
+            editOne(event.channel_id, event.message_id, message =>
+                withReactionBatchAdded(
+                    message,
+                    event.reactions,
+                    session.userId,
+                ),
             ),
         )
         dispatch.on('MESSAGE_REACTION_REMOVE_ALL', event =>

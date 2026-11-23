@@ -15,6 +15,7 @@ import { reactionChangeOf } from './messages/messages'
 import {
     sameEmoji,
     withReactionAdded,
+    withReactionBatchAdded,
     withReactionRemoved,
 } from './messages/reactionEdits'
 import { usersStore } from './users'
@@ -158,6 +159,11 @@ export const forumPostsStore = defineStore('forumPosts', session => {
     dispatch.on('MESSAGE_REACTION_ADD', event =>
         editFirst(event.channel_id, event.message_id, message =>
             withReactionAdded(message, reactionChangeOf(event, session.userId)),
+        ),
+    )
+    dispatch.on('MESSAGE_REACTION_ADD_MANY', event =>
+        editFirst(event.channel_id, event.message_id, message =>
+            withReactionBatchAdded(message, event.reactions, session.userId),
         ),
     )
     dispatch.on('MESSAGE_REACTION_REMOVE', event =>

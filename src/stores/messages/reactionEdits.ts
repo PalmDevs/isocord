@@ -14,6 +14,11 @@ export interface ReactionChange {
     index?: number
 }
 
+export interface DebouncedReaction {
+    emoji: Reaction['emoji']
+    users: string[]
+}
+
 export const sameEmoji = (a: Reaction['emoji'], b: Reaction['emoji']) =>
     a.id ? a.id === b.id : !b.id && a.name === b.name
 
@@ -92,6 +97,23 @@ export function withReactionAdded(
                 : reaction,
         ),
     }
+}
+
+/** Applies a batch of normal reactions, following MessageRecord.addReactionBatch. */
+export function withReactionBatchAdded(
+    message: Message,
+    reactions: DebouncedReaction[],
+    userId: string,
+): Message {
+    let updated = message
+    for (const { emoji, users } of reactions)
+        for (const user of users)
+            updated = withReactionAdded(updated, {
+                emoji,
+                burst: false,
+                mine: user === userId,
+            })
+    return updated
 }
 
 /** MESSAGE_REACTION_REMOVE. The echo of a reaction we already took back changes nothing. */
