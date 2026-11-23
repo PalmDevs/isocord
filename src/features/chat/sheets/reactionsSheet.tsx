@@ -46,8 +46,8 @@ const TABS_HEIGHT = 56
 const NAME_HEIGHT = 48
 /** Bottom padding BottomSheet gives a footer: the larger of the inset and 16, plus 4. */
 const MIN_BOTTOM_PADDING = 16 + 4
-/** Placeholder rows shown while a tab's first page loads. */
-const PLACEHOLDER_COUNT = 8
+/** Most placeholder rows shown while a tab's first page loads. */
+const MAX_PLACEHOLDERS = 8
 
 /** The `type` of the reactors request. */
 type ReactionKind = (typeof ReactionType)[keyof typeof ReactionType]
@@ -305,6 +305,8 @@ function ReactionsSheet({
     // The first page is not in yet: placeholder rows, as the members list shows (GuildMemberList).
     const firstPage = list.users.length === 0 && !list.failed && !list.done
     const hasMore = !list.done && list.users.length < selected.count
+    // One placeholder per reactor, up to what the list shows.
+    const placeholderCount = Math.min(selected.count, MAX_PLACEHOLDERS)
     const height = Math.round(windowHeight * HEIGHT_RATIO)
     const listHeight =
         height -
@@ -370,9 +372,9 @@ function ReactionsSheet({
                                 contentContainerStyle={styles.listContent}
                             >
                                 <MemberPlaceholderRows
-                                    count={PLACEHOLDER_COUNT}
+                                    count={placeholderCount}
                                 />
-                                {hasMore && (
+                                {selected.count > placeholderCount && (
                                     <ActivityIndicator style={styles.spinner} />
                                 )}
                             </ScrollView>

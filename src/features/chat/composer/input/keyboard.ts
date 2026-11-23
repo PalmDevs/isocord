@@ -3,7 +3,6 @@ import { BackHandler, Keyboard } from 'react-native'
 import { KeyboardEvents } from 'react-native-keyboard-controller'
 import { deviceStorage } from '../../../../core/storage'
 import { onDismissKeyboard } from '../../../../design/components/keyboard'
-import { Commands } from '../../../../native/ChatInputNativeComponent'
 import type { LocalStore } from '../state/ComposerContext'
 import type { ComposerInput } from './nativeInput'
 
@@ -75,15 +74,13 @@ export function useDismissal(store: LocalStore, input: ComposerInput): void {
                 panelTyping: false,
                 mediaRowOpen: false,
             })
-            input.run(native => Commands.blur(native))
+            input.blur()
             // A field of the panel (its search) may hold the keyboard instead.
             Keyboard.dismiss()
         }
         resetters.add(reset)
         // An overlay opening hides the keyboard: the native input loses focus, a custom panel stays.
-        const removeBlur = onDismissKeyboard(() =>
-            input.run(native => Commands.blur(native)),
-        )
+        const removeBlur = onDismissKeyboard(input.blur)
         return () => {
             resetters.delete(reset)
             removeBlur()

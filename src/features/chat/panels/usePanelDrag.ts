@@ -22,7 +22,7 @@ const DETAILS_CLOSE_EDGE = 24
 /** Whether a released drag leaves the panel open: by fling direction, else by which half it is in. */
 function shouldShow(
     event: { velocityX: number; canceled?: boolean },
-    x: SharedValue<number>,
+    x: number,
     width: number,
     whenCanceled: boolean,
 ) {
@@ -30,7 +30,7 @@ function shouldShow(
     if (event.canceled) return whenCanceled
     if (Math.abs(event.velocityX) > PANEL_MIN_FLING_VELOCITY)
         return event.velocityX < 0
-    return x.get() < width / 2
+    return x < width / 2
 }
 
 /** Slides a released panel to its end and tells React whether it is shown. */
@@ -57,6 +57,7 @@ export function usePanelDrag({
     width,
     enabled,
     detailsOnSwipe,
+    dragging,
     chat,
     details,
     stack,
@@ -66,14 +67,22 @@ export function usePanelDrag({
     /** The tab is on screen and has a channel. */
     enabled: boolean
     detailsOnSwipe: boolean
+    dragging: SharedValue<boolean>
     chat: ChatPanelState
     details: DetailsPanel
     stack: StackedChat
     create: ThreadCreation
 }) {
     // Destructured: a worklet must capture these one by one, not the hook results that hold state.
-    const { x: translateX, open, setShown: setOpen } = chat
-    const { channelId, builtChannelId, setBuiltChannelId } = chat
+    const {
+        x: translateX,
+        open,
+        drawn,
+        channelId,
+        setShown: setOpen,
+        waitingForRows,
+        openFromSwipe,
+    } = chat
     const { x: detailsX, setShown: setDetailsShown } = details
     const { closed: detailsClosed } = details
     const { x: stackX, setShown: setStackShown, closed: stackClosed } = stack
@@ -82,13 +91,12 @@ export function usePanelDrag({
         setShown: setCreateShown,
         closed: createClosed,
     } = create
-    const dragging = useSharedValue(false)
     // What a drag moves, decided when it starts: the chat panel, the stacked chat over it, or the details.
     const dragsDetails = useSharedValue(false)
     const dragsStack = useSharedValue(false)
     const dragsCreate = useSharedValue(false)
     const pan = usePanGesture({
-        enabled: enabled && !details.open,
+        enabled: enabled && !details.open && !waitingForRows,
         activeOffsetX: [
             open && !detailsOnSwipe ? -width : -PANEL_TOUCH_SLOP,
             PANEL_TOUCH_SLOP,
@@ -108,9 +116,6 @@ export function usePanelDrag({
                     !dragsCreate.get() &&
                     stackX.get() < width,
             )
-            // A swipe toward a closed chat builds the selected channel now instead of waiting for idle.
-            if (translateX.get() === width && channelId !== builtChannelId)
-                scheduleOnRN(setBuiltChannelId, channelId)
         },
         onFinalize: () => {
             dragging.set(false)
@@ -123,16 +128,16 @@ export function usePanelDrag({
                   : dragsStack.get()
                     ? stackX
                     : translateX
-            target.set(
-                Math.max(0, Math.min(width, target.get() + event.changeX)),
-            )
+            const position = target.get()
+            // MainTabsChannelScreenStack: drag the frame while content loads.
+            target.set(Math.max(0, Math.min(width, position + event.changeX)))
         },
         onDeactivate: event => {
             // A canceled drag: the system took the touch (its back gesture starts at the screen edge), so put the
             // panel back where it was. Committing here closed the chat and its composer, so the back event that
             // follows found no handler left and left the app.
             if (dragsDetails.get()) {
-                const show = shouldShow(event, detailsX, width, false)
+                const show = shouldShow(event, detailsX.get(), width, false)
                 // Blurs the native input and closes its panels once the drag commits. A module-level
                 // function: objects captured by the worklet (Keyboard, the composer) do not reach the UI runtime.
                 if (show) scheduleOnRN(dismissComposers)
@@ -140,18 +145,22 @@ export function usePanelDrag({
                 return
             }
             if (dragsCreate.get()) {
-                const show = shouldShow(event, createX, width, true)
+                const show = shouldShow(event, createX.get(), width, true)
                 if (!show) scheduleOnRN(dismissComposers)
                 settle(createX, width, show, setCreateShown, createClosed)
                 return
             }
             if (dragsStack.get()) {
-                const show = shouldShow(event, stackX, width, true)
+                const show = shouldShow(event, stackX.get(), width, true)
                 if (!show) scheduleOnRN(dismissComposers)
                 settle(stackX, width, show, setStackShown, stackClosed)
                 return
             }
-            const show = shouldShow(event, translateX, width, open)
+            const show = shouldShow(event, translateX.get(), width, open)
+            if (show && !open && !drawn && channelId) {
+                scheduleOnRN(openFromSwipe, channelId)
+                return
+            }
             if (open && !show) scheduleOnRN(dismissComposers)
             scheduleOnRN(setOpen, show)
             slideTo(translateX, width, show, true)
@@ -176,9 +185,9 @@ export function usePanelDrag({
         },
         onDeactivate: event => {
             // Canceled: the system back gesture took the edge touch. Its back event closes the details.
-            const show = shouldShow(event, detailsX, width, true)
+            const show = shouldShow(event, detailsX.get(), width, true)
             settle(detailsX, width, show, setDetailsShown, detailsClosed)
         },
     })
-    return { pan, closePan, dragging }
+    return { pan, closePan }
 }

@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { View } from 'react-native'
+import { useAnimatedReaction } from 'react-native-reanimated'
 import { StyleSheet } from 'react-native-unistyles'
+import { scheduleOnRN } from 'react-native-worklets'
 import { useSessionStore } from '../../core/react'
 import { NavigatorHeader } from '../../design/components/layout/NavigatorHeader'
 import { Icon } from '../../design/icons/Icon'
@@ -9,12 +11,14 @@ import { channelsStore, isPrivate } from '../../stores/channels/channels'
 import { DMHeader } from '../messages/DMHeader'
 import { useChannelIcon } from '../servers/channelIcon'
 import { ChatList } from './ChatList'
+import { ChatListPlaceholder } from './ChatListPlaceholder'
 import { Composer, ComposerProvider } from './composer'
 import { HeaderSearchButton } from './details/HeaderSearchButton'
 import { useChatHistory, useChatRows } from './hooks/useChatData'
 import { useChatScroll } from './hooks/useChatScroll'
 import { useReadSession } from './hooks/useReadSession'
 import { ThreadBars } from './threadBars/ThreadBars'
+import type { SharedValue } from 'react-native-reanimated'
 import type { SearchTab } from '../search/types'
 
 interface Props {
@@ -24,6 +28,13 @@ interface Props {
     onRowsDrawn?: (channelId: string) => void
     /** Whether the user can actually see this chat right now. Only visible chats are marked as read. */
     visible: boolean
+    panelX: SharedValue<number>
+    /** Mounts the primary chat's composer before the slide. */
+    prepareComposer?: boolean
+    mountList?: boolean
+    listChannelId?: string
+    showRows?: boolean
+    showSkeleton?: boolean
     /**
      * A message to scroll to once the chat is open (a message link from another chat, a search result). A new object
      * for every request, so the same message can be jumped to again.
@@ -39,9 +50,6 @@ interface Props {
     swipeOpensDetails?: boolean
 }
 
-/** How long the offscreen chat waits for idle before its input is built. */
-const COMPOSER_IDLE_MS = 1500
-
 /** A channel or conversation: header, the native message list and the composer. */
 export function ChatPanel(props: Props) {
     return (
@@ -51,19 +59,16 @@ export function ChatPanel(props: Props) {
     )
 }
 
-/** The native input is built a little after the list (in a later idle slot), or at once when the chat is shown, so the
- * offscreen chat is not mounted in one long frame. */
-function useDeferredComposer(visible: boolean) {
-    const [mounted, setMounted] = useState(visible)
-    useEffect(() => {
-        if (mounted) return
-        if (visible) return setMounted(true)
-        const idle = requestIdleCallback(() => setMounted(true), {
-            timeout: COMPOSER_IDLE_MS,
-        })
-        return () => cancelIdleCallback(idle)
-    }, [mounted, visible])
-    return mounted
+/** Keeps the native input out of the opening gesture. */
+function useComposerInputReady(visible: boolean, panelX: SharedValue<number>) {
+    const [ready, setReady] = useState(false)
+    useAnimatedReaction(
+        () => !ready && visible && panelX.get() === 0,
+        settled => {
+            if (settled) scheduleOnRN(setReady, true)
+        },
+    )
+    return ready
 }
 
 function ChatPanelContent({
@@ -71,12 +76,90 @@ function ChatPanelContent({
     onBack,
     onRowsDrawn,
     visible,
+    panelX,
+    prepareComposer,
+    mountList = true,
+    listChannelId = channelId,
+    showRows = true,
+    showSkeleton = false,
     jump,
     onOpenDetails,
     swipeOpensDetails,
 }: Props) {
-    const composerMounted = useDeferredComposer(visible)
+    const inputReady = useComposerInputReady(visible, panelX)
+    return (
+        <View style={styles.container}>
+            <ChatHeader
+                channelId={channelId}
+                onBack={onBack}
+                onOpenDetails={onOpenDetails}
+            />
+            <ThreadBars channelId={channelId} />
+            <View style={styles.list}>
+                {mountList && (
+                    <View
+                        collapsable={false}
+                        style={styles.list}
+                        pointerEvents={showRows ? 'auto' : 'none'}
+                        importantForAccessibility={
+                            showRows ? 'auto' : 'no-hide-descendants'
+                        }
+                    >
+                        <ChatPanelMessages
+                            channelId={listChannelId}
+                            visible={visible && listChannelId === channelId}
+                            jump={
+                                listChannelId === channelId ? jump : undefined
+                            }
+                            onRowsDrawn={onRowsDrawn}
+                            onOpenDetails={onOpenDetails}
+                            swipeOpensDetails={swipeOpensDetails}
+                            waitForDraw={prepareComposer}
+                        />
+                    </View>
+                )}
+                {!showRows && (
+                    <ChatListPlaceholder showSkeleton={showSkeleton} />
+                )}
+            </View>
+            <Composer inputReady={prepareComposer ? undefined : inputReady} />
+        </View>
+    )
+}
+
+function ChatPanelMessages({
+    channelId,
+    onRowsDrawn,
+    visible,
+    jump,
+    onOpenDetails,
+    swipeOpensDetails,
+    waitForDraw,
+}: Pick<
+    Props,
+    | 'channelId'
+    | 'onRowsDrawn'
+    | 'visible'
+    | 'jump'
+    | 'onOpenDetails'
+    | 'swipeOpensDetails'
+> & {
+    waitForDraw?: boolean
+}) {
     const history = useChatHistory(channelId)
+    const reportDrawn = useEffectEvent((id: string) => onRowsDrawn?.(id))
+    const messages = history.messages
+    const settledEmpty =
+        messages?.messages.length === 0 &&
+        (messages.error ||
+            (!messages.loading && !messages.hasMore && !messages.stale))
+    useEffect(() => {
+        if (!waitForDraw || !settledEmpty) return
+        let frame = requestAnimationFrame(() => {
+            frame = requestAnimationFrame(() => reportDrawn(channelId))
+        })
+        return () => cancelAnimationFrame(frame)
+    }, [channelId, waitForDraw, settledEmpty])
     const scroll = useChatScroll(channelId, jump)
     const read = useReadSession({
         channelId,
@@ -90,27 +173,18 @@ function ChatPanelContent({
         swipeOpensDetails,
     })
     return (
-        <View style={styles.container}>
-            <ChatHeader
-                channelId={channelId}
-                onBack={onBack}
-                onOpenDetails={onOpenDetails}
-            />
-            <ThreadBars channelId={channelId} />
-            <ChatList
-                channelId={channelId}
-                rows={rows}
-                messages={history.messages}
-                scroll={scroll}
-                read={read}
-                composerMounted={composerMounted}
-                onRowsDrawn={onRowsDrawn}
-                onOpenPins={
-                    onOpenDetails && (() => onOpenDetails(false, false, 'pins'))
-                }
-            />
-            {composerMounted && <Composer />}
-        </View>
+        <ChatList
+            channelId={channelId}
+            rows={rows}
+            messages={messages}
+            scroll={scroll}
+            read={read}
+            interactive={visible}
+            onRowsDrawn={onRowsDrawn}
+            onOpenPins={
+                onOpenDetails && (() => onOpenDetails(false, false, 'pins'))
+            }
+        />
     )
 }
 
@@ -159,4 +233,5 @@ export function ChatHeader({
 
 const styles = StyleSheet.create(theme => ({
     container: { flex: 1, backgroundColor: theme.colors.BACKGROUND_BASE_LOWER },
+    list: { flex: 1 },
 }))

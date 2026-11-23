@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react'
 import { compareSnowflakes } from '../../../core/discord/snowflake'
 import { useSession } from '../../../core/react'
 import { showToast } from '../../../design/components/overlays/toastStore'
@@ -50,6 +57,12 @@ function revealIfHidden(
  */
 export function useChatScroll(channelId: string, jump?: { messageId: string }) {
     const session = useSession()
+    // Identity for in-flight scrolls across a channel switch and return.
+    const scope = useMemo(() => ({ session, channelId }), [session, channelId])
+    const current = useRef(scope)
+    useLayoutEffect(() => {
+        current.current = scope
+    }, [scope])
     const [scrollTarget, setScrollTarget] = useState<{
         scrollKey: string
         messageId?: string
@@ -60,6 +73,7 @@ export function useChatScroll(channelId: string, jump?: { messageId: string }) {
     useEffect(() => setScrollTarget(undefined), [channelId])
     /** Scrolls to a message, `null` meaning the bottom. */
     const scrollTo = (messageId: string | null, flash = false) => {
+        if (current.current !== scope) return
         if (messageId) revealIfHidden(session, channelId, messageId)
         setScrollTarget({
             scrollKey: channelId,
@@ -73,6 +87,7 @@ export function useChatScroll(channelId: string, jump?: { messageId: string }) {
     const scrollToMessage = useCallback(
         async (messageId: string) => {
             const result = await jumpToMessage(session, channelId, messageId)
+            if (current.current !== scope) return
             if (result !== 'loaded') return toastJumpFailure(result)
             revealIfHidden(session, channelId, messageId)
             setScrollTarget({
@@ -82,7 +97,7 @@ export function useChatScroll(channelId: string, jump?: { messageId: string }) {
                 flash: true,
             })
         },
-        [session, channelId],
+        [session, channelId, scope],
     )
     useEffect(() => {
         if (jump) void scrollToMessage(jump.messageId)
@@ -92,6 +107,7 @@ export function useChatScroll(channelId: string, jump?: { messageId: string }) {
         const ack = session.get(readStatesStore).getState().acks[channelId]
         if (!ack) return
         const result = await jumpToMessage(session, channelId, ack)
+        if (current.current !== scope) return
         if (result !== 'loaded') return toastJumpFailure(result)
         const loaded =
             session.get(messagesStore).getState().channels[channelId]

@@ -70,7 +70,13 @@ export function usePanelsBackHandler(
     useEffect(() => {
         // The details can also be open over the tab alone (the server header's search).
         if (
-            !(chat.open || details.open || stack.open || create.open) ||
+            !(
+                chat.open ||
+                chat.waitingForRows ||
+                details.open ||
+                stack.open ||
+                create.open
+            ) ||
             !active
         )
             return
@@ -91,7 +97,14 @@ export function usePanelsBackHandler(
             },
         )
         return () => subscription.remove()
-    }, [chat.open, details.open, stack.open, create.open, active])
+    }, [
+        chat.open,
+        chat.waitingForRows,
+        details.open,
+        stack.open,
+        create.open,
+        active,
+    ])
 }
 
 /** Registers what the chat on screen can open: stacked channels, thread creation, a channel from the details. */

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { AppState } from 'react-native'
 import { loadDraft, onDraftSaved, saveDraft } from '../outbox/drafts'
 import { composerStore, updateEdit } from '../state/composerStore'
@@ -127,7 +127,7 @@ export type DraftSync = ReturnType<typeof createDraftSync>
 
 /** Keeps the input and the drafts in step while the composer shows `channelId`. */
 export function useDraftSync(drafts: DraftSync, channelId: string): void {
-    useEffect(() => drafts.show(channelId), [drafts, channelId])
+    useLayoutEffect(() => drafts.show(channelId), [drafts, channelId])
     useEffect(() => drafts.followEdits(), [drafts])
     useEffect(() => drafts.followOtherComposers(), [drafts])
     // Leaving the app writes the pending draft at once: the system may kill the app in the background.

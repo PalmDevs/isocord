@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import me.palmdevs.isocord.chat.rows.ChatRow
+import me.palmdevs.isocord.core.Perf
 
 /**
  * How far above the newest row still counts as reading it: new messages keep the list at the bottom and are read
@@ -153,10 +154,12 @@ internal fun RestoreScrollOnFirstRows(state: LazyListState, rows: List<ChatRow>,
   // uses it (a LaunchedEffect would run after that frame). Without one the list starts at the newest row.
   val restored = remember { BooleanArray(1) }
   if (hasContent && !restored[0]) {
-    restored[0] = true
-    val saved = ChatScrollMemory.positions[scrollKey]
-    val index = saved?.let { s -> rows.indexOfFirst { changes.lazyKey(it.key) == s.key } } ?: -1
-    if (saved != null && index >= 0) state.requestScrollToItem(index, saved.offset)
+    Perf.span("chat:restore-scroll") {
+      restored[0] = true
+      val saved = ChatScrollMemory.positions[scrollKey]
+      val index = saved?.let { s -> rows.indexOfFirst { changes.lazyKey(it.key) == s.key } } ?: -1
+      if (saved != null && index >= 0) state.requestScrollToItem(index, saved.offset)
+    }
   }
 }
 

@@ -34,7 +34,7 @@ export function ChatList({
     messages,
     scroll,
     read,
-    composerMounted,
+    interactive,
     onRowsDrawn,
     onOpenPins,
 }: {
@@ -43,13 +43,14 @@ export function ChatList({
     messages: ReturnType<typeof useChatHistory>['messages']
     scroll: ReturnType<typeof useChatScroll>
     read: ReturnType<typeof useReadSession>
-    composerMounted: boolean
+    interactive: boolean
     onRowsDrawn?: (channelId: string) => void
     /** Opens this chat's details on Pinned Messages. */
     onOpenPins?: () => void
 }) {
     const session = useSession()
     const composer = useComposer()
+    const acceptsActions = interactive && composer.channelId === channelId
     const { theme } = useUnistyles()
     const themeJson = useChatTheme()
     // The typing indicator's height while it is up; the list is pushed up by it, animated natively.
@@ -63,7 +64,8 @@ export function ChatList({
     )
     const newMessages = useNewMessages(channelId)
     const optInGuildId = useShowChannelOptInNotice(channelId)
-    const openLink = (url: string) =>
+    const openLink = (url: string) => {
+        if (!acceptsActions) return
         handleChatLink(url, {
             session,
             channelId,
@@ -72,23 +74,20 @@ export function ChatList({
             scrollToMessage: scroll.scrollToMessage,
             openPins: onOpenPins,
         })
+    }
     return (
         // One native view serves every channel this panel shows, so it is never unmounted for the error state.
         <View style={styles.chat}>
             <ChatView
                 style={styles.chat}
                 scrollKey={channelId}
-                composerNativeId={
-                    composerMounted ? composer.nativeId : undefined
-                }
+                composerNativeId={composer.nativeId}
                 // The composer overlaps the bottom of the list by half its scrim gradient, plus a visible gap.
                 bottomInset={
-                    composerMounted
-                        ? theme.modules.mobile
-                              .CHAT_INPUT_FLOATING_SCRIM_GRADIENT_HEIGHT /
-                              2 +
-                          MESSAGE_LIST_GAP
-                        : 0
+                    theme.modules.mobile
+                        .CHAT_INPUT_FLOATING_SCRIM_GRADIENT_HEIGHT /
+                        2 +
+                    MESSAGE_LIST_GAP
                 }
                 typingInset={typingInset}
                 composerTargetId={composerTargetId}
@@ -112,7 +111,8 @@ export function ChatList({
                         event.nativeEvent.atBottom,
                     )
                 }
-                onMessageLongPress={event =>
+                onMessageLongPress={event => {
+                    if (!acceptsActions) return
                     handleMessageLongPress(
                         session,
                         channelId,
@@ -124,8 +124,9 @@ export function ChatList({
                             media: event.nativeEvent.media,
                         },
                     )
-                }
-                onMessageSwipe={event =>
+                }}
+                onMessageSwipe={event => {
+                    if (!acceptsActions) return
                     handleMessageSwipe(
                         session,
                         channelId,
@@ -133,7 +134,7 @@ export function ChatList({
                         event.nativeEvent.action,
                         composer,
                     )
-                }
+                }}
                 onLinkPress={event => openLink(event.nativeEvent.url)}
             />
             {/* The reference's StickyHeader over the list (ChatBanner): new messages win over the opt-in notice. The

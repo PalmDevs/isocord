@@ -1,8 +1,8 @@
 import { useIsFocused } from '@react-navigation/native'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useWindowDimensions, View } from 'react-native'
 import { GestureDetector } from 'react-native-gesture-handler'
-import Animated from 'react-native-reanimated'
+import Animated, { useSharedValue } from 'react-native-reanimated'
 import { StyleSheet } from 'react-native-unistyles'
 import { logger } from '../../core/log'
 import { useSessionStore } from '../../core/react'
@@ -13,6 +13,7 @@ import {
     swipeOpensDetails,
 } from '../../stores/settings/settingsStore'
 import { dismissComposers } from './composer'
+import { usePrepareChatRows } from './hooks/useChatData'
 import { PanelLayers } from './panels/PanelLayers'
 import { useChatPanel } from './panels/useChatPanel'
 import { useDetailsPanel } from './panels/useDetailsPanel'
@@ -72,6 +73,7 @@ export function ChatPanels({
     const [tabFocused, setTabFocused] = useState(false)
     const stackFocused = useIsFocused()
     const active = tabFocused && stackFocused
+    const dragging = useSharedValue(false)
     const detailsOnSwipe = useSessionStore(settingsStore, swipeOpensDetails)
     const details = useDetailsPanel(width)
     const stack = useStackedChat(width, details.reset)
@@ -80,11 +82,17 @@ export function ChatPanels({
         width,
         selectedChannelId,
         tabFocused,
+        active,
+        dragging,
         dropOverlays: () => {
             create.drop()
             stack.drop()
         },
     })
+    usePrepareChatRows(
+        active && !chat.built ? chat.channelId : undefined,
+        detailsOnSwipe,
+    )
     const panels = { chat, details, stack, create }
     const modalOpen = useModalOpen()
     const topPanel = details.open
@@ -93,7 +101,7 @@ export function ChatPanels({
           ? 'create'
           : stack.open
             ? 'stack'
-            : chat.open
+            : chat.open || chat.waitingForSwipe
               ? 'chat'
               : undefined
     const backPreview = usePanelBackPreview(
@@ -109,10 +117,11 @@ export function ChatPanels({
     usePanelsLifecycle(width, tabFocused, panels)
     usePanelsBackHandler(active, panels, backPreview.takeOffset)
     usePanelsOpeners(active, panels)
-    const { pan, closePan, dragging } = usePanelDrag({
+    const { pan, closePan } = usePanelDrag({
         width,
         enabled: active && chat.hasChannel,
         detailsOnSwipe,
+        dragging,
         ...panels,
     })
     const animated = usePanelStyles(width, dragging, backPreview, {
@@ -128,23 +137,39 @@ export function ChatPanels({
         stack.drop()
         chat.close()
     }
+    const actions =
+        useRef<
+            Pick<ChatPanelsApi, 'openChat' | 'closeChat' | 'openGuildSearch'>
+        >(null)
+    useLayoutEffect(() => {
+        actions.current = {
+            openChat: chat.openChat,
+            closeChat,
+            openGuildSearch: () => {
+                if (chat.hasChannel) details.show(true, true)
+            },
+        }
+    })
+    const { listCovered } = animated
+    // MainTabsNavigatorPanelContext: stable identity across channel and gesture updates.
+    const api = useMemo<ChatPanelsApi>(
+        () => ({
+            openChat: (channelId, messageId) =>
+                actions.current?.openChat(channelId, messageId),
+            closeChat: () => actions.current?.closeChat(),
+            setTabFocused,
+            openGuildSearch: () => actions.current?.openGuildSearch(),
+            listCovered,
+        }),
+        [listCovered],
+    )
     const covered = chat.open || details.open
     // DIAG: every change of what gates opening and swiping.
-    const diagState = `${selectedChannelId === undefined ? 'messages' : 'servers'} tab=${tabFocused} stack=${stackFocused} chat=${chat.channelId} has=${chat.hasChannel} open=${chat.open} x=${Math.round(chat.x.get())} built=${chat.built}/${chat.builtChannelId}/${chat.hasBuiltChannel} details=${details.open}/${details.mounted} stacked=${stack.open} create=${create.open} width=${width}`
+    const diagState = `${selectedChannelId === undefined ? 'messages' : 'servers'} tab=${tabFocused} stack=${stackFocused} chat=${chat.channelId} has=${chat.hasChannel} open=${chat.open} x=${Math.round(chat.x.get())} built=${chat.built} drawn=${chat.drawn} details=${details.open}/${details.mounted} stacked=${stack.open} create=${create.open} width=${width}`
     useEffect(() => diag.debug(diagState), [diagState])
 
     return (
-        <PanelsContext
-            value={{
-                openChat: chat.openChat,
-                closeChat,
-                setTabFocused,
-                openGuildSearch: () => {
-                    if (chat.hasChannel) details.show(true, true)
-                },
-                listCovered: animated.listCovered,
-            }}
-        >
+        <PanelsContext value={api}>
             <GestureDetector gesture={pan}>
                 <View style={styles.root}>
                     {/* Never flattened: toggling importantForAccessibility on a flattenable view makes Fabric remove

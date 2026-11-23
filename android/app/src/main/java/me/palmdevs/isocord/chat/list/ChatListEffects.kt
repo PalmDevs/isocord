@@ -116,11 +116,11 @@ internal fun ScrollRequestEffect(
   val targetLoaded = remember(rows, target) { target != null && (target.messageId == null || rows.indexOfMessage(target.messageId) >= 0) }
   LaunchedEffect(target?.nonce, targetLoaded) {
     if (target == null || !targetLoaded || target.nonce == handledNonce[0]) return@LaunchedEffect
-    handledNonce[0] = target.nonce
     // Lets a replaced window (see the newest key effect above) settle first.
     withFrameNanos {}
     val index = if (target.messageId == null) 0 else latestRows.indexOfMessage(target.messageId)
     if (index < 0) return@LaunchedEffect
+    handledNonce[0] = target.nonce
     state.scrollToRow(index, center = target.messageId != null, margin = scrollMargin)
     // Not tied to this effect: a recomposition that restarts it must not cut the flash short.
     if (target.flash && target.messageId != null) scope.launch { highlight.flash(target.messageId) }

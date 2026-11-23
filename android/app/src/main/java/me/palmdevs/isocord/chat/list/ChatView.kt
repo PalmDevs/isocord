@@ -1,6 +1,9 @@
 package me.palmdevs.isocord.chat.list
 
 import android.content.Context
+import android.os.Build
+import android.os.Trace
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewTreeObserver
@@ -18,20 +21,28 @@ import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.events.Event
 import com.facebook.react.uimanager.util.ReactFindViewUtil
 import java.lang.ref.WeakReference
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import me.palmdevs.isocord.BuildConfig
 import me.palmdevs.isocord.chat.ChatFonts
 import me.palmdevs.isocord.chat.media.buildImageLoader
 import me.palmdevs.isocord.chat.rows.ChatRow
 import me.palmdevs.isocord.chat.rows.ChatTheme
 import me.palmdevs.isocord.chat.rows.parseRows
 import me.palmdevs.isocord.core.DisposeAfterDetach
+import me.palmdevs.isocord.core.Perf
 
 /** The Android view behind `IsocordChatView`: a Compose message list fed by the `rows` and `theme` props. */
 class ChatView(context: Context) : FrameLayout(context) {
-  var rows by mutableStateOf<List<ChatRow>>(emptyList())
-    private set
   var theme by mutableStateOf(ChatTheme())
-  var scrollKey by mutableStateOf("")
-  var scrollTarget by mutableStateOf<ScrollTarget?>(null)
+  var scrollKey = ""
+  var rowsJson: String? = null
+  var scrollTarget: ScrollTarget? = null
 
   /** The message the jump button leads back to, instead of the present (a search result's preview). */
   var jumpTarget by mutableStateOf<String?>(null)
@@ -64,18 +75,67 @@ class ChatView(context: Context) : FrameLayout(context) {
     return view?.height
   }
 
-  /** The previous update's rows by their JSON line, so unchanged rows are not parsed again (see [parseRows]). */
-  private var rowLines: Map<String, ChatRow> = emptyMap()
+  private data class RowsInput(val scrollKey: String, val json: String?)
+  private class DecodedRows(val input: RowsInput, val rows: List<ChatRow>, val lines: Map<String, ChatRow>)
 
-  /**
-   *   Parses every JS update into new objects. Unchanged rows keep their previous instances, since Compose compares
-   *   lists by identity. Rows whose line changed but whose content did not are swapped back by key.
-   */
-  fun updateRows(json: String?) {
-    val (next, lines) = parseRows(json, rowLines)
-    rowLines = lines
-    val previous = rows.associateBy { it.key }
-    rows = next.map { row -> previous[row.key]?.takeIf { it == row } ?: row }
+  private val rowsScope = CoroutineScope(Dispatchers.Main.immediate)
+  private var rowsJob: Job? = null
+  private var rowsPaused = false
+  private var requestedRows by mutableStateOf<RowsInput?>(null)
+  private var decodedRows by mutableStateOf<DecodedRows?>(null)
+  private var acceptedScrollTarget by mutableStateOf<ScrollTarget?>(null)
+
+  /** Schedules rows and their scroll key together after the Fabric prop transaction. */
+  fun updateRows() {
+    val input = RowsInput(scrollKey, rowsJson)
+    if (input != requestedRows) {
+      requestedRows = input
+      rowsJob?.cancel()
+      decodeRequestedRows()
+    }
+    updateAcceptedScrollTarget()
+  }
+
+  private fun updateAcceptedScrollTarget() {
+    val input = requestedRows ?: return
+    val target = scrollTarget?.takeIf { it.scrollKey == input.scrollKey }
+    val accepted = acceptedScrollTarget
+    // A live row update must not interrupt an already accepted scroll.
+    acceptedScrollTarget = when {
+      target == null -> null
+      decodedRows?.input === input -> target
+      accepted != null && accepted.scrollKey == target.scrollKey && accepted.nonce == target.nonce -> accepted
+      else -> null
+    }
+  }
+
+  private fun decodeRequestedRows() {
+    val input = requestedRows ?: return
+    val previous = decodedRows
+    if (rowsPaused || previous?.input === input) return
+    rowsJob = rowsScope.launch {
+      decodedRows = withContext(Dispatchers.Default) {
+        val started = if (BuildConfig.DEBUG) System.nanoTime() else 0L
+        val decoded = Perf.span("chat:rows") {
+          val (rows, lines) = parseRows(input.json, previous?.lines.orEmpty()) { ensureActive() }
+          val previousByKey = previous?.rows.orEmpty().associateBy { it.key }
+          val reused = rows.map { row ->
+            ensureActive()
+            previousByKey[row.key]?.takeIf { it == row } ?: row
+          }
+          DecodedRows(input, reused, lines)
+        }
+        if (BuildConfig.DEBUG) {
+          Log.d("IsocordChat", "rows: ${input.json?.length ?: 0} chars in ${(System.nanoTime() - started) / 1_000_000} ms")
+        }
+        decoded
+      }
+      updateAcceptedScrollTarget()
+    }
+  }
+
+  fun disposeRows() {
+    rowsScope.cancel()
   }
 
   // Declared before `init`, which triggers a layout request by adding the child view.
@@ -101,12 +161,14 @@ class ChatView(context: Context) : FrameLayout(context) {
       ComposeView(context).apply {
         setViewCompositionStrategy(DisposeAfterDetach)
         setContent {
+          val requested = requestedRows ?: return@setContent
+          val decoded = decodedRows?.takeIf { it.input.scrollKey == requested.scrollKey } ?: return@setContent
           ChatList(
-            scrollKey = scrollKey,
-            scrollTarget = scrollTarget,
+            scrollKey = decoded.input.scrollKey,
+            scrollTarget = acceptedScrollTarget,
             jumpTarget = jumpTarget,
             composerTarget = composerTarget,
-            rows = rows,
+            rows = decoded.rows,
             theme = theme,
             fonts = fonts,
             bottomInset = bottomInset.dp,
@@ -128,7 +190,9 @@ class ChatView(context: Context) : FrameLayout(context) {
                 putString("action", action)
               }
             },
-            onRowsDrawn = { key -> emit("topRowsDrawn") { putString("scrollKey", key) } },
+            onRowsDrawn = { key ->
+              Perf.span("chat:rows-drawn") { emit("topRowsDrawn") { putString("scrollKey", key) } }
+            },
             onAtBottomChange = { key, atBottom ->
               emit("topAtBottomChange") {
                 putString("scrollKey", key)
@@ -169,6 +233,7 @@ class ChatView(context: Context) : FrameLayout(context) {
     val child = getChildAt(0) ?: return
     if (!isAttachedToWindow || width == 0 || height == 0) return
     if (!force && child.measuredWidth == width && child.measuredHeight == height) return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Trace.setCounter("chat:list-height-px", height.toLong())
     child.measure(
       MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
       MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY),
@@ -183,12 +248,19 @@ class ChatView(context: Context) : FrameLayout(context) {
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
+    if (rowsPaused) {
+      rowsPaused = false
+      decodeRequestedRows()
+    }
     viewTreeObserver.addOnPreDrawListener(fitBeforeDraw)
     layoutPosted = false
     requestLayout()
   }
 
   override fun onDetachedFromWindow() {
+    rowsPaused = true
+    rowsJob?.cancel()
+    rowsJob = null
     viewTreeObserver.removeOnPreDrawListener(fitBeforeDraw)
     super.onDetachedFromWindow()
   }

@@ -1,5 +1,4 @@
 import { logger } from '../../../core/log'
-import { Commands } from '../../../native/ChatInputNativeComponent'
 import { unparseMessage } from './parsing/parse'
 import { parseContext } from './parsing/parseContext'
 import { useComposerSlots } from './parsing/slots'
@@ -31,37 +30,37 @@ interface ApiParts {
 }
 
 /** Returns the text half of the API: reading and changing the input's text. */
-function textApi(store: LocalStore, input: ComposerInput) {
+function textApi(store: LocalStore, input: ComposerInput, drafts: DraftSync) {
+    const replace: ComposerApi['replaceRange'] = (
+        { location, length },
+        text,
+        options,
+    ) => {
+        const next = input.replaceRange(
+            location,
+            length,
+            text,
+            options?.keepCursorPosition,
+        )
+        if (next !== undefined) drafts.changed(next)
+    }
     return {
         getText: () => store.getState().text,
         getSelection: () => store.getState().selection,
         flushText: input.flushText,
         insertText: ((text, options) => {
             const range = options?.range ?? store.getState().selection
-            input.replaceRange(
-                range.start,
-                Math.max(0, range.end - range.start),
+            replace(
+                { location: range.start, length: range.end - range.start },
                 options?.space ? `${text} ` : text,
             )
         }) satisfies ComposerApi['insertText'],
-        replaceRange: (({ location, length }, text, options) =>
-            input.replaceRange(
-                location,
-                length,
-                text,
-                options?.keepCursorPosition,
-            )) satisfies ComposerApi['replaceRange'],
+        replaceRange: replace,
         setText: input.setText,
         setSelection: (start: number, end = start) =>
-            input.run(native =>
-                Commands.setSelectedRange(
-                    native,
-                    start,
-                    Math.max(0, end - start),
-                ),
-            ),
-        focus: () => input.run(native => Commands.focus(native)),
-        blur: () => input.run(native => Commands.blur(native)),
+            input.setSelection(start, Math.max(0, end - start)),
+        focus: () => input.focus(),
+        blur: input.blur,
     }
 }
 
@@ -70,7 +69,7 @@ function panelApi(store: LocalStore, input: ComposerInput) {
     return {
         openCustomKeyboard: (panel: string) => {
             store.setState({ panel })
-            input.run(native => Commands.openCustomKeyboard(native))
+            input.focus('openCustomKeyboard')
         },
         closeCustomKeyboard: () =>
             store.setState({ panel: null, panelTyping: false }),
@@ -79,7 +78,7 @@ function panelApi(store: LocalStore, input: ComposerInput) {
             // it, so the panel closes now.
             if (store.getState().keyboardOpen)
                 store.setState({ panel: null, panelTyping: false })
-            input.run(native => Commands.openSystemKeyboard(native))
+            input.focus('openSystemKeyboard')
         },
         setPanelTyping: (typing: boolean) =>
             store.setState({ panelTyping: typing }),
@@ -101,7 +100,7 @@ function messageApi({ session, input, drafts, channelId }: ApiParts) {
                     shouldMention: options?.mention ?? true,
                 },
             )
-            if (message) input.run(native => Commands.focus(native))
+            if (message) input.focus()
         }) satisfies ComposerApi['setReplyTo'],
         setReplyMention: (mention: boolean) =>
             setReplyMention(session, channelId, mention),
@@ -120,7 +119,7 @@ function messageApi({ session, input, drafts, channelId }: ApiParts) {
                     parseContext(session, channelId),
                 ),
             )
-            input.run(native => Commands.focus(native))
+            input.focus()
         }) satisfies ComposerApi['setEditing'],
     }
 }
@@ -133,7 +132,7 @@ export function createComposerApi(parts: ApiParts): ComposerApi {
         channelId,
         nativeId: parts.nativeId,
         attachmentsKey,
-        ...textApi(store, input),
+        ...textApi(store, input, drafts),
         ...panelApi(store, input),
         ...messageApi(parts),
         addAttachments: attachments => {

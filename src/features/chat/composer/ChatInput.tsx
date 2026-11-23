@@ -6,9 +6,10 @@ import Animated, {
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated'
-import { useUnistyles } from 'react-native-unistyles'
+import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { ChannelType } from '../../../core/discord/channelType'
 import { useSessionStore } from '../../../core/react'
+import { Text } from '../../../design/components/Text'
 import { INPUT_HEIGHT_TIMING } from '../../../design/tokens/motion'
 import { t } from '../../../i18n'
 import ChatInputNative from '../../../native/ChatInputNativeComponent'
@@ -34,7 +35,7 @@ const MIN_HEIGHT = chatInputLineHeight + 2 * VERTICAL_INSET
 const MAX_INPUT_HEIGHT = 200
 const MIN_INPUT_HEIGHT = 72
 
-function usePlaceholder(channelId: string): string {
+function useChannelPlaceholder(channelId: string): string {
     const channel = useSessionStore(
         channelsStore,
         state => state.channels[channelId],
@@ -50,6 +51,38 @@ function usePlaceholder(channelId: string): string {
             name: computeChannelName(channel, users),
         })
     return t('composer.placeholder.channel', { name: channel.name ?? '' })
+}
+
+function useInputPlaceholder(editable: boolean): string {
+    const { channelId } = useComposer()
+    const attached = useComposerState(state => state.attached)
+    const channelPlaceholder = useChannelPlaceholder(channelId)
+    // ShareChatInput's placeholder for a forward's or a share's text.
+    if (attached) return t('share.optionalMessage')
+    return editable ? channelPlaceholder : t('composer.noPermission')
+}
+
+function useSingleLineHeight(): number {
+    const { fontScale } = useWindowDimensions()
+    return chatInputLineHeight * Math.max(fontScale, 1) + 2 * VERTICAL_INSET
+}
+
+/** Reserves a one-line input while the native field is mounting. */
+export function ChatInputPlaceholder() {
+    const editable = useComposerState(state => state.canSend)
+    const placeholder = useInputPlaceholder(editable)
+    const draft = useComposerState(state => state.text)
+    const height = useSingleLineHeight()
+    return (
+        <Text
+            variant="text-md/medium"
+            color={draft ? 'TEXT_DEFAULT' : 'TEXT_MUTED'}
+            lineClamp={1}
+            style={[styles.placeholder, { height }]}
+        >
+            {draft || placeholder}
+        </Text>
+    )
 }
 
 /** useChatInputMaxHeight: dp the input may grow to, leaving room for the chat above whatever keyboard or panel is up. */
@@ -72,41 +105,45 @@ function useMaxHeight(): number {
  * The native text field, wired to the composer: events in, commands out through `useComposer()`. Read-only, with
  * a placeholder saying so, where the user cannot send.
  */
-export function ChatInput() {
+export function ChatInput({
+    animateInitialHeight = false,
+}: {
+    animateInitialHeight?: boolean
+}) {
     const { attachNative, onSelectionOrTextChange, onTextFlushed } =
         useComposerInternals()
     const composer = useComposer()
     const editable = useComposerState(state => state.canSend)
-    const attached = useComposerState(state => state.attached)
-    const channelPlaceholder = usePlaceholder(composer.channelId)
-    // ShareChatInput's placeholder for a forward's or a share's text.
-    const placeholder = attached
-        ? t('share.optionalMessage')
-        : editable
-          ? channelPlaceholder
-          : t('composer.noPermission')
+    const empty = useComposerState(state => state.text === '')
+    const placeholder = useInputPlaceholder(editable)
     const maxHeight = useMaxHeight()
+    const singleLineHeight = useSingleLineHeight()
+    const minimumHeight = animateInitialHeight ? singleLineHeight : MIN_HEIGHT
     const { theme } = useUnistyles()
     const reducedMotion = useReducedMotion()
-    const contentHeight = useRef(MIN_HEIGHT)
-    // The first size (the chat opening, a draft restored) is taken as is; later ones are animated.
-    const settled = useRef(false)
-    const height = useSharedValue(MIN_HEIGHT)
+    const contentHeight = useRef(minimumHeight)
+    // Animate draft growth when a one-line frame is already on screen.
+    const settled = useRef(animateInitialHeight)
+    const height = useSharedValue(minimumHeight)
     const limit = useRef(maxHeight)
     limit.current = maxHeight
     const apply = (animate: boolean) => {
-        const next = Math.min(
-            Math.max(contentHeight.current, MIN_HEIGHT),
-            limit.current,
-        )
+        // Keep the empty field in the reserved frame through native font padding.
+        const next =
+            animateInitialHeight && empty
+                ? minimumHeight
+                : Math.min(
+                      Math.max(contentHeight.current, minimumHeight),
+                      limit.current,
+                  )
         height.set(
             animate && !reducedMotion
                 ? withTiming(next, INPUT_HEIGHT_TIMING)
                 : next,
         )
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: only the limit changing matters
-    useEffect(() => apply(settled.current), [maxHeight])
+    // biome-ignore lint/correctness/useExhaustiveDependencies: current height, font scale, and draft state
+    useEffect(() => apply(settled.current), [maxHeight, minimumHeight, empty])
     const heightStyle = useAnimatedStyle(() => ({ height: height.get() }))
 
     return (
@@ -145,3 +182,7 @@ export function ChatInput() {
         </Animated.View>
     )
 }
+
+const styles = StyleSheet.create({
+    placeholder: { textAlignVertical: 'center' },
+})

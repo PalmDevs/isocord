@@ -36,6 +36,7 @@ import me.palmdevs.isocord.chat.list.SwipeToReply
 import me.palmdevs.isocord.chat.media.AttachmentList
 import me.palmdevs.isocord.core.LinkKind
 import me.palmdevs.isocord.core.Links
+import me.palmdevs.isocord.core.Perf
 
 internal val AVATAR_SIZE = 40.dp
 
@@ -60,7 +61,7 @@ fun MessageRow(row: ChatRow.Message) {
     SwipeToReply(
       canEdit = row.swipe?.let { it == SwipeMode.REPLY_EDIT },
       onSwipe = { actions.onMessageSwipe(row.id, it.wire) },
-    ) { MessageRowContent(row) }
+    ) { Perf.span("chat:compose-message") { MessageRowContent(row) } }
   }
 }
 
@@ -99,10 +100,12 @@ private fun MessageRowContent(row: ChatRow.Message) {
     val start = if (row.grouped) AVATAR_SIZE + AVATAR_GAP else AVATAR_GAP
     Column(Modifier.weight(1f).padding(start = start, end = END_SPACING).then(if (row.status == "sending") Modifier.alpha(0.5f) else Modifier)) {
       if (!row.grouped) Header(row)
-      MessageText(row.content, row.jumbo, row.edited)
+      Perf.span("chat:compose-message-text") { MessageText(row.content, row.jumbo, row.edited) }
       row.rich?.let { RichParts(it) }
-      AttachmentList(row.id, row.attachments)
-      row.embeds.forEachIndexed { index, embed -> EmbedView(embed, row.id, index) }
+      Perf.span("chat:compose-media") {
+        AttachmentList(row.id, row.attachments)
+        row.embeds.forEachIndexed { index, embed -> EmbedView(embed, row.id, index) }
+      }
       // Buttons and other interactive components sit below the embeds, as in the reference.
       row.rich?.components?.takeIf { it.isNotEmpty() }?.let { ComponentsView(it, row.id) }
       row.stickers.forEach { StickerView(it) }

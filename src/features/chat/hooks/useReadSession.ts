@@ -85,11 +85,17 @@ export function useReadSession({
         known &&
         bottom.atBottom &&
         settled
-    const { ackedId, reading } = useDivider(channelId, messages, looking)
+    const { ackedId, reading } = useDivider(
+        channelId,
+        messages,
+        visible,
+        looking,
+    )
     useFirstMentionJump({
         channelId,
         messages,
         ackedId,
+        visible,
         jumping,
         opening,
         setOpening,
@@ -136,6 +142,7 @@ function useAppActive(): boolean {
 function useDivider(
     channelId: string,
     messages: ChannelMessages | undefined,
+    visible: boolean,
     looking: boolean,
 ): { ackedId?: string; reading: boolean } {
     const session = useSession()
@@ -150,12 +157,14 @@ function useDivider(
         channelId,
         newestId,
         ackedId: readAck(),
+        shown: visible,
     }))
     let ackedId = divider.ackedId
-    if (divider.channelId !== channelId) {
+    const channelChanged = divider.channelId !== channelId
+    if (channelChanged || (visible && !divider.shown)) {
         ackedId = readAck()
-        setDivider({ channelId, newestId, ackedId })
-        setManualUnread(undefined)
+        setDivider({ channelId, newestId, ackedId, shown: visible })
+        if (channelChanged) setManualUnread(undefined)
     } else if (divider.newestId !== newestId) {
         const previousId = divider.newestId
         // One message arrived at the newest end (a gateway MESSAGE_CREATE), rather than a new window, a refresh of
@@ -174,7 +183,7 @@ function useDivider(
         } else if (arrived && reading) {
             if (caughtUp) ackedId = newestId
         } else if (arrived && !hadUnread) ackedId = previousId
-        setDivider({ channelId, newestId, ackedId })
+        setDivider({ ...divider, newestId, ackedId })
     }
 
     // Marking a message unread moves the divider above it at once (MESSAGE_ACK `manual`: rebuildChannelState).
@@ -230,6 +239,7 @@ function useFirstMentionJump({
     channelId,
     messages,
     ackedId,
+    visible,
     jumping,
     opening,
     setOpening,
@@ -239,6 +249,7 @@ function useFirstMentionJump({
     channelId: string
     messages: ChannelMessages | undefined
     ackedId: string | undefined
+    visible: boolean
     jumping: boolean
     opening: Opening | undefined
     setOpening: Dispatch<SetStateAction<Opening | undefined>>
@@ -258,7 +269,8 @@ function useFirstMentionJump({
         messages.stale !== true &&
         messages.loading === false
     useEffect(() => {
-        if (!historyReady || opening?.channelId === channelId) return
+        if (!visible || !historyReady || opening?.channelId === channelId)
+            return
         // A page that arrives after the user moved to another channel settles nothing there.
         const mark = (scrolled: boolean) =>
             setOpening(current =>
@@ -298,6 +310,7 @@ function useFirstMentionJump({
         session,
         channelId,
         historyReady,
+        visible,
         opening,
         setOpening,
         jumping,

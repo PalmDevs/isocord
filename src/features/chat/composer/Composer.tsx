@@ -4,7 +4,7 @@ import { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useTypingUserIds } from '../useTypingUserIds'
 import './builtins'
-import { ChatInput } from './ChatInput'
+import { ChatInput, ChatInputPlaceholder } from './ChatInput'
 import { ChatInputScrim } from './floating'
 import { KeyboardArea } from './KeyboardArea'
 import { useComposerSlots } from './parsing/slots'
@@ -14,9 +14,6 @@ import { Suggestions } from './suggestions/Suggestions'
 import { useSuggestion } from './suggestions/useSuggestion'
 import { TypingIndicator } from './TypingIndicator'
 import type { ComposerActionButton, ComposerPanel } from './parsing/slots'
-
-/** CHAT_INPUT_PILL_CONTENT_SIZE: one line of text with its insets. */
-const INPUT_MIN_HEIGHT = 36
 
 /** The panels registered for `placement`, by order. */
 function placed(
@@ -52,7 +49,7 @@ function sided(
  *
  * The container overlaps the chat by half the scrim's height. The chat list leaves the same room.
  */
-export function Composer() {
+export function Composer({ inputReady }: { inputReady?: boolean }) {
     const composer = useComposer()
     const { channelId } = composer
     const { theme } = useUnistyles()
@@ -61,6 +58,8 @@ export function Composer() {
     const actionButtons = useComposerSlots(state => state.actionButtons)
     const { height: windowHeight } = useWindowDimensions()
     const [pressed, setPressed] = useState(false)
+    const inputRequested = useComposerState(state => state.inputRequested)
+    const inputMounted = inputReady !== false || inputRequested
     const suggestion = useSuggestion()
     // useTypingUserIdsForDisplay(channel.id, 4): four names already read as "Several people".
     const typingUserIds = useTypingUserIds(channelId, 4)
@@ -110,8 +109,7 @@ export function Composer() {
             pointerEvents="box-none"
             style={{ marginTop: -windowHeight, paddingTop: windowHeight }}
         >
-            {/* The chat list watches this view's height (composerNativeId): while the user reads older messages,
-                the card growing (a reply bar, more lines, the attachments) covers the list instead of moving it. */}
+            {/* FloatingChatInputContainer: the measured frame stays mounted while the input attaches. */}
             <View
                 nativeID={composer.nativeId}
                 collapsable={false}
@@ -164,7 +162,15 @@ export function Composer() {
                         <View style={styles.main}>
                             {draw(sided(actionButtons, 'start'))}
                             <View style={styles.input}>
-                                <ChatInput />
+                                {inputMounted ? (
+                                    <ChatInput
+                                        animateInitialHeight={
+                                            inputReady !== undefined
+                                        }
+                                    />
+                                ) : (
+                                    <ChatInputPlaceholder />
+                                )}
                             </View>
                             {draw(sided(actionButtons, 'end'))}
                         </View>
@@ -217,6 +223,6 @@ const styles = StyleSheet.create(theme => {
                 mobile.CHAT_INPUT_FLOATING_CONTENT_PADDING_VERTICAL,
             gap: mobile.CHAT_INPUT_FLOATING_CONTENT_GAP,
         },
-        input: { flex: 1, minWidth: 0, minHeight: INPUT_MIN_HEIGHT },
+        input: { flex: 1, minWidth: 0 },
     }
 })

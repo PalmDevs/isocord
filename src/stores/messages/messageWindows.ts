@@ -303,13 +303,10 @@ export async function jumpToPresent(
 export const messageHistoryStore = defineStore('messageHistory', session => {
     const store = session.get(messagesStore)
     const { dispatch } = session.gateway
-    /**
-     * Stale channels whose refresh was asked for and has not landed: a request in flight or one that failed. The
-     * open chat asks only when its channel turns stale, so for these, which already were, nothing else asks again.
-     */
+    /** Pending history and failed refreshes to retry after reconnecting. */
     const wanted = () =>
         Object.entries(store.getState().channels).flatMap(([id, channel]) =>
-            channel.stale && (channel.loading || channel.error) ? [id] : [],
+            channel.loading || (channel.stale && channel.error) ? [id] : [],
         )
     // MessageStore.handleConnectionOpen: anything loaded before this connection may have gaps. It stays on
     // screen, and an open chat refetches its newest page (see loadMessages). Requests from before READY are

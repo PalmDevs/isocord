@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.SystemClock
+import android.os.Trace
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
@@ -41,8 +42,10 @@ import coil3.size.Size
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.WritableMap
+import com.facebook.react.uimanager.PixelUtil
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.events.Event
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -58,8 +61,9 @@ import me.palmdevs.isocord.notifications.notify.title
  */
 private const val TAG = "IsocordChatInput"
 
-/** The input text's line height in dp, text-md/normal: 16 over 20. JS sizes the input from it. */
+/** The input text's base line height, text-md/medium. JS reserves the first line from it. */
 const val INPUT_LINE_HEIGHT_DP = 20
+private const val INPUT_FONT_SIZE_SP = 16f
 
 /** Code text relative to the surrounding text, as in the message list's inline code (MessageText.kt). */
 private const val CODE_SCALE = 0.875f
@@ -114,11 +118,13 @@ class ChatInputView(context: Context) : FrameLayout(context) {
     editText.apply {
       background = null
       gravity = Gravity.TOP or Gravity.START
-      setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-      TextViewCompat.setLineHeight(this, (INPUT_LINE_HEIGHT_DP * density).roundToInt())
-      typeface = fonts.normal
-      isVerticalScrollBarEnabled = true
       applyKeyboardType()
+      typeface = fonts.normal
+      // text-md/medium: the React Native placeholder's pixel size and font padding.
+      includeFontPadding = false
+      setTextSize(TypedValue.COMPLEX_UNIT_PX, ceil(PixelUtil.toPixelFromSP(INPUT_FONT_SIZE_SP)))
+      TextViewCompat.setLineHeight(this, ceil(PixelUtil.toPixelFromSP(INPUT_LINE_HEIGHT_DP.toFloat())).toInt())
+      isVerticalScrollBarEnabled = true
       setPadding(0, (5 * density).roundToInt(), 0, (5 * density).roundToInt())
       filters = arrayOf(EditDisabledFilter())
 
@@ -407,6 +413,10 @@ class ChatInputView(context: Context) : FrameLayout(context) {
     val heightDp = min((layout.height + editText.paddingTop + editText.paddingBottom) / density, maxHeightDp)
     if (kotlin.math.abs(heightDp - lastContentHeight) < 0.5f) return
     lastContentHeight = heightDp
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      Trace.setCounter("chat:input-text-size-px", editText.textSize.roundToInt().toLong())
+      Trace.setCounter("chat:input-content-height-px", (heightDp * density).roundToInt().toLong())
+    }
     emit("topChangeContentSize") { putDouble("height", heightDp.toDouble()) }
   }
 

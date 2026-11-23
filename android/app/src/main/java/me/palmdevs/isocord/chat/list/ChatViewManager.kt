@@ -1,7 +1,5 @@
 package me.palmdevs.isocord.chat.list
 
-import me.palmdevs.isocord.BuildConfig
-
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
@@ -25,11 +23,17 @@ class ChatViewManager : SimpleViewManager<ChatView>(), IsocordChatViewManagerInt
 
   @ReactProp(name = "rows")
   override fun setRows(view: ChatView, value: String?) {
-    val started = System.nanoTime()
-    me.palmdevs.isocord.core.Perf.span("chat:rows") { view.updateRows(value) }
-    if (BuildConfig.DEBUG) {
-      android.util.Log.d("IsocordChat", "rows: ${value?.length ?: 0} chars in ${(System.nanoTime() - started) / 1_000_000} ms")
-    }
+    view.rowsJson = value
+  }
+
+  override fun onAfterUpdateTransaction(view: ChatView) {
+    super.onAfterUpdateTransaction(view)
+    view.updateRows()
+  }
+
+  override fun onDropViewInstance(view: ChatView) {
+    view.disposeRows()
+    super.onDropViewInstance(view)
   }
 
   @ReactProp(name = "theme")

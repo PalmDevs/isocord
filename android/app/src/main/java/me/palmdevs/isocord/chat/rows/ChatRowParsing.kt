@@ -21,7 +21,7 @@ fun parseReactions(json: String?): List<Reaction> =
  * Unchanged rows keep their instance, so a page or one new message costs only the changed rows.
  * A bad or unknown row is logged and skipped.
  */
-fun parseRows(json: String?, previous: Map<String, ChatRow> = emptyMap()): Pair<List<ChatRow>, Map<String, ChatRow>> {
+fun parseRows(json: String?, previous: Map<String, ChatRow>, checkActive: () -> Unit): Pair<List<ChatRow>, Map<String, ChatRow>> {
   if (json.isNullOrEmpty()) return emptyList<ChatRow>() to emptyMap()
   // An array on one line: fewer than two rows, or a writer that does not break lines.
   if ('\n' !in json) return decodeEach(ChatRow.serializer(), json) to emptyMap()
@@ -29,6 +29,7 @@ fun parseRows(json: String?, previous: Map<String, ChatRow> = emptyMap()): Pair<
   val lines = HashMap<String, ChatRow>()
   var start = 0
   while (start < json.length) {
+    checkActive()
     var end = json.indexOf('\n', start)
     if (end < 0) end = json.length
     // Each line is one row object, with the array's `[` before the first and `,` or `]` after each.

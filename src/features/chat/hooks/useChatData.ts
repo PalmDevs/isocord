@@ -1,5 +1,9 @@
 import { useEffect, useMemo } from 'react'
-import { useSession, useSessionStore } from '../../../core/react'
+import {
+    useSession,
+    useSessionReady,
+    useSessionStore,
+} from '../../../core/react'
 import { channelsStore } from '../../../stores/channels/channels'
 import { loadLinkedChannels } from '../../../stores/channels/linkedChannels'
 import { threadsStore } from '../../../stores/channels/threads'
@@ -11,15 +15,16 @@ import { loadMessages } from '../../../stores/messages/messageWindows'
 import { relationshipsStore } from '../../../stores/relationships'
 import { usersStore } from '../../../stores/users'
 import { useForumFirstMessage } from '../../forum/useForumPost'
-import { canReact, messageSwipeActions } from '../longPress/actions'
 import {
     clearFailedInteractions,
     componentInteractionsStore,
 } from '../messageComponents/interactionStore'
 import { pollStateStore, refreshPollsAt } from '../polls/pollState'
-import { nextPollChange } from '../polls/pollTime'
-import { buildRows, hiddenReasonOf } from '../rows/buildRows'
-import { encodeRows } from '../rows/rowEncoder'
+import {
+    chatRowsFor,
+    prepareChatRows,
+    releasePreparedChatRows,
+} from './preparedChatRows'
 
 /** Loads and watches a channel's history, and what its guild needs to show it. */
 export function useChatHistory(channelId: string) {
@@ -65,6 +70,20 @@ export function useChatHistory(channelId: string) {
 
 type History = ReturnType<typeof useChatHistory>
 
+/** Schedules data-only work for the selected chat while the list is active. */
+export function usePrepareChatRows(
+    channelId: string | undefined,
+    swipeOpensDetails: boolean,
+) {
+    const session = useSession()
+    const ready = useSessionReady()
+    // MainTabsNavigatorPanel: selected background channel preload.
+    useEffect(() => {
+        if (!ready || !channelId) return
+        return prepareChatRows(session, channelId, swipeOpensDetails)
+    }, [session, ready, channelId, swipeOpensDetails])
+}
+
 /** The chat's rows as the JSON the native list takes. */
 export function useChatRows({
     channel,
@@ -107,12 +126,10 @@ export function useChatRows({
         state => state,
     )
     // Keeps its identity: a JSON string prop of the native view.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: pollClock rebuilds the poll rows' time labels.
-    const { json, unknownChannels, pollChange } = useMemo(() => {
-        const started = __DEV__ ? performance.now() : 0
-        const unknownChannels = new Set<string>()
-        const json = encodeRows(
-            buildRows(messages, {
+    const { json, unknownChannels, pollChange } = useMemo(
+        () =>
+            chatRowsFor({
+                messages,
                 session,
                 guild,
                 guilds,
@@ -121,54 +138,43 @@ export function useChatRows({
                 channels,
                 ackedId,
                 channel,
-                canReact: message => canReact(session, message),
-                swipeActions: swipeOpensDetails
-                    ? () => undefined
-                    : messageSwipeActions(session, channel),
-                onUnknownChannel: id => unknownChannels.add(id),
+                swipeOpensDetails,
                 threads,
                 threadMessages,
                 polls,
+                pollClock,
                 interactions,
                 forumPostStarter,
-                hiddenReason: userId => hiddenReasonOf(relationships[userId]),
+                relationships,
             }),
-        )
-        if (__DEV__)
-            console.log(
-                `[chat] rows: ${json.length} chars in ${Math.round(performance.now() - started)} ms`,
-            )
-        // The soonest time a shown poll's label changes or it ends.
-        const pollChange = Math.min(
-            ...(messages?.messages ?? []).map(message =>
-                message.poll
-                    ? (nextPollChange(message.poll) ?? Infinity)
-                    : Infinity,
-            ),
-        )
-        return { json, unknownChannels, pollChange }
-    }, [
-        messages,
-        session,
-        guild,
-        guilds,
-        members,
-        users,
-        channels,
-        ackedId,
-        channel,
-        swipeOpensDetails,
-        threads,
-        threadMessages,
-        polls,
-        pollClock,
-        interactions,
-        forumPostStarter,
-        relationships,
-    ])
+        [
+            messages,
+            session,
+            guild,
+            guilds,
+            members,
+            users,
+            channels,
+            ackedId,
+            channel,
+            swipeOpensDetails,
+            threads,
+            threadMessages,
+            polls,
+            pollClock,
+            interactions,
+            forumPostStarter,
+            relationships,
+        ],
+    )
     useEffect(() => {
         if (Number.isFinite(pollChange)) refreshPollsAt(session, pollChange)
     }, [session, pollChange])
+    const channelId = channel?.id
+    useEffect(
+        () => releasePreparedChatRows(session, channelId),
+        [session, channelId],
+    )
     // A fetched channel lands in the channels store, which rebuilds the rows.
     useEffect(
         () => loadLinkedChannels(session, unknownChannels),

@@ -36,6 +36,8 @@ export interface ComposerState {
     selection: { start: number; end: number }
     focused: boolean
     keyboardOpen: boolean
+    /** An input command needs the native field before the opening animation settles. */
+    inputRequested: boolean
     /** Name of the panel shown in the custom-keyboard area, or null. */
     panel: string | null
     /** A field inside the panel (its search) has the keyboard, so a keyboard coming up must not close the panel. */
@@ -154,6 +156,7 @@ const createLocalStore = (
         selection: { start: 0, end: 0 },
         focused: false,
         keyboardOpen: false,
+        inputRequested: false,
         panel: null,
         panelTyping: false,
         mediaRowOpen: false,
@@ -250,18 +253,22 @@ export function ComposerProvider({
         attached?.ready,
         allowsEmpty,
     )
-    const latest = useRef({ session, colors: theme.colors })
-    latest.current = { session, colors: theme.colors }
+    const latest = useRef({ session, colors: theme.colors, channelId })
+    latest.current = { session, colors: theme.colors, channelId }
     // Lives as long as the composer: it holds the native view.
     const [input] = useState(() =>
-        createComposerInput(store, channelId, (text, id) =>
-            JSON.stringify(
-                styleBlocks(
-                    text,
-                    parseContext(latest.current.session, id),
-                    latest.current.colors,
+        createComposerInput(
+            store,
+            channelId,
+            () => latest.current.channelId,
+            (text, id) =>
+                JSON.stringify(
+                    styleBlocks(
+                        text,
+                        parseContext(latest.current.session, id),
+                        latest.current.colors,
+                    ),
                 ),
-            ),
         ),
     )
     // Memoised for identity: the effects that subscribe for the drafts follow it.

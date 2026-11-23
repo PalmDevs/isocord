@@ -935,6 +935,17 @@ export function buildRows(
     state: ChannelMessages | undefined,
     context: RowContext,
 ): ChatRow[] {
+    const work = buildRowsIncrementally(state, context)
+    let step = work.next()
+    while (!step.done) step = work.next()
+    return step.value
+}
+
+/** Builds the same rows, yielding after each message. */
+export function* buildRowsIncrementally(
+    state: ChannelMessages | undefined,
+    context: RowContext,
+): Generator<void, ChatRow[]> {
     if (!state)
         return [{ type: 'loading', key: 'loading-initial', placeholder: true }]
     const env = makeEnv(context)
@@ -943,7 +954,7 @@ export function buildRows(
     const post = forumPostOf(context)
     let postActionsPlaced = false
     let hidden: HiddenRun | undefined
-    state.messages.forEach((held, index) => {
+    for (const [index, held] of state.messages.entries()) {
         let message = held
         // The post's action bar sits under its first message and shows its reactions instead.
         if (post && held.id === post.id) {
@@ -978,7 +989,8 @@ export function buildRows(
             hidden = addHidden(rows, hidden, built, reason, state.revealedId)
         else rows.push(built)
         addDividers(message, date, older, olderDate)
-    })
+        yield
+    }
     if (post && !postActionsPlaced)
         rows.push(postActionsRow(post, context.forumPostStarter, context, true))
     addEdgeRows(rows, state, context)

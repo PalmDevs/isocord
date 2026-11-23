@@ -7,6 +7,7 @@ import type ChatInputNative from '../../../../native/ChatInputNativeComponent'
 import type { LocalStore } from '../state/ComposerContext'
 
 export type NativeInput = ComponentRef<typeof ChatInputNative>
+type FocusCommand = 'focus' | 'openCustomKeyboard' | 'openSystemKeyboard'
 
 /** What the input reports on every change of its text or selection. */
 export interface ChangeEvent {
@@ -26,6 +27,7 @@ const RESTYLE_MS = 200
 export function createComposerInput(
     store: LocalStore,
     channelId: string,
+    currentChannel: () => string,
     styleBlocks: (text: string, channelId: string) => string,
 ) {
     let native: NativeInput | null = null
@@ -37,9 +39,11 @@ export function createComposerInput(
     let barrier: string | null = null
     /** The text whose styles were last pushed. */
     let styledText: string | null = null
+    let pendingFocus: FocusCommand | undefined
 
-    const run = (action: (view: NativeInput) => void) => {
-        if (native) action(native)
+    const requestInput = () => {
+        if (!store.getState().inputRequested)
+            store.setState({ inputRequested: true })
     }
 
     const restyle = throttle((id: string, text: string, edit: number) => {
@@ -49,8 +53,25 @@ export function createComposerInput(
 
     const input = {
         /** The chat the input shows. */
-        channelId,
-        run,
+        get channelId() {
+            return channelId
+        },
+        set channelId(next: string) {
+            if (channelId === next) return
+            channelId = next
+            pendingFocus = undefined
+        },
+        focus: (command: FocusCommand = 'focus') => {
+            if (native) Commands[command](native)
+            else {
+                pendingFocus = command
+                requestInput()
+            }
+        },
+        blur: () => {
+            pendingFocus = undefined
+            if (native) Commands.blur(native)
+        },
         restyle: () => restyle(input.channelId, store.getState().text, editId),
         cancelRestyle: () => restyle.cancel(),
 
@@ -83,29 +104,63 @@ export function createComposerInput(
             })
         },
 
-        /** Replaces a range of the text, styling the result at once. */
+        /** Sets the selection, including before native attachment. */
+        setSelection: (start: number, length: number) => {
+            if (native) Commands.setSelectedRange(native, start, length)
+            else {
+                const size = store.getState().text.length
+                const from = Math.max(0, Math.min(start, size))
+                store.setState({
+                    selection: {
+                        start: from,
+                        end: Math.min(from + length, size),
+                    },
+                })
+                requestInput()
+            }
+        },
+
+        /** Replaces a range, returning the local text if the field is detached. */
         replaceRange: (
             location: number,
             length: number,
             text: string,
             keepCursorPosition = false,
         ) => {
-            const current = store.getState().text
-            const next =
-                current.slice(0, location) +
-                text +
-                current.slice(location + length)
-            run(view =>
+            const { text: current, selection } = store.getState()
+            const start = Math.max(0, Math.min(location, current.length))
+            const end = Math.min(start + Math.max(0, length), current.length)
+            const next = current.slice(0, start) + text + current.slice(end)
+            if (native) {
                 Commands.replaceRange(
-                    view,
+                    native,
                     location,
                     length,
                     text,
                     styleBlocks(next, input.channelId),
                     keepCursorPosition,
                     editId,
-                ),
-            )
+                )
+                return
+            }
+            const cursor = start + text.length
+            const shift = (position: number) =>
+                position <= start
+                    ? position
+                    : position >= end
+                      ? position + cursor - end
+                      : cursor
+            store.setState({
+                text: next,
+                selection: keepCursorPosition
+                    ? {
+                          start: shift(selection.start),
+                          end: shift(selection.end),
+                      }
+                    : { start: cursor, end: cursor },
+            })
+            requestInput()
+            return next === current ? undefined : next
         },
 
         /** The ref callback of the native view. */
@@ -113,9 +168,26 @@ export function createComposerInput(
             native = view
             // A detached input will not answer the flush that ends the barrier.
             barrier = null
-            // The input is built after the composer (the offscreen chat adds it when idle), empty: it shows the
-            // draft the composer restored for it.
-            if (view) input.setText(store.getState().text)
+            editId = -1
+            if (!view) return
+            const focus = pendingFocus
+            pendingFocus = undefined
+            if (channelId !== currentChannel()) return
+            // Hydrate the draft and selection before replaying an early focus request.
+            const { text, selection, panel, canSend } = store.getState()
+            input.setText(text)
+            if (
+                selection.start !== text.length ||
+                selection.end !== text.length
+            ) {
+                input.setSelection(
+                    selection.start,
+                    selection.end - selection.start,
+                )
+                store.setState({ selection })
+            }
+            if (focus && canSend && (focus !== 'openCustomKeyboard' || panel))
+                Commands[focus](view)
         },
 
         /** Takes a change event. `onText` hears of a changed text, unless the event is stale. */
