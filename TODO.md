@@ -50,6 +50,7 @@ Compared against the official client side by side (split-screen screenshot, 2026
 - [ ] Server-specific avatars (member `avatar`) and server profiles.
 
 ### Replies
+- [x] Composer reply bar: semibold display name with the same role colour as the Members list (`ChatInputReplyBar`). Untested on device.
 - [x] **Reply spine**: the curved line from the avatar column up to the reply preview.
 - [x] Reply preview content: 16px avatar of the replied-to author, `@` before the name, clan tag, and markdown-stripped text.
 - [x] Reply to a deleted / unloaded message ("Original message was deleted"), reply to an attachment-only message (icon + "Click to see attachment").
@@ -578,6 +579,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 
 - [ ] Full You tab (status picker, the settings gear in the header instead of the temporary Settings button). The profile itself is the sheet's `UserProfile` (2026-11-19, untested on device); the status bar strip above the banner is plain.
 - [ ] Account switcher: invalid-token indicator; divider inset is off while editing.
+- [x] Restore the saved username, display name and avatar from READY after signing back in.
 - [x] TableRow family, switch/checkbox/radio, slider, RowButton (Mana port), with the Android ripple as press state (`RipplePressable`) — draggable rows still missing.
 
 ---
