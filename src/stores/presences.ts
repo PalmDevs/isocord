@@ -1,6 +1,7 @@
 import { createStore } from 'zustand/vanilla'
 import { ActivityType } from '../core/discord/activity'
 import { defineStore } from '../core/session'
+import type { StoreApi } from 'zustand/vanilla'
 import type { Status } from '../core/discord/status'
 import type { Session as AppSession } from '../core/session'
 
@@ -130,9 +131,17 @@ export function applyPresences(
             )
     }
     if (Object.keys(incoming).length === 0) return
-    session.get(presencesStore).setState(state => ({
-        presences: { ...state.presences, ...incoming },
-    }))
+    merge(session.get(presencesStore), incoming)
+}
+
+/** Writes `incoming` into the map in place, then notifies with a new state object. */
+function merge(
+    store: StoreApi<PresencesState>,
+    incoming: PresencesState['presences'],
+) {
+    const { presences } = store.getState()
+    Object.assign(presences, incoming)
+    store.setState({ presences })
 }
 
 const isMobileOnline = (clientStatus: ClientStatus | undefined) =>
@@ -142,17 +151,21 @@ const isMobileOnline = (clientStatus: ClientStatus | undefined) =>
 
 const MOBILE_CLIENTS = new Set(['mobile', 'android', 'ios'])
 
+interface PresencesState {
+    /**
+     * By user id. Written in place: a copy per PRESENCE_UPDATE costs O(users seen).
+     * Select an entry, or derive inside the selector. The map itself is only replaced on READY.
+     */
+    presences: Readonly<Record<string, Presence>>
+}
+
 /** Online status of friends, DM recipients, members of subscribed guilds and the current user. */
 export const presencesStore = defineStore('presences', session => {
-    const store = createStore<{ presences: Record<string, Presence> }>(() => ({
-        presences: {},
-    }))
+    const store = createStore<PresencesState>(() => ({ presences: {} }))
     const { dispatch } = session.gateway
 
     const set = (userId: string, presence: Presence) =>
-        store.setState(state => ({
-            presences: { ...state.presences, [userId]: presence },
-        }))
+        merge(store, { [userId]: presence })
     const setSelf = (sessions: Session[] | undefined) => {
         const own = sessions?.[0]
         if (!own) return
@@ -178,7 +191,7 @@ export const presencesStore = defineStore('presences', session => {
     })
     dispatch.on('SESSIONS_REPLACE', setSelf)
     dispatch.on('READY_SUPPLEMENTAL', supplemental => {
-        const presences = { ...store.getState().presences }
+        const presences: Record<string, Presence> = {}
         for (const update of supplemental.merged_presences?.friends ?? []) {
             const id = update.user_id ?? update.user?.id
             if (id)
@@ -187,7 +200,7 @@ export const presencesStore = defineStore('presences', session => {
                     isMobileOnline(update.client_status),
                 )
         }
-        store.setState({ presences })
+        merge(store, presences)
     })
     dispatch.on('GUILD_MEMBERS_CHUNK', chunk => {
         if (chunk.presences?.length) applyPresences(session, chunk.presences)
