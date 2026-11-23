@@ -89,16 +89,22 @@ export const usersStore = defineStore(
             if (next) store.setState({ users: next })
         }
 
-        dispatch.on('READY', ready =>
-            upsert([...(ready.users ?? []), ready.user]),
-        )
-        dispatch.on('USER_UPDATE', user => {
-            upsert([user])
+        const syncAccount = (user: User) => {
             updateAccount(user.id, {
                 username: user.username,
                 globalName: user.global_name ?? null,
                 avatar: user.avatar,
             })
+        }
+
+        // MultiAccountStore.handleConnectionOpen: Account identity from READY.
+        dispatch.on('READY', ready => {
+            upsert([...(ready.users ?? []), ready.user])
+            syncAccount(ready.user)
+        })
+        dispatch.on('USER_UPDATE', user => {
+            upsert([user])
+            syncAccount(user)
         })
         dispatch.on('MESSAGE_CREATE', message =>
             upsert([message.author, ...(message.mentions ?? [])]),
