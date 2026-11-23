@@ -55,8 +55,34 @@ export const Permission = {
 
 const ALL = ~0n
 
+/** Cache key for a call without a channel. */
+const NO_CHANNEL = {}
+
+/**
+ * Computed permissions by guild, user and channel object. Stores replace a guild or channel object when it
+ * changes, so identity is the invalidation (PermissionStore caches per channel and clears on guild, role and
+ * own member updates).
+ */
+const cache = new WeakMap<Guild, Map<string, WeakMap<object, bigint>>>()
+
 /** The current user's permissions in a guild channel (or in its parent, for a thread's caller to pass). */
 export function computePermissions(
+    guild: Guild,
+    channel: Channel | undefined,
+    userId: string,
+): bigint {
+    let byUser = cache.get(guild)
+    if (!byUser) cache.set(guild, (byUser = new Map()))
+    let byChannel = byUser.get(userId)
+    if (!byChannel) byUser.set(userId, (byChannel = new WeakMap()))
+    const key = channel ?? NO_CHANNEL
+    let permissions = byChannel.get(key)
+    if (permissions === undefined)
+        byChannel.set(key, (permissions = compute(guild, channel, userId)))
+    return permissions
+}
+
+function compute(
     guild: Guild,
     channel: Channel | undefined,
     userId: string,
@@ -114,7 +140,7 @@ export function memberCanView(
     roleIds: string[],
 ): boolean {
     return (
-        (computePermissions({ ...guild, myRoles: roleIds }, channel, userId) &
+        (compute({ ...guild, myRoles: roleIds }, channel, userId) &
             Permission.VIEW_CHANNEL) !==
         0n
     )

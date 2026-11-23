@@ -12,7 +12,7 @@ import { t } from '../../../i18n'
 import { swipeMode } from '../../../native/NativeIsocordConstants'
 import { channelsStore, isPrivate } from '../../../stores/channels/channels'
 import { guildsStore } from '../../../stores/guilds'
-import { channelPermissions } from '../../../stores/permissions'
+import { can as hasPermission } from '../../../stores/permissions'
 import { settingsStore } from '../../../stores/settings/settingsStore'
 import {
     copyMediaLink,
@@ -67,10 +67,9 @@ export type FlaggedMessage = Message & {
     message_reference?: { type?: number }
 }
 
-/** Returns a check of one permission bit in a channel, worked out once (PermissionStore.can). */
+/** Returns a check of one permission bit in a channel (PermissionStore.can), a lookup in the permission cache. */
 function permissionCheck(session: Session, channelId: string) {
-    const permissions = channelPermissions(session, channelId)
-    return (permission: bigint) => (permissions & permission) !== 0n
+    return (permission: bigint) => hasPermission(session, channelId, permission)
 }
 
 /**
