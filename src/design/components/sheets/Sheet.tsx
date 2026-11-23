@@ -144,7 +144,8 @@ export interface BottomSheetProps {
     onDismiss?: () => void
     keyboardShouldPersistTaps?: ScrollViewProps['keyboardShouldPersistTaps']
     children?: ReactNode
-    backgroundStyles?: StyleProp<ViewStyle>
+    /** Drawn behind the sheet content and clipped to the sheet. */
+    background?: ReactNode
     /** Style of the content container, which holds the body. */
     contentStyles?: StyleProp<ViewStyle>
     bodyStyles?: StyleProp<ViewStyle>
@@ -171,7 +172,7 @@ export function BottomSheet({
     onDismiss,
     keyboardShouldPersistTaps,
     children,
-    backgroundStyles,
+    background,
     contentStyles,
     bodyStyles,
 }: BottomSheetProps) {
@@ -324,13 +325,9 @@ export function BottomSheet({
 
     const sheet = scrollable ? (
         <Animated.View
-            style={[
-                styles.sheet,
-                { backgroundColor: surfaceBg },
-                backgroundStyles,
-                sheetStyle,
-            ]}
+            style={[styles.sheet, { backgroundColor: surfaceBg }, sheetStyle]}
         >
+            {background}
             <GestureDetector gesture={pan}>{chrome}</GestureDetector>
             <SheetDrag scrollAtTop={scrollAtTop} style={styles.fill}>
                 <ScrollView
@@ -360,10 +357,10 @@ export function BottomSheet({
                 style={[
                     styles.sheet,
                     { backgroundColor: surfaceBg },
-                    backgroundStyles,
                     sheetStyle,
                 ]}
             >
+                {background}
                 <View
                     style={styles.natural}
                     onLayout={event =>

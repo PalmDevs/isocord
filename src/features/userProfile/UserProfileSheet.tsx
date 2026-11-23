@@ -1,5 +1,5 @@
 import { useContext, useState } from 'react'
-import { View } from 'react-native'
+import { StyleSheet as NativeStyleSheet, View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { IconButton } from '../../design/components/buttons/IconButton'
 import { ContextMenu } from '../../design/components/overlays/ContextMenu'
@@ -53,10 +53,18 @@ export function UserProfileSheet({
             handleDisabled
             contentStyles={styles.sheet}
             bodyStyles={styles.body}
-            backgroundStyles={
-                view.themeColors
-                    ? profileBackground(view.themeColors)
-                    : undefined
+            background={
+                view.themeColors && (
+                    // UserProfileFixedBackground: cache only the gradient under the menu's animated scrim.
+                    <View
+                        pointerEvents="none"
+                        renderToHardwareTextureAndroid
+                        style={[
+                            NativeStyleSheet.absoluteFill,
+                            profileBackground(view.themeColors),
+                        ]}
+                    />
+                )
             }
         >
             <View>
