@@ -1,6 +1,6 @@
 import { MessageType } from '../../../core/discord/messages'
 import { snowflakeTimestamp } from '../../../core/discord/snowflake'
-import { humanizeDuration } from '../timestamp'
+import { formatTime, humanizeDuration } from '../timestamp'
 import { automodAuthor } from './automod'
 import { authorValues } from './types'
 import type { MessageKey } from '../../../i18n'
@@ -48,12 +48,7 @@ function streamContent(message: Message, env: SystemEnv): SystemContent {
 
 /** The time security actions last until: the content holds it (toLocaleString with hour and minute). */
 const alertUntil = (message: Message) =>
-    message.content
-        ? new Date(message.content).toLocaleTimeString(undefined, {
-              hour: 'numeric',
-              minute: '2-digit',
-          })
-        : ''
+    message.content ? formatTime(new Date(message.content)) : ''
 
 /** An incident message: sent as AutoMod, with the author named in the text. */
 const incident = (

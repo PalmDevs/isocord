@@ -13,6 +13,7 @@ import { chatLink } from '../links/chatLink'
 import { attachmentRows } from '../media'
 import { componentRows } from '../messageComponents/componentRow'
 import { pollRow } from '../polls/pollRow'
+import { formatShortDate, formatTime, formatWeekday } from '../timestamp'
 import { ephemeralIndication, executedCommand } from './interaction'
 import type { Session } from '../../../core/session'
 import type { Channel } from '../../../stores/channels/channels'
@@ -73,22 +74,14 @@ interface RichHelpers {
 
 /** DateUtils.calendarFormatCompact: the time today, "Yesterday at" the time, the weekday within a week, else the date. */
 function calendarFormatCompact(date: Date): string {
-    const time = date.toLocaleTimeString(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-    })
+    const time = formatTime(date)
     const startOfDay = (day: Date) =>
         new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime()
     const days = Math.round((startOfDay(date) - startOfDay(new Date())) / DAY)
     if (days === 0) return time
     if (days === -1) return t('chat.yesterday', { time })
-    if (days > -7 && days < 0)
-        return date.toLocaleDateString(undefined, { weekday: 'long' })
-    return date.toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    })
+    if (days > -7 && days < 0) return formatWeekday(date)
+    return formatShortDate(date)
 }
 
 /**

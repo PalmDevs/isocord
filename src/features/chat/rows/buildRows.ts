@@ -43,7 +43,7 @@ import {
 import { NO_POLL_STATE } from '../polls/pollState'
 import { keyOf } from '../reactions'
 import { systemRow } from '../system'
-import { calendarTimestamp, sameDay } from '../timestamp'
+import { calendarTimestamp, formatLongDate, sameDay } from '../timestamp'
 import { isJumbo, parseEmbedTitle, parseMarkdown, toSpans } from './markdown'
 import { messagePreview } from './messagePreview'
 import { richParts } from './rich'
@@ -762,11 +762,7 @@ function dividerAdder(
             rows.push({
                 type: 'separator',
                 key: `day-${message.id}`,
-                text: date.toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                }),
+                text: formatLongDate(date),
             })
         }
     }

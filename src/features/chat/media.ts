@@ -9,7 +9,7 @@ import { formatBytes } from '../../core/format'
 import { DAY } from '../../core/time'
 import { t } from '../../i18n'
 import { rgbInt } from './color'
-import { sameDay } from './timestamp'
+import { formatNumericDate, formatTime, sameDay } from './timestamp'
 import type {
     Attachment,
     Embed,
@@ -129,15 +129,12 @@ function embedMedia(media: EmbedMedia | undefined): MediaRow | undefined {
 /** The footer's timestamp: "Today at 1:25 PM", "Yesterday at 1:25 PM", or the date. */
 function calendar(iso: string): string {
     const date = new Date(iso)
-    const time = date.toLocaleTimeString(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-    })
+    const time = formatTime(date)
     const now = new Date()
     if (sameDay(date, now)) return t('chat.today', { time })
     if (sameDay(date, new Date(now.getTime() - DAY)))
         return t('chat.yesterday', { time })
-    return date.toLocaleDateString()
+    return formatNumericDate(date)
 }
 
 const httpUrl = (url: string | undefined) =>
