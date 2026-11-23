@@ -3,6 +3,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { Button } from '../../design/components/buttons/Button'
 import { Text } from '../../design/components/Text'
 import { t } from '../../i18n'
+import { splashContentNativeId } from '../../native/NativeIsocordConstants'
 import type { AuthScreenProps } from './navigation'
 
 const backgrounds = {
@@ -13,7 +14,7 @@ const backgrounds = {
 export function Welcome({ navigation }: AuthScreenProps<'welcome'>) {
     const { theme } = useUnistyles()
     return (
-        <View style={styles.container}>
+        <View nativeID={splashContentNativeId} style={styles.container}>
             <Image
                 source={theme.isDark ? backgrounds.dark : backgrounds.light}
                 resizeMode="cover"

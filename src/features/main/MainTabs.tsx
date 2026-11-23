@@ -12,7 +12,6 @@ import { endMainWait } from '../../app/startupTrace'
 import { accountsStore, currentAccount } from '../../core/accounts'
 import { logger } from '../../core/log'
 import { useSession, useSessionStore } from '../../core/react'
-import { hideSplashAfterFrame } from '../../core/startup'
 import { StatusAvatar } from '../../design/components/avatars/StatusAvatar'
 import { Badge } from '../../design/components/Badge'
 import { Text } from '../../design/components/Text'
@@ -296,7 +295,6 @@ function ChannelOpener() {
 export function MainTabs() {
     const session = useSession()
     useEffect(endMainWait, [])
-    useEffect(hideSplashAfterFrame, [])
     return (
         // The Servers chat panel slides over the whole tab navigator, tab bar included.
         <ServersPanels>

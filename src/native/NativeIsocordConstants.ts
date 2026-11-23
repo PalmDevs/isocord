@@ -4,6 +4,8 @@ import type { TurboModule } from 'react-native'
 /** Values native code owns and JS reads (ConstantsModule.kt). */
 export interface Spec extends TurboModule {
     getConstants(): {
+        /** The first screen's native ID for Android's splash draw gate. */
+        splashContentNativeId: string
         /** The scheme of in-app links (`Links.SCHEME`). */
         linkScheme: string
         /** The query key of a media link, `origin=x,y,width,height` (`Links.ORIGIN_PARAM`). */
@@ -139,6 +141,7 @@ const NativeIsocordConstants =
     TurboModuleRegistry.getEnforcing<Spec>('IsocordConstants')
 
 export const {
+    splashContentNativeId,
     linkScheme,
     originParam,
     thumbnailPart,

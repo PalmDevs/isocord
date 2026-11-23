@@ -7,6 +7,7 @@ import { useSession, useSessionReady, useSessionStore } from '../../core/react'
 import { Skeleton, SkeletonPulse } from '../../design/components/Skeleton'
 import { Text } from '../../design/components/Text'
 import { t } from '../../i18n'
+import { splashContentNativeId } from '../../native/NativeIsocordConstants'
 import { guildsStore } from '../../stores/guilds'
 import { settingsStore } from '../../stores/settings/settingsStore'
 import { useTabSelected } from '../main/useTabSelected'
@@ -91,7 +92,7 @@ export function ServersTab() {
         : 0
 
     return (
-        <View style={styles.container}>
+        <View nativeID={splashContentNativeId} style={styles.container}>
             <GuildsBar />
             <View
                 style={styles.panel}

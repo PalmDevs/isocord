@@ -21,6 +21,7 @@ import {
 import { Text } from '../../design/components/Text'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
+import { splashContentNativeId } from '../../native/NativeIsocordConstants'
 import SpanTextView from '../../native/SpanTextViewNativeComponent'
 import { channelsStore } from '../../stores/channels/channels'
 import { dmPreviewsStore } from '../../stores/channels/dmPreviews'
@@ -257,7 +258,7 @@ export function MessagesTab() {
     const listRef = useRef<FlashListRef<string>>(null)
 
     return (
-        <View style={styles.container}>
+        <View nativeID={splashContentNativeId} style={styles.container}>
             <View style={styles.header}>
                 <Text
                     variant="heading-xl/bold"

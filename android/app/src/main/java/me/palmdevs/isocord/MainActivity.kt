@@ -11,7 +11,9 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.facebook.react.uimanager.util.ReactFindViewUtil
 import me.palmdevs.isocord.core.FontScale
+import me.palmdevs.isocord.core.Perf
 import me.palmdevs.isocord.notifications.Handover
 import me.palmdevs.isocord.notifications.gateway.AppVisibility
 import me.palmdevs.isocord.share.SharedContentInbox
@@ -46,12 +48,17 @@ class MainActivity : ReactActivity() {
    * screens from JS instead. Without this, restoring the activity throws in ScreenFragment's constructor.
    */
   override fun onCreate(savedInstanceState: Bundle?) {
-    // The splash stays until JS reports the first real frame, or a few seconds at most.
-    // Reset per activity. The process outlives a swiped-away task while the notifications gateway runs.
-    splashDone = false
+    // The initial React screen must be attached and laid out before Android draws it.
     val start = SystemClock.uptimeMillis()
     installSplashScreen().setKeepOnScreenCondition {
-      !splashDone && SystemClock.uptimeMillis() - start < SPLASH_TIMEOUT_MS
+      val content = ReactFindViewUtil.findView(window.decorView, SPLASH_CONTENT_NATIVE_ID)
+      when {
+        content != null && content.width > 0 && content.height > 0 ->
+          Perf.span("startup:splash-content-ready") { false }
+        SystemClock.uptimeMillis() - start >= SPLASH_TIMEOUT_MS ->
+          Perf.span("startup:splash-timeout") { false }
+        else -> true
+      }
     }
     super.onCreate(null)
     // A restored activity or one reopened from recents would share the same content again.
@@ -78,8 +85,10 @@ class MainActivity : ReactActivity() {
   }
 
   companion object {
-    private const val SPLASH_TIMEOUT_MS = 3000L
-    @Volatile var splashDone = false
+    internal const val SPLASH_CONTENT_NATIVE_ID = "isocord-splash-content"
+
+    /** Recovery limit when the initial screen never mounts. */
+    private const val SPLASH_TIMEOUT_MS = 5_000L
   }
 
   /**

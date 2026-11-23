@@ -22,7 +22,6 @@ import { features } from '../core/feature'
 import { logger } from '../core/log'
 import { startCurrentSession } from '../core/react'
 import { SessionProvider } from '../core/SessionProvider'
-import { hideSplashAfterFrame } from '../core/startup'
 import { ModalScreen } from '../design/components/overlays/ModalStack'
 import { usePanelBackEvents } from '../design/components/overlays/usePanelBackPreview'
 import { AuthNavigator } from '../features/auth/AuthNavigator'
@@ -45,11 +44,6 @@ declare module '@react-navigation/native' {
 
 const log = logger('App')
 AppState.addEventListener('change', state => log.info(`State: ${state}`))
-
-function LoggedOut() {
-    useEffect(hideSplashAfterFrame, [])
-    return <AuthNavigator />
-}
 
 const ANDROID_16_API = 36
 const APP_HOST_SCREEN = 'app'
@@ -110,7 +104,7 @@ export function App() {
                 <SafeAreaProvider initialMetrics={initialWindowMetrics}>
                     <KeyboardProvider>
                         <QueryClientProvider client={queryClient}>
-                            <SessionProvider fallback={<LoggedOut />}>
+                            <SessionProvider fallback={<AuthNavigator />}>
                                 <NavigationContainer
                                     ref={navigation}
                                     onStateChange={() =>

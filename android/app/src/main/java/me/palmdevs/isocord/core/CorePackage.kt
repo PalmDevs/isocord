@@ -9,11 +9,10 @@ import me.palmdevs.isocord.compression.CompressionModule
 import me.palmdevs.isocord.network.NetworkModule
 import me.palmdevs.isocord.share.ShareModule
 
-/** The small app-wide TurboModules: startup, font scale, tracing, the cookie jars and shared content. */
+/** App-wide modules for font scale, tracing, networking and shared content. */
 class CorePackage : BaseReactPackage() {
   override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? =
     when (name) {
-      StartupModule.NAME -> StartupModule(reactContext)
       FontScaleModule.NAME -> FontScaleModule(reactContext)
       TraceModule.NAME -> TraceModule(reactContext)
       NetworkModule.NAME -> NetworkModule(reactContext)
@@ -25,7 +24,6 @@ class CorePackage : BaseReactPackage() {
 
   override fun getReactModuleInfoProvider() = ReactModuleInfoProvider {
     mapOf(
-      StartupModule::class.java to StartupModule.NAME,
       FontScaleModule::class.java to FontScaleModule.NAME,
       TraceModule::class.java to TraceModule.NAME,
       NetworkModule::class.java to NetworkModule.NAME,

@@ -6,6 +6,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
+import me.palmdevs.isocord.MainActivity
 import me.palmdevs.isocord.chat.list.LONGEST_SCROLL_MS
 import me.palmdevs.isocord.chat.list.SwipeAction
 import me.palmdevs.isocord.chat.list.SwipeMode
@@ -35,6 +36,7 @@ class ConstantsModule(context: ReactApplicationContext) : NativeIsocordConstants
   override fun getName() = NAME
 
   override fun getTypedExportedConstants(): Map<String, Any> = mapOf(
+    "splashContentNativeId" to MainActivity.SPLASH_CONTENT_NATIVE_ID,
     "linkScheme" to Links.SCHEME,
     "originParam" to Links.ORIGIN_PARAM,
     "thumbnailPart" to Links.THUMBNAIL_PART,
