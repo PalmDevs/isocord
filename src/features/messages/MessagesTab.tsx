@@ -246,14 +246,22 @@ export function MessagesTab() {
 
     // ChannelsUnreadBars: conversations with mentions or unreads the bars can point at.
     // Every private channel notifies, so an unread one shows unless it is muted.
-    const readStates = useSessionStore(readStatesStore, state => state)
-    const barRows = ids.flatMap((id, index) => {
-        const count = readStates.mentions[id] ?? 0
-        const mention = count > 0
-        const unread = !mention && isUnread(readStates, id)
-        if (!mention && !unread) return []
-        return [{ index, mention }]
-    })
+    // Primitives per conversation, so messages elsewhere don't re-render this tab.
+    const barKinds = useSessionStore(
+        readStatesStore,
+        useShallow(state =>
+            ids.map(id =>
+                (state.mentions[id] ?? 0) > 0
+                    ? 'mention'
+                    : isUnread(state, id)
+                      ? 'unread'
+                      : 'read',
+            ),
+        ),
+    )
+    const barRows = barKinds.flatMap((kind, index) =>
+        kind === 'read' ? [] : [{ index, mention: kind === 'mention' }],
+    )
     const unreadBars = useUnreadBars(barRows)
     const listRef = useRef<FlashListRef<string>>(null)
 

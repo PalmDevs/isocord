@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native-unistyles'
+import { useShallow } from 'zustand/react/shallow'
 import { useSessionStore } from '../../core/react'
 import { Text } from '../../design/components/Text'
 import { t } from '../../i18n'
@@ -29,14 +30,27 @@ export function TypingText({
         channelsStore,
         state => state.channels[channelId]?.guild_id,
     )
-    const users = useSessionStore(usersStore, state => state.users)
-    const members = useSessionStore(membersStore, state =>
-        guildId ? state.members[guildId] : undefined,
+    // Arrays of strings, per typer: a user or member elsewhere changing re-renders nothing.
+    const displayNames = useSessionStore(
+        usersStore,
+        useShallow(state =>
+            userIds.map(id => {
+                const user = state.users[id]
+                return user ? displayName(user) : undefined
+            }),
+        ),
     )
-    const names = userIds.flatMap(id => {
-        const user = users[id]
-        return user ? [members?.[id]?.nick ?? displayName(user)] : []
-    })
+    const nicks = useSessionStore(
+        membersStore,
+        useShallow(state =>
+            userIds.map(id =>
+                guildId ? state.members[guildId]?.[id]?.nick : undefined,
+            ),
+        ),
+    )
+    const names = displayNames.flatMap((name, index) =>
+        name === undefined ? [] : [nicks[index] ?? name],
+    )
     const [a, b, c, d] = names
     if (a === undefined) return null
     const key =

@@ -97,10 +97,15 @@ function useTabBadge(route: string): { count: number; low: boolean } {
         notificationsStore,
         state => state.items,
     )
-    const acks = useSessionStore(readStatesStore, state => state.acks)
-    const unreadNotifications = notifications.filter(
-        item => isMentionItem(item) && isUnreadMention(item, acks),
-    ).length
+    // Counted inside the selector: an ack of another channel re-renders nothing unless the count changes.
+    const unreadNotifications = useSessionStore(
+        readStatesStore,
+        state =>
+            notifications.filter(
+                item =>
+                    isMentionItem(item) && isUnreadMention(item, state.acks),
+            ).length,
+    )
     return route === 'servers'
         ? { count: serverMentions, low: serversLow }
         : {

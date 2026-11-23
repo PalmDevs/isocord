@@ -40,17 +40,16 @@ function useChannelPlaceholder(channelId: string): string {
         channelsStore,
         state => state.channels[channelId],
     )
-    const users = useSessionStore(usersStore, state => state.users)
+    // The name is derived inside the selector: other users changing re-renders nothing.
+    const name = useSessionStore(usersStore, state =>
+        channel ? computeChannelName(channel, state.users) : '',
+    )
     if (!channel) return ''
     if (channel.type === ChannelType.DM)
-        return t('composer.placeholder.dm', {
-            name: computeChannelName(channel, users),
-        })
+        return t('composer.placeholder.dm', { name })
     if (channel.type === ChannelType.GROUP_DM)
-        return t('composer.placeholder.group', {
-            name: computeChannelName(channel, users),
-        })
-    return t('composer.placeholder.channel', { name: channel.name ?? '' })
+        return t('composer.placeholder.group', { name })
+    return t('composer.placeholder.channel', { name })
 }
 
 function useInputPlaceholder(editable: boolean): string {
