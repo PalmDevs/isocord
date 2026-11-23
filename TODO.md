@@ -259,10 +259,10 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
   - Slow flings stuttered (2026-11-16, A06): the posted `measureAndLayout` laid out only the ComposeView, so `ChatView`'s own layout request was never cleared. Android then stopped passing Compose's requests up, and `AndroidComposeView` kept waiting for a layout pass instead of invalidating. A fling with no new rows reached the screen on 1 frame in 3–8 (60–90 px jumps). The runnable now also calls `layout()` on `ChatView` (React Native's native-view pattern). Confirmed on the A06.
   - Reply previews draw the replied-to text as spans (`ReplyRow.spans`, `buildRows.replySpans`: mentions, emoji, links styled, one line, quotes/code/line breaks flattened like the reference's inline reply rules), through the span builder shared with the message body (`buildSpanText` in `MessageText.kt`).
   Still open:
-  - **Baseline profile.** A Perfetto trace of the release build (2026-11-13) spent 2.4 s JIT-compiling; the first chat opens cost 170–250 ms on the UI thread versus 45–80 ms once warm. Sideloaded release builds get no cloud profile. Generate one with a Macrobenchmark `BaselineProfileRule` run on the emulator (startup, open a chat, scroll it, swipe panels), ship it as `baseline-prof.txt` with `androidx.profileinstaller`. The release build is already `profileable` (manifest) for tracing.
+  - **Baseline profile.** A Perfetto trace of the release build (2026-11-13) spent 2.4 s JIT-compiling; the first chat opens cost 170–250 ms on the UI thread versus 45–80 ms once warm. Sideloaded release builds get no cloud profile. Generate one with a Macrobenchmark `BaselineProfileRule` run on the emulator (startup, open a chat, scroll it, swipe panels), ship it as `baseline-prof.txt` with `androidx.profileinstaller`. The release build is already `profileable` (manifest) for tracing. The generator exists (`android/baselineprofile`, 2026-11-24) but has not been run, and no profile is committed.
   - Coil disk cache lock contention: ~10 coroutine threads waited up to 100 ms on `DiskLruCache.get` in the same trace (delays images, not frames). Consider a smaller fetcher/decoder parallelism.
   - Three image stacks are loaded (Fresco via RN `Image`, Glide via expo-image, Coil in the chat); consolidating would cut memory and startup.
-  - `ChatPanel` still rebuilds *all* rows in JS whenever the whole `users` / `members` / `channels` maps change (presence, member chunks). Native now parses only changed lines (`serializeRows` one row per line, `parseRows(json, previous)` line cache in `ChatRows.kt`). Built 2026-11-15, untested on device. Narrow the deps or build rows per message.
+  - `ChatPanel` still rebuilds *all* rows in JS whenever the whole `users` / `members` / `channels` maps change (presence, member chunks). Native now parses only changed lines (`serializeRows` one row per line, `parseRows(json, previous)` line cache in `ChatRows.kt`). Built 2026-11-15, untested on device. Narrow the deps or build rows per message. Rows and their JSON lines are now reused per message while nothing they read changed (`rowMemo.ts`, 2026-11-24, untested on device).
   - Mention and add-reaction icons are decoded once per process (`cachedPainter`); `animateItem` removed from rows; reply spine path cached (`drawWithCache`). Built 2026-11-15, untested on device.
   - Traces of sideloaded builds run Compose JIT-only (1282 baseline compiles in a 17 s trace). Run `adb shell cmd package compile -f -m speed-profile me.palmdevs.isocord` after one launch before tracing.
   - GIFs don't start while a finger is down (`isScrollInProgress` is true during a drag).
@@ -365,7 +365,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
   - The font follows the parser: text-presentation symbols (▶, ✔, ♥, digits) stay text unless followed by U+FE0F; minimally-qualified ZWJ sequences (`👁‍🗨`) aren't Twemoji in either.
   - `@twemoji/parser` is pinned to 17.0.1: 17.0.2 stops matching text-default modifier bases (✌️, ☝️, ✍️, ⛹️ and their skin tones).
   - `TwemojiFonts.REACT_FAMILIES` lists the families React Native uses; a family added to the tokens needs adding there, or it gets the system emoji.
-  - The fonts are decoded at startup (Twemoji.ttf is 4.4 MB, compressed in the APK); check the startup cost in a trace.
+  - The fonts are decoded at startup (Twemoji.ttf is 4.4 MB). Since 2026-11-24 they are stored uncompressed and loaded off the main thread, and the React host waits for them. Check the startup cost in a trace.
   - Jumbo emoji (48sp) and the emoji info sheet upscale the 72px art and may look soft.
   - Emoji 17 renders, but the picker data (`unicode-emojis.json`, from the reference APK) stops at Emoji 16 until Discord's data adds it.
 - [ ] Blocked/ignored messages row (collapsed "N blocked messages" row as in the reference).
@@ -700,6 +700,24 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [x] Development timing logs in `socket.ts` / `session.ts` now go to the always-on logger (Debug Logs). `ChatPanel.tsx`'s per-update rows timing stays a `__DEV__` console log (too frequent for the buffer).
 - [x] Debug Logs (Settings → Developer Settings → Logs, needs Developer Mode; `core/log.ts`, `features/debugLogs`), after UserSettingsDebugLogs and LogAggregator: 5000-entry in-memory buffer, regex filter, sort order, share as text; the list updates live (batched every 500 ms) and follows new entries when at the newest end. Logged: REST method/path/status/time (never query, headers or bodies), gateway state/closes/reconnects/READY size and timing, session start/feature setup times/cache restore and save/READY, feature registration, accounts (no identifiers), uploads, chat link kinds, screens, app state, startup milestones, console warnings/errors, uncaught errors, unhandled rejections (release). The last 100 lines before a fatal error are kept for the next launch. Built and installed on the emulator 2026-11-16, untested on device. Departures: entries have a level (category coloured for warn/error); the Logs row opens the screen directly instead of a sheet of log screens; live list instead of a snapshot with pull to refresh (no Refresh option); the options button is a secondary IconButton beside the field, not inside it. Open: native (Kotlin) logs don't reach the buffer.
 - [x] In-app perf monitor (Settings → Developer Settings → Performance, needs Developer Mode; `features/perf`, `core/trace.ts`, `Perf.kt`): records `traced`/`beginSection` spans, native `Perf.span`s (`chat:rows`), janky frames (FrameMetrics, over 2× the deadline like JankStats) and JS stalls (rAF gaps over 100 ms, only while the overlay shows); overlay with JS/UI fps, jank, worst frame, JS/Java/native heap; exports Chrome trace JSON to Downloads. Recording survives restarts so startup sections are caught. Built and installed on the emulator 2026-11-16, untested on device. Open: the screen's own text is plain English (no reference strings); turn the timing logs in `socket.ts` / `session.ts` into spans; Android 15+ could add a full system trace via `ProfilingManager`.
+- [ ] Performance batch 1 (2026-11-24). Not yet seen working on a device.
+  - Measure startup before and after the font, host prewarm, R8, connect-first and deferred restore changes. Use `am start -S -W` for 10 runs, plus Perfetto `bindApplication`, `js:session`, `cache:*` and `save:*`.
+  - Check on a device:
+    - batched UI notifications on resume, including the 150 ms pause;
+    - deferred restores on the first frame;
+    - idle cache saves;
+    - the channels and expressions cache migration.
+  - Run the R8 runtime checklist on the release APK (`ClassNotFoundException`, `NoSuchMethod`, Expo package list).
+  - Run `:baselineprofile` and commit the generated profile. Pass `-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true`, or the run uninstalls the app and its login.
+  - A/B the Discord mounting flags (`-PdiscordMountingFlags=true`) with Perfetto traces. Compare mount batches, missed frames and `chat:rows`.
+  - Resource shrinking needs `res/raw/keep.xml` for drawables JS loads by name. Add it, then turn on `shrinkResources`.
+  - Measure whether `me.palmdevs.isocord.chat.rows.ChatRow` belongs in `compose-stability.conf`. Compose treats the `row: ChatRow` interface parameter as unstable.
+  - Measure `js:notify:forward` with a busy server. If it's still hot, send channel and parent only when they change.
+  - Measure the row memo on Hermes. Its map reads go through a Proxy, and the timings so far are from Bun/JSC.
+  - The row memo keeps a row and JSON line per built message, and the messages store never evicts. Evict both with the message once history is capped.
+  - Cache parts compare by identity. A store that mutates a cached object in place isn't rewritten until something else in that part changes.
+  - Parts written before a skipped or outdated cache stay on disk until the same key is written again.
+  - Move `readFlags` and the channel row builders out of the store import chain, so `bun test` can cover them.
 
 ## Cleanup
 
