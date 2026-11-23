@@ -20,11 +20,7 @@ import {
     componentInteractionsStore,
 } from '../messageComponents/interactionStore'
 import { pollStateStore, refreshPollsAt } from '../polls/pollState'
-import {
-    chatRowsFor,
-    prepareChatRows,
-    releasePreparedChatRows,
-} from './preparedChatRows'
+import { chatRowsFor, prepareChatRows } from './preparedChatRows'
 
 /** Loads and watches a channel's history, and what its guild needs to show it. */
 export function useChatHistory(channelId: string) {
@@ -126,6 +122,7 @@ export function useChatRows({
         state => state,
     )
     // Keeps its identity: a JSON string prop of the native view.
+    // A change elsewhere in these maps rebuilds cheaply: unchanged message rows are reused (rowMemo).
     const { json, unknownChannels, pollChange } = useMemo(
         () =>
             chatRowsFor({
@@ -170,11 +167,6 @@ export function useChatRows({
     useEffect(() => {
         if (Number.isFinite(pollChange)) refreshPollsAt(session, pollChange)
     }, [session, pollChange])
-    const channelId = channel?.id
-    useEffect(
-        () => releasePreparedChatRows(session, channelId),
-        [session, channelId],
-    )
     // A fetched channel lands in the channels store, which rebuilds the rows.
     useEffect(
         () => loadLinkedChannels(session, unknownChannels),

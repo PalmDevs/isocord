@@ -42,45 +42,20 @@ export interface ChatRowInputs
     > {
     messages: ChannelMessages | undefined
     swipeOpensDetails: boolean | undefined
+    /** Bumped when a poll's time-left label changes or it ends. */
     pollClock: number
     relationships: Record<string, Relationship>
 }
 
-interface EncodedChatRows {
-    json: string
-    unknownChannels: Set<string>
-    pollChange: number
-}
-
-interface PreparedChatRows {
-    inputs: ChatRowInputs
-    rows: EncodedChatRows
-    day: string
-}
-
 /** Spare JS time held for input and frame work. */
 const IDLE_ROW_MARGIN_MS = 3
-/** Timestamp mentions can show relative text. */
-const TIMESTAMP_SPAN = '"timestamp":true'
-const prepared = new WeakMap<Session, PreparedChatRows>()
 
-function expired(cached: PreparedChatRows): 'day' | 'poll' | undefined {
-    if (cached.day !== new Date().toDateString()) return 'day'
-    if (Date.now() >= cached.rows.pollChange) return 'poll'
-}
-
-function firstChangedInput(previous: ChatRowInputs, current: ChatRowInputs) {
-    for (const key in current) {
-        const field = key as keyof ChatRowInputs
-        if (previous[field] !== current[field]) return field
-    }
-}
-
-function rowBuild(inputs: ChatRowInputs) {
-    const { session, channel, swipeOpensDetails, relationships, messages } =
-        inputs
-    const unknownChannels = new Set<string>()
-    const context: RowContext = {
+function rowContext(
+    inputs: ChatRowInputs,
+    unknownChannels: Set<string>,
+): RowContext {
+    const { session, channel, swipeOpensDetails, relationships } = inputs
+    return {
         ...inputs,
         canReact: message => canReact(session, message),
         swipeActions: swipeOpensDetails
@@ -89,38 +64,25 @@ function rowBuild(inputs: ChatRowInputs) {
         onUnknownChannel: id => unknownChannels.add(id),
         hiddenReason: userId => hiddenReasonOf(relationships[userId]),
     }
-    const pollChange = Math.min(
-        ...(messages?.messages ?? []).map(message =>
-            message.poll
-                ? (nextPollChange(message.poll) ?? Infinity)
-                : Infinity,
-        ),
-    )
-    return { context, unknownChannels, pollChange }
 }
 
-/** Encodes a live window, reusing the prepared payload while its inputs match. */
-export function chatRowsFor(inputs: ChatRowInputs): EncodedChatRows {
-    const cached = prepared.get(inputs.session)
-    if (cached && cached.inputs.channel?.id === inputs.channel?.id) {
-        const miss = firstChangedInput(cached.inputs, inputs) ?? expired(cached)
-        if (!miss) return traced('js:chat:prepared-rows-hit', () => cached.rows)
-        traced(`js:chat:prepared-rows-miss-${miss}`, () => undefined)
-    } else {
-        traced('js:chat:prepared-rows-miss-no-candidate', () => undefined)
-    }
-
+/** Encodes the chat's rows. Message rows built before, by the chat or `prepareChatRows`, are reused. */
+export function chatRowsFor(inputs: ChatRowInputs) {
     return traced('js:chat:build-rows', () => {
-        const { context, unknownChannels, pollChange } = rowBuild(inputs)
-        const json = encodeRows(buildRows(inputs.messages, context))
+        const unknownChannels = new Set<string>()
+        const json = encodeRows(
+            buildRows(inputs.messages, rowContext(inputs, unknownChannels)),
+        )
+        // The soonest time a shown poll's label changes or it ends.
+        const pollChange = Math.min(
+            ...(inputs.messages?.messages ?? []).map(message =>
+                message.poll
+                    ? (nextPollChange(message.poll) ?? Infinity)
+                    : Infinity,
+            ),
+        )
         return { json, unknownChannels, pollChange }
     })
-}
-
-/** Releases the prepared payload after the opening chat commits. */
-export function releasePreparedChatRows(session: Session, channelId?: string) {
-    if (prepared.get(session)?.inputs.channel?.id === channelId)
-        prepared.delete(session)
 }
 
 function readInputs(
@@ -159,23 +121,18 @@ function readInputs(
     }
 }
 
-function startBuild(inputs: ChatRowInputs, day: string) {
-    const { context, unknownChannels, pollChange } = rowBuild(inputs)
-    const iterator = buildRowsIncrementally(inputs.messages, context)
-    return { inputs, day, iterator, unknownChannels, pollChange }
-}
-
-/** Prepares one cached page for the selected channel during idle slices. */
+/**
+ * Builds the selected channel's message rows during idle slices. Opening the chat then reuses them and rebuilds
+ * only rows whose data changed since.
+ */
 export function prepareChatRows(
     session: Session,
     channelId: string,
     swipeOpensDetails: boolean,
 ): () => void {
-    if (prepared.get(session)?.inputs.channel?.id !== channelId)
-        prepared.delete(session)
     let idle: number | undefined
-    let work: ReturnType<typeof startBuild> | undefined
-    let rejectedTimestamps: ChannelMessages | undefined
+    let work: ReturnType<typeof buildRowsIncrementally> | undefined
+    let built: ChannelMessages | undefined
     function schedule() {
         idle ??= requestIdleCallback(run)
     }
@@ -185,90 +142,38 @@ export function prepareChatRows(
             schedule()
             return
         }
-        const inputs = readInputs(session, channelId, swipeOpensDetails)
-        const count = inputs.messages?.messages.length ?? 0
-        if (
-            !inputs.channel ||
-            count === 0 ||
-            count > PAGE_SIZE ||
-            inputs.messages === rejectedTimestamps
-        )
-            return
-        const cached = prepared.get(session)
-        if (
-            cached &&
-            !firstChangedInput(cached.inputs, inputs) &&
-            !expired(cached)
-        )
-            return
-        const day = new Date().toDateString()
-        if (!work || work.day !== day || firstChangedInput(work.inputs, inputs))
-            work = startBuild(inputs, day)
-        const { iterator, unknownChannels, pollChange } = work
-        const rows = traced('js:chat:prepare-rows', () => {
-            let step = iterator.next()
-            while (!step.done && deadline.timeRemaining() > IDLE_ROW_MARGIN_MS)
-                step = iterator.next()
-            return step.done ? step.value : undefined
-        })
-        if (rows === undefined) {
-            schedule()
-            return
+        if (!work) {
+            const inputs = readInputs(session, channelId, swipeOpensDetails)
+            const count = inputs.messages?.messages.length ?? 0
+            if (
+                !inputs.channel ||
+                count === 0 ||
+                count > PAGE_SIZE ||
+                inputs.messages === built
+            )
+                return
+            built = inputs.messages
+            work = buildRowsIncrementally(
+                inputs.messages,
+                rowContext(inputs, new Set()),
+            )
         }
-        work = undefined
-        // Encoding in its own idle slice after the last message.
-        idle = requestIdleCallback(function encode(deadline) {
-            idle = undefined
-            if (deadline.timeRemaining() <= IDLE_ROW_MARGIN_MS) {
-                idle = requestIdleCallback(encode)
-                return
-            }
-            const changed = firstChangedInput(
-                inputs,
-                readInputs(session, channelId, swipeOpensDetails),
-            )
-            if (changed) {
-                traced(
-                    `js:chat:prepare-invalidated-${changed}`,
-                    () => undefined,
-                )
-                schedule()
-                return
-            }
-            const json = traced('js:chat:prepare-encode', () =>
-                encodeRows(rows),
-            )
-            if (json.includes(TIMESTAMP_SPAN)) {
-                rejectedTimestamps = inputs.messages
-                traced('js:chat:prepare-timestamp-mention', () => undefined)
-            } else {
-                prepared.set(session, {
-                    inputs,
-                    rows: { json, unknownChannels, pollChange },
-                    day,
-                })
-                traced('js:chat:prepare-cached', () => undefined)
-            }
+        const generator = work
+        const done = traced('js:chat:prepare-rows', () => {
+            let step = generator.next()
+            while (!step.done && deadline.timeRemaining() > IDLE_ROW_MARGIN_MS)
+                step = generator.next()
+            return step.done
         })
+        if (done) work = undefined
+        // Continues the build, or catches history that changed during it.
+        schedule()
     }
     schedule()
-    // A live update can invalidate a candidate before the first gesture.
-    const unsubscribes = [
-        session.get(channelsStore).subscribe(schedule),
-        session.get(threadsStore).subscribe(schedule),
-        session.get(forumPostsStore).subscribe(schedule),
-        session.get(guildsStore).subscribe(schedule),
-        session.get(membersStore).subscribe(schedule),
-        session.get(messagesStore).subscribe(schedule),
-        session.get(readStatesStore).subscribe(schedule),
-        session.get(relationshipsStore).subscribe(schedule),
-        session.get(usersStore).subscribe(schedule),
-        session.get(componentInteractionsStore).subscribe(schedule),
-        session.get(pollStateStore).subscribe(schedule),
-    ]
+    // History can arrive, or change, before the first gesture.
+    const unsubscribe = session.get(messagesStore).subscribe(schedule)
     return () => {
         if (idle !== undefined) cancelIdleCallback(idle)
-        for (const unsubscribe of unsubscribes) unsubscribe()
-        // The opening chat can consume the candidate after preparation stops.
+        unsubscribe()
     }
 }
