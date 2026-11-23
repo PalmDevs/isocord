@@ -2,7 +2,7 @@ import { Endpoint } from '../../core/api/paths'
 import { ApiError } from '../../core/api/rest'
 import { compareSnowflakes } from '../../core/discord/snowflake'
 import { messagesStore, PAGE_SIZE } from './messages'
-import { AROUND_HALF, upsertUsers } from './messageWindows'
+import { aroundEdges, upsertUsers } from './messageWindows'
 import type { Session } from '../../core/session'
 import type { Message } from '../readStates'
 import type { MessagePreview } from './messageTypes'
@@ -63,10 +63,9 @@ export async function loadPreview(
                 ...preview,
                 messages,
                 loading: false,
-                hasMore:
-                    index >= 0 &&
-                    messages.length - index - 1 >= AROUND_HALF - 1,
-                hasMoreAfter: index >= AROUND_HALF - 1,
+                ...(index >= 0
+                    ? aroundEdges(messages, index)
+                    : { hasMore: false, hasMoreAfter: false }),
                 // The API answers with the messages near a deleted one as well.
                 error: messages.some(message => message.id === messageId)
                     ? undefined

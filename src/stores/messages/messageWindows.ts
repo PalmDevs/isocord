@@ -8,8 +8,21 @@ import type { Session } from '../../core/session'
 import type { Message } from '../readStates'
 import type { ChannelMessages } from './messageTypes'
 
-/** Messages the API returns on each side of an `around` request: half of PAGE_SIZE. */
-export const AROUND_HALF = PAGE_SIZE / 2
+/**
+ * Returns which sides of an `around` page may have more, for the target at `index` (newest first). The counts of
+ * MessageActionCreators.fetchMessages for a jump: a side is short when it came back below half the limit.
+ */
+export function aroundEdges(
+    messages: Message[],
+    index: number,
+): Pick<ChannelMessages, 'hasMore' | 'hasMoreAfter'> {
+    const half = Math.floor(PAGE_SIZE / 2)
+    const older = messages.length - index - 1
+    return {
+        hasMore: older >= half + (PAGE_SIZE % 2) - 1,
+        hasMoreAfter: index + 1 >= half,
+    }
+}
 /** Wait after a failed history request before the scroll position asks again. */
 const FAILURE_BACKOFF_MS = 5000
 
@@ -167,9 +180,8 @@ export async function loadMessages(
         if (!older) {
             // A detached window (`jumpToPresent`) is replaced the same way; it never holds newer messages.
             const merged = mergeNewest(known, page)
+            // MessagesRenderer fetchMoreBefore: the next page waits for the list to near its top.
             set({ ...merged, hasMoreAfter: false, stale: false })
-            // Scrolling up is the usual next step: have the second page ready.
-            if (merged.hasMore) void loadMessages(session, channelId, true)
             return
         }
         // Messages that arrived over the gateway while the request was in flight are already in `known`.
@@ -230,8 +242,7 @@ export async function jumpToMessage(
         upsertUsers(session, messages)
         patchChannel(session, channelId, {
             messages,
-            hasMore: messages.length - index - 1 >= AROUND_HALF - 1,
-            hasMoreAfter: index >= AROUND_HALF - 1,
+            ...aroundEdges(messages, index),
             stale: false,
         })
         return 'loaded'

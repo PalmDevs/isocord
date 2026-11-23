@@ -102,8 +102,8 @@ export function messagesAround(
         : chat
 }
 
-/** Messages one history request asks for. */
-export const PAGE_SIZE = 50
+/** Messages one history request asks for: getMessageLimit, MAX_MESSAGES_PER_CHANNEL on mobile. */
+export const PAGE_SIZE = 25
 
 const CACHED_CHANNELS = 10
 
