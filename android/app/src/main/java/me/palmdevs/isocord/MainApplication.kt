@@ -14,6 +14,9 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import me.palmdevs.isocord.chat.ChatPackage
 import me.palmdevs.isocord.core.ConstantsPackage
 import me.palmdevs.isocord.core.CorePackage
@@ -58,9 +61,12 @@ class MainApplication : Application(), ReactApplication {
     TwemojiFonts.registerReactFonts(assets)
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
+    // The reference's PreInitReactHost thread: builds the host while the activity starts.
+    CoroutineScope(Dispatchers.Default).launch { reactHost }
   }
 
-  private var scaledResources: Resources? = null
+  // Volatile as in the reference: the host prewarm reads it off the main thread.
+  @Volatile private var scaledResources: Resources? = null
 
   /**
    * MainApplication.getResources in the reference: the application's resources carry the custom font scale, so React
