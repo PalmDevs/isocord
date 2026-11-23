@@ -137,7 +137,7 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
     // Predictive Back progress callbacks used by BackModule.
-    implementation("androidx.activity:activity:1.11.0")
+    implementation("androidx.activity:activity:1.12.4")
     // Launch splash, held until the first React frame (MainActivity).
     implementation("androidx.core:core-splashscreen:1.2.0")
     // Native chat list (me.palmdevs.isocord.chat): Compose for layout, Coil for images.

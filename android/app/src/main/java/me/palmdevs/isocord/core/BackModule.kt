@@ -36,8 +36,11 @@ class BackModule(context: ReactApplicationContext) : NativeIsocordBackSpec(conte
 
     @Suppress("DEPRECATION")
     override fun handleOnBackPressed() {
-      finish()
-      // ReactActivity: existing BackHandler order for overlays and the composer.
+      if (gestureOwner != null) {
+        finish(committed = true)
+        return
+      }
+      // ReactActivity: hardware Back without a gesture preview.
       isEnabled = false
       try {
         activity?.onBackPressed()
@@ -73,17 +76,18 @@ class BackModule(context: ReactApplicationContext) : NativeIsocordBackSpec(conte
     }
   }
 
-  private fun emitFrame(offset: Float, finished: Boolean) {
+  private fun emitFrame(offset: Float, finished: Boolean, committed: Boolean = false) {
     val owner = gestureOwner ?: return
     emitOnBackPreview(Arguments.createMap().apply {
       putString("owner", owner)
       putDouble("offset", PixelUtil.toDIPFromPixel(offset).toDouble())
       putBoolean("finished", finished)
+      putBoolean("committed", committed)
     })
   }
 
-  private fun finish() {
-    emitFrame(0f, true)
+  private fun finish(committed: Boolean = false) {
+    emitFrame(0f, true, committed)
     gestureOwner = null
   }
 

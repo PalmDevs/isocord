@@ -223,3 +223,9 @@ export const ELLIPSIS_STAGGER_MS = ELLIPSIS_TIMING.duration / 3
 export const TYPING_ELLIPSIS_MS = 350
 export const TYPING_ELLIPSIS_STAGGER_MS = (TYPING_ELLIPSIS_MS * 2) / 3
 export const TYPING_ELLIPSIS_START_DELAY_MS = TYPING_ELLIPSIS_MS / 3
+
+/** Android predictive back. */
+export const PANEL_ANDROID_PREDICTIVE_BACK_INPUT_TIMING = {
+    duration: 50,
+    easing: Easing.out(Easing.cubic),
+}

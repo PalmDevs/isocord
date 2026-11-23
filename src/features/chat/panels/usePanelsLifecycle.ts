@@ -3,6 +3,7 @@ import { BackHandler } from 'react-native'
 import { logger } from '../../../core/log'
 import { dismissComposers } from '../composer'
 import { openChannel, setOpener } from '../links/openChannel'
+import type { PanelBackPreview } from '../../../design/components/overlays/usePanelBackPreview'
 import type { ChatPanelState } from './useChatPanel'
 import type { DetailsPanel } from './useDetailsPanel'
 import type { StackedChat } from './useStackedChat'
@@ -59,9 +60,13 @@ export function usePanelsLifecycle(
 }
 
 /** The hardware back button closes the details, then the thread creation, the stacked chat and the chat. */
-export function usePanelsBackHandler(active: boolean, panels: Panels) {
+export function usePanelsBackHandler(
+    active: boolean,
+    panels: Panels,
+    takeOffset: PanelBackPreview['takeOffset'],
+) {
     const { chat, details, stack, create } = panels
-    // biome-ignore lint/correctness/useExhaustiveDependencies: the handlers only use refs and setters
+    // biome-ignore lint/correctness/useExhaustiveDependencies: the handlers only use refs, shared values and setters
     useEffect(() => {
         // The details can also be open over the tab alone (the server header's search).
         if (
@@ -72,10 +77,16 @@ export function usePanelsBackHandler(active: boolean, panels: Panels) {
         const subscription = BackHandler.addEventListener(
             'hardwareBackPress',
             () => {
-                if (details.openRef.current) details.close()
-                else if (create.openRef.current) create.close()
-                else if (stack.openRef.current) stack.close()
-                else chat.close()
+                const target = details.openRef.current
+                    ? 'details'
+                    : create.openRef.current
+                      ? 'create'
+                      : stack.openRef.current
+                        ? 'stack'
+                        : 'chat'
+                const panel = panels[target]
+                takeOffset(target, panel.x)
+                panel.close()
                 return true
             },
         )

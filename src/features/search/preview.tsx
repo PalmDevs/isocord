@@ -97,7 +97,7 @@ export function SearchPreviewHost({
 
     const modalOpen = useModalOpen()
     const focused = useIsFocused()
-    const { offset } = usePanelBackPreview(
+    const { offset, takeOffset } = usePanelBackPreview(
         open && active && focused && !modalOpen ? 'searchPreview' : undefined,
         width,
         true,
@@ -148,12 +148,13 @@ export function SearchPreviewHost({
     }
 
     // Back closes the preview before anything under it (the last listener added runs first).
-    // biome-ignore lint/correctness/useExhaustiveDependencies: close only uses setters and the shared value
+    // biome-ignore lint/correctness/useExhaustiveDependencies: close only uses refs, shared values and setters
     useEffect(() => {
         if (!open || !active || !focused) return
         const subscription = BackHandler.addEventListener(
             'hardwareBackPress',
             () => {
+                takeOffset('searchPreview', x)
                 close()
                 return true
             },

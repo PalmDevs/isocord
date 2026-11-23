@@ -5,6 +5,7 @@ export interface BackPreviewFrame {
     owner: string
     offset: number
     finished: boolean
+    committed: boolean
 }
 
 export interface Spec extends TurboModule {

@@ -24,6 +24,8 @@ import { startCurrentSession } from '../core/react'
 import { SessionProvider } from '../core/SessionProvider'
 import { hideSplashAfterFrame } from '../core/startup'
 import { ModalDismissGuard } from '../design/components/overlays/ModalStack'
+import { PopoverBackground } from '../design/components/overlays/PopoverLayer'
+import { usePanelBackEvents } from '../design/components/overlays/usePanelBackPreview'
 import { AuthNavigator } from '../features/auth/AuthNavigator'
 import { MainTabs } from '../features/main/MainTabs'
 import { beginMainWait } from './startupTrace'
@@ -74,11 +76,12 @@ let renderTraced: 'pending' | 'open' | 'done' = 'pending'
 const renderStackScreen = ({ children }: { children: ReactNode }) => (
     <>
         <ModalDismissGuard />
-        {children}
+        <PopoverBackground style={styles.screen}>{children}</PopoverBackground>
     </>
 )
 
 export function App() {
+    usePanelBackEvents()
     // Rendering is synchronous, so the section spans React's first render of the whole tree.
     if (renderTraced === 'pending') {
         renderTraced = 'open'
@@ -157,4 +160,5 @@ export function App() {
 
 const styles = StyleSheet.create(theme => ({
     root: { flex: 1, backgroundColor: theme.colors.BACKGROUND_BASE_LOWEST },
+    screen: { flex: 1 },
 }))

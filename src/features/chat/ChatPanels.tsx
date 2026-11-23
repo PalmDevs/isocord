@@ -107,7 +107,7 @@ export function ChatPanels({
     // biome-ignore lint/correctness/useExhaustiveDependencies: reset on every channel change
     useEffect(details.reset, [detailsChannelId])
     usePanelsLifecycle(width, tabFocused, panels)
-    usePanelsBackHandler(active, panels)
+    usePanelsBackHandler(active, panels, backPreview.takeOffset)
     usePanelsOpeners(active, panels)
     const { pan, closePan, dragging } = usePanelDrag({
         width,

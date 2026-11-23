@@ -306,12 +306,13 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 
 ### Patches and dependencies
 - [x] Opt into Android predictive back with the Native Stack `/next` preview and Screens v5.
-- [ ] Verify commit and cancel gestures on the emulator. Replace the vendored Native Stack package when `/next` is published on npm.
+- [x] Check predictive Back commit and cancel after backing out to Home and reopening. Replace the vendored Native Stack package when `/next` is published on npm.
 - Android 16 hosts the app's stacks in a child fragment so they receive Back progress ahead of ReactActivity.
-- [x] Check rounded predictive Back from both edges and with cancellation. The previous page tracks the finger up to 16 dp and finishes the Screens slide on commit.
+- [x] Check rounded predictive Back from both edges and with cancellation. On commit, the previous page finishes its slide using the full 450 ms Screens preset.
 - [x] Check that system Back closes the media viewer from chat and from a pushed screen.
 - [x] Check Compose views during a push and after tapping Back before enter finishes, including the chat list and You-tab bio.
-- [x] Check predictive Back on swipeable chat panels and search previews. The first 20% tracks the finger, then travel interpolates to the 25% cap.
+- [x] Check that chat panels and search previews close rightward from both Back gesture edges. The first 15% tracks finger travel, then interpolates to the 25% cap.
+- [x] Check that chat panels and search previews close from the gesture's release position and return to rest on cancellation.
 - Screens 5.0.0-beta.1 is patched to accept repeated Android `screenKey` assignments from Fabric. Re-check when upgrading Screens.
 - Unistyles 3.8.1 is patched (top inset in multi-window). Drop the patch when upstream fixes it; re-check on upgrade.
 - OkHttp is held at 4.11.0, the version in the official 353.11 APK (TLS handshake). Re-check when moving to a newer reference build, together with `CLIENT` and `IsocordNetwork.USER_AGENT`.
@@ -615,6 +616,7 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
   - [x] Blocked and ignored users (2026-11-20, built, untested on device): "You blocked them" / "You ignored them • Unignore" card under the identity (UserProfileRemediatedNotice). Add Friend and Call are disabled on a blocked profile (the reference hides Add Friend instead). In the chat, back-to-back messages of a blocked or ignored user fold into "N blocked messages" / "N ignored messages" (createChannelStream BLOCKED_GROUP / IGNORED_GROUP, BlockedMessageGroupView): a tap opens one group at a time (`revealedId`, revealMessage), with the height, fill and messages animated, and a message deleted from an open group fades and collapses. A group has the margin of a new message group above it, and its label is centred in a 34 dp strip. Reply previews of a blocked or ignored author say "Blocked message" / "Ignored message" (createMessageContent). A jump to a folded message opens its group first (`revealMessage`, our addition: the reference leaves it folded) and scrolls to the group. A deleted open message hands the reveal to its newer neighbour (MessageStore MESSAGE_DELETE). A group keeps its list item when its key moves (`ChatRowChanges` aliases). Open: `message_horizontal_spacing` of the group view couldn't be read from the APK, so the group's side padding is a guess; a jump into a group taller than the screen lines up the group's bottom, not the message; message previews, search and the chat preview don't fold.
   - [x] Profile-themed buttons (2026-11-19, untested on device): inside `ProfileThemeScope`, primary buttons take the theme's primary colour (`getContrastingColor` against white, pressed darkened), secondary and tertiary use the translucent white / primary fills (`useProfileThemedButtonStyles`, `design/components/buttons/buttonTheme.ts`, colour maths in `design/colors.ts`). Checked in the gallery's scope picker, not yet against the reference's numbers.
   - [x] Verify context menu opening on a lower-end Android device with plain and gradient profiles. The profile background now blends the tint into its gradient stops to remove a full-sheet draw.
+  - [ ] Gradient profiles still drop frames on menu open and close after blending the tint. Verify the separate Android hardware layer for the gradient.
   - [ ] Custom status: no "clear after" choice (never expires), no verified bot check mark on the APP tag, the RPC card has no party size, buttons or Spotify links.
 - [ ] Friends list, friend requests, add friend.
 - [ ] Search (messages, people, channels), pins, saved/bookmarks. Messages tab global search screen (Recent + People pages, history) done; no friends list/guild members in People yet.
