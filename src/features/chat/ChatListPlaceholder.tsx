@@ -52,7 +52,7 @@ const styles = StyleSheet.create(theme => ({
         justifyContent: 'flex-end',
         overflow: 'hidden',
         paddingHorizontal: theme.space.PX_12,
-        paddingBottom: theme.space.PX_24,
+        paddingBottom: theme.space.PX_48,
         gap: theme.space.PX_24,
         backgroundColor: theme.colors.BACKGROUND_BASE_LOWER,
     },
