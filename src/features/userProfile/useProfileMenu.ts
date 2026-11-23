@@ -82,12 +82,12 @@ export function useProfileMenu(
         {
             label: t('userProfile.copyUsername'),
             icon: 'CopyIcon',
-            action: () => copy(username),
+            onPress: () => copy(username),
         },
         {
             label: t('userProfile.copyUserId'),
             icon: 'IdIcon',
-            action: () => copy(id),
+            onPress: () => copy(id),
         },
         { label: t('userProfile.apps'), icon: 'AppsIcon', divider: true },
     )
@@ -96,7 +96,7 @@ export function useProfileMenu(
             label: t('userProfile.removeFriend'),
             icon: 'UserMinusIcon',
             variant: 'destructive',
-            action: () =>
+            onPress: () =>
                 confirm(
                     t('userProfile.removeFriend'),
                     t('userProfile.removeFriendBody', { name: view.name }),
@@ -111,7 +111,7 @@ export function useProfileMenu(
                 ? t('userProfile.unignore')
                 : t('userProfile.ignore'),
             icon: 'EyeSlashIcon',
-            action: () =>
+            onPress: () =>
                 ignored
                     ? unignoreUser(session, id)
                     : openRestrictionConfirmation('ignore', id, view.name),
@@ -121,7 +121,7 @@ export function useProfileMenu(
             label: blocked ? t('userProfile.unblock') : t('userProfile.block'),
             icon: 'DenyIcon',
             variant: 'destructive',
-            action: () =>
+            onPress: () =>
                 blocked
                     ? unblock()
                     : openRestrictionConfirmation('block', id, view.name),
