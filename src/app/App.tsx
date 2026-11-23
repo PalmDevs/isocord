@@ -16,7 +16,7 @@ import {
     initialWindowMetrics,
     SafeAreaProvider,
 } from 'react-native-safe-area-context'
-import { Stack as NativeScreensStack } from 'react-native-screens'
+import { enableFreeze, Stack as NativeScreensStack } from 'react-native-screens'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { features } from '../core/feature'
 import { logger } from '../core/log'
@@ -29,6 +29,8 @@ import { AuthNavigator } from '../features/auth/AuthNavigator'
 import { MainTabs } from '../features/main/MainTabs'
 import { beginMainWait } from './startupTrace'
 import type { ReactNode } from 'react'
+
+enableFreeze(true)
 
 // Connecting is the slowest part of startup, so it begins before the first render.
 startCurrentSession()
@@ -77,18 +79,21 @@ const renderStackScreen = ({ children }: { children: ReactNode }) => (
 )
 
 export function App() {
-    usePanelBackEvents()
     // Rendering is synchronous, so the section spans React's first render of the whole tree.
     if (renderTraced === 'pending') {
         renderTraced = 'open'
         beginSection('js:first-render')
     }
+
     useEffect(() => {
         if (renderTraced !== 'open') return
         renderTraced = 'done'
         endSection()
         beginMainWait()
     }, [])
+
+    usePanelBackEvents()
+
     // One per App: a recreated activity mounts a new App before the old one unmounts and clears its ref.
     const navigation =
         useNavigationContainerRef<Record<string, object | undefined>>()
