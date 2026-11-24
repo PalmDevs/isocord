@@ -149,7 +149,7 @@ function FavoriteGifButton({ source }: { source: ViewerSource }) {
                         style={{ tintColor: rawColors.YELLOW_300 }}
                     />
                 ) : (
-                    <Icon name="StarOutlineIcon" />
+                    'StarOutlineIcon'
                 )
             }
             accessibilityLabel={t(

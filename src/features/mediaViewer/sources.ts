@@ -88,6 +88,10 @@ function attachmentSource(attachment: Attachment): ViewerSource | undefined {
     return undefined
 }
 
+/** Returns 'gif' for a picture at a .gif link from any site (isAnimatedImageSource), 'image' otherwise. */
+const imageKind = (media: EmbedMedia): 'gif' | 'image' =>
+    GIF.test(pathOf(media.url)) ? 'gif' : 'image'
+
 /**
  * MediaSourceUtil.extractMediaFromEmbed: the embed's picture, and what plays over it. The picture is the one the
  * tile shows: the search tiles' (embedImage, thumbnail first) or the chat's (image first). `spoiler`: the link was
@@ -128,7 +132,7 @@ function embedSource(
         spoiler,
         link: embed.url ?? video?.url ?? media.url,
         file: (file && video?.url) || media.url,
-        kind: embed.type === 'gifv' ? 'gif' : file ? 'video' : 'image',
+        kind: embed.type === 'gifv' ? 'gif' : file ? 'video' : imageKind(media),
     }
 }
 
@@ -144,7 +148,7 @@ function pictureSource(media: EmbedMedia): ViewerSource {
         height: media.height ?? 0,
         link: media.url,
         file: media.url,
-        kind: 'image',
+        kind: imageKind(media),
     }
 }
 
