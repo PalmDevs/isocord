@@ -16,6 +16,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import me.palmdevs.isocord.chat.list.LocalChatFonts
 import me.palmdevs.isocord.chat.list.LocalChatTheme
 
+/** Inline emoji over the font size: slightly taller than the letters. */
+internal const val INLINE_EMOJI_SCALE = 1.25f
+
 /**
  * Inline markup spans (mentions, emoji, links) as one [BasicText], optionally after a [prefix].
  * Links and spoilers only react when [onLink] is given.
@@ -42,7 +45,7 @@ fun SpanText(
     )
     if (prefix == null) body else buildAnnotatedString { append(prefix); append(body) }
   }
-  val inline = remember(spans, style.fontSize, theme) { spanInlineContent(spans, style.fontSize * 1.25f, theme) }
+  val inline = remember(spans, style.fontSize, theme) { spanInlineContent(spans, style.fontSize * INLINE_EMOJI_SCALE, theme) }
   BasicText(
     text = text,
     inlineContent = inline,

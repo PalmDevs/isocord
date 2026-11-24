@@ -26,6 +26,13 @@ class ChatFonts(assets: AssetManager) {
     AssetFont(assets, "ggmono-Normal", FontWeight.Normal, FontStyle.Normal),
     AssetFont(assets, "ggmono-Bold", FontWeight.Bold, FontStyle.Normal),
   )
+
+  companion object {
+    private var shared: ChatFonts? = null
+
+    /** Returns one instance for views outside a composition, so they share font lookups. Main thread only. */
+    fun shared(context: Context): ChatFonts = shared ?: ChatFonts(context.applicationContext.assets).also { shared = it }
+  }
 }
 
 /** `fonts/<name>.ttf` as [TwemojiFonts] builds it. Each weight and style keeps its own file. */

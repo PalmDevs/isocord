@@ -152,8 +152,6 @@ private val HEADING_SIZES = mapOf(1 to (24.sp to 32.sp), 2 to (20.sp to 24.sp), 
 /** Subtext is text-sm/normal in the muted colour. */
 private val SUBTEXT_SIZE = 14.sp to 18.sp
 
-private const val SPOILER_EMOJI = "spoiler-emoji"
-
 /** The link tag of a hidden spoiler, which a tap reveals. */
 private const val SPOILER_TAG = "spoiler"
 
@@ -387,7 +385,7 @@ private fun StyledText(spans: List<Span>, base: TextStyle, jumbo: Boolean, edite
   if (text.isEmpty()) return
 
   // Slightly taller than the letters, but never taller than the line, which would push lines apart.
-  val emojiSize = if (jumbo) 48.sp else base.fontSize * 1.25f
+  val emojiSize = if (jumbo) 48.sp else base.fontSize * INLINE_EMOJI_SCALE
   val inline = remember(spans, emojiSize, theme, base.lineHeight) { spanInlineContent(spans, emojiSize, theme, base.lineHeight) }
   val layout = remember { arrayOfNulls<TextLayoutResult>(1) }
   BasicText(
@@ -446,16 +444,16 @@ internal fun buildSpanText(
       // A hidden spoiler covers emoji with a plain block; tapping it reveals the whole message part.
       if (hidden) {
         if (onSpoiler != null) {
-          withLink(LinkAnnotation.Clickable(SPOILER_TAG) { onSpoiler() }) { appendInlineContent(SPOILER_EMOJI, span.text) }
+          withLink(LinkAnnotation.Clickable(SPOILER_TAG) { onSpoiler() }) { appendPlaceholder(SPOILER_EMOJI, span.text) }
         } else {
-          appendInlineContent(SPOILER_EMOJI, span.text)
+          appendPlaceholder(SPOILER_EMOJI, span.text)
         }
       } else if (span.link != null && onLink != null) {
         // A tapped emoji opens its info sheet (MessageEmojiActionSheet), or the link it is part of.
         val url = span.link
-        withLink(LinkAnnotation.Clickable(url) { onLink(url) }) { appendInlineContent(span.emoji, span.text) }
+        withLink(LinkAnnotation.Clickable(url) { onLink(url) }) { appendPlaceholder(span.emoji, span.text) }
       } else {
-        appendInlineContent(span.emoji, span.text)
+        appendPlaceholder(span.emoji, span.text)
       }
       return@forEachIndexed
     }
@@ -503,8 +501,8 @@ internal fun buildSpanText(
     val icon = span.icon?.takeIf { mentionIcon(it) != null }
     val emit: AnnotatedString.Builder.() -> Unit = when {
       icon == null -> {{ append(body) }}
-      hidden -> {{ appendInlineContent(SPOILER_EMOJI, span.text) }}
-      else -> {{ appendInlineContent("$ICON_PREFIX$icon", span.text) }}
+      hidden -> {{ appendPlaceholder(SPOILER_EMOJI, span.text) }}
+      else -> {{ appendPlaceholder("$ICON_PREFIX$icon", span.text) }}
     }
     when {
       hidden && onSpoiler != null -> withLink(LinkAnnotation.Clickable(SPOILER_TAG, TextLinkStyles(style)) { onSpoiler() }) { emit() }
@@ -524,8 +522,6 @@ internal fun buildSpanText(
     withStyle(SpanStyle(color = theme.textMuted, fontSize = 10.sp)) { append(" $edited") }
   }
 }
-
-private const val ICON_PREFIX = "icon:"
 
 /**
  * The gradient of a role mention. A span's brush is laid over the whole paragraph, so it is mirrored over the width
@@ -558,46 +554,4 @@ internal fun mentionIconWidth(name: String): Float = when (name) {
   "text" -> 1f
   "caret" -> 0.75f
   else -> 1.125f
-}
-
-/**
- * The images behind the emoji and mention icon placeholders of [buildSpanText].
- * A placeholder gets no span background, so a mention icon draws its pill over [lineHeight], or its own height if unspecified.
- */
-internal fun spanInlineContent(
-  spans: List<Span>,
-  emojiSize: TextUnit,
-  theme: ChatTheme,
-  lineHeight: TextUnit = TextUnit.Unspecified,
-): Map<String, InlineTextContent> {
-  // The icons are as tall as the text; emoji are a quarter taller.
-  val iconSize = emojiSize * 0.8f
-  val icons = spans.mapNotNull { it.icon }.distinct().mapNotNull { name ->
-    val resource = mentionIcon(name) ?: return@mapNotNull null
-    val width = iconSize * mentionIconWidth(name)
-    "$ICON_PREFIX$name" to InlineTextContent(Placeholder(width, iconSize, PlaceholderVerticalAlign.TextCenter)) {
-      Box(
-        Modifier.fillMaxSize().drawBehind {
-          // Icons only lead channel, message and route mentions, which never take a role colour.
-          val height = if (lineHeight.isSpecified) lineHeight.toPx() else size.height
-          drawRect(theme.mentionBackground, Offset(0f, (size.height - height) / 2), Size(size.width, height))
-        },
-      ) {
-        Image(
-          painter = cachedPainter(resource),
-          contentDescription = null,
-          colorFilter = ColorFilter.tint(theme.mentionForeground),
-          modifier = Modifier.fillMaxHeight().aspectRatio(1f),
-        )
-      }
-    }
-  }.toMap()
-  val images = spans.mapNotNull { it.emoji }.distinct().associateWith { url ->
-    InlineTextContent(Placeholder(emojiSize, emojiSize, PlaceholderVerticalAlign.TextCenter)) { name ->
-      AsyncImage(model = url, contentDescription = name, modifier = Modifier.fillMaxSize())
-    }
-  }
-  return icons + images + (SPOILER_EMOJI to InlineTextContent(Placeholder(emojiSize, emojiSize, PlaceholderVerticalAlign.TextCenter)) {
-    Box(Modifier.fillMaxSize().background(theme.spoilerBackground, RoundedCornerShape(4.dp)))
-  })
 }

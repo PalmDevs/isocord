@@ -79,6 +79,12 @@ class SpanTextViewManager :
     view.markdown = value
   }
 
+  // Lays the text out once per batch, with every prop of the batch applied.
+  override fun onAfterUpdateTransaction(view: SpanTextView) {
+    super.onAfterUpdateTransaction(view)
+    view.onPropsUpdated()
+  }
+
   override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> = mapOf(
     "topContentHeight" to mapOf("registrationName" to "onContentHeight"),
     "topLinkPress" to mapOf("registrationName" to "onLinkPress"),

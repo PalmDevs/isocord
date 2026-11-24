@@ -2,6 +2,7 @@ import { useNavigation } from '@react-navigation/native'
 import { FlashList } from '@shopify/flash-list'
 import { useEffect, useRef } from 'react'
 import { Pressable, View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -28,21 +29,31 @@ import { channelsStore } from '../../stores/channels/channels'
 import { dmPreviewsStore } from '../../stores/channels/dmPreviews'
 import { isUnread, readStatesStore } from '../../stores/readStates'
 import { settingsStore } from '../../stores/settings/settingsStore'
+import {
+    isFavorite,
+    PRIVATE_SETTINGS_KEY,
+} from '../../stores/settings/userGuildSettings'
 import { isMuted } from '../../stores/unreadPolicy'
 import { openChannelActionSheet } from '../channelActions'
 import { useChatTheme } from '../chat/rows/rowEncoder'
 import { TypingText } from '../chat/typing'
 import { useTypingUserIds } from '../chat/useTypingUserIds'
 import { useTabSelected } from '../main/useTabSelected'
+import { useIsPinned } from '../notificationSettings'
 import { UnreadBar } from '../servers/UnreadBar'
 import { useUnreadBars } from '../servers/useUnreadBars'
 import { GroupAvatar } from './GroupAvatar'
 import { previewIcon, previewPrefix, usePreviewSpans } from './preview'
 import { useDm } from './useDm'
+import { FadingEdgeScrollView, useFadingEdge } from './useFadingEdge'
 import { useMessagesPanels } from './useMessagesPanels'
 import { useMinute } from './useMinute'
 import type { FlashListRef } from '@shopify/flash-list'
 import type { ComponentProps } from 'react'
+import type { Message } from '../../stores/readStates'
+
+// Reanimated's scroll handler sets the fading edge on the UI thread, without a JS round trip.
+const AnimatedFlashList = Animated.createAnimatedComponent(FlashList<string>)
 
 const AVATAR_SIZE = 40
 /** UserPlaceholderRow: the avatar's corners and the name bar. */
@@ -50,6 +61,8 @@ const SKELETON_AVATAR_RADIUS = 16
 const SKELETON_LABEL_HEIGHT = 20
 const SKELETON_LABEL_RADIUS = 8
 const SKELETON_LABEL_WIDTH = { min: 40, max: 80 }
+/** The `spans` of a row with no preview: the view stays mounted with nothing to draw. */
+const NO_SPANS = '[]'
 /** A conversation row without a preview line (styles.row). */
 const ROW_MIN_HEIGHT = 56
 
@@ -66,9 +79,66 @@ function relativeTime(timestamp: number, now: number): string {
     return t('time.years', { count: Math.floor(days / 365) })
 }
 
+/** The line under a conversation's name: who is typing, or the last message. */
+function ConversationPreview({
+    id,
+    message,
+    isGroup,
+    showUnread,
+}: {
+    id: string
+    message: Message | undefined
+    isGroup: boolean
+    showUnread: boolean
+}) {
+    const { userId } = useSession()
+    const typingUserIds = useTypingUserIds(id)
+    const chatTheme = useChatTheme('transparent')
+    const spans = usePreviewSpans(message, userId)
+    const { theme } = useUnistyles()
+    const variant = theme.text['text-sm/medium']
+    const typing = typingUserIds.length > 0
+    const preview = !typing && spans && message ? { spans, message } : undefined
+    return (
+        <>
+            {/* Someone typing takes the preview's place until they stop or their message arrives. */}
+            {typing ? (
+                <View style={styles.typing}>
+                    <Ellipsis />
+                    <TypingText
+                        channelId={id}
+                        userIds={typingUserIds}
+                        variant="text-sm/medium"
+                        boldVariant="text-sm/bold"
+                        color={showUnread ? 'TEXT_DEFAULT' : 'TEXT_MUTED'}
+                    />
+                </View>
+            ) : null}
+            {/* ChannelRowPreview's markup: emoji, mentions and inline formatting, drawn natively.
+                Always mounted, at no height when hidden, so a recycled row never creates or drops the view. */}
+            <SpanTextView
+                spans={preview?.spans ?? NO_SPANS}
+                theme={chatTheme}
+                color={
+                    showUnread
+                        ? theme.colors.TEXT_DEFAULT
+                        : theme.colors.TEXT_MUTED
+                }
+                fontSize={variant.fontSize}
+                lineHeight={variant.lineHeight}
+                prefix={
+                    preview && previewPrefix(preview.message, userId, isGroup)
+                }
+                trailingIcon={preview && previewIcon(preview.message, userId)}
+                lineClamp={1}
+                style={{ height: preview ? variant.lineHeight : 0 }}
+            />
+        </>
+    )
+}
+
 function ConversationRow({ id }: { id: string }) {
     const { openChat } = useMessagesPanels()
-    const { userId } = useSession()
     const navigation = useNavigation()
     const dm = useDm(id)
     const lastMessageId = useSessionStore(
@@ -89,19 +159,16 @@ function ConversationRow({ id }: { id: string }) {
     const muted = useSessionStore(settingsStore, state =>
         isMuted(state, { id }),
     )
-    const typingUserIds = useTypingUserIds(id)
-    const chatTheme = useChatTheme('transparent')
+    const pinned = useIsPinned({ id })
     // A cached preview older than the channel's newest message is stale: show none rather than a wrong one.
     const fresh =
         message &&
         (!lastMessageId || compareSnowflakes(message.id, lastMessageId) >= 0)
-    const spans = usePreviewSpans(fresh ? message : undefined, userId)
     const now = useMinute()
     const { theme } = useUnistyles()
     if (!dm) return null
 
     const showUnread = unread && !muted
-    const previewVariant = theme.text['text-sm/medium']
     const highlighted = showUnread || (mentions > 0 && !muted)
 
     return (
@@ -147,36 +214,12 @@ function ConversationRow({ id }: { id: string }) {
                 >
                     {dm.name}
                 </Text>
-                {/* Someone typing takes the preview's place until they stop or their message arrives. */}
-                {typingUserIds.length > 0 ? (
-                    <View style={styles.typing}>
-                        <Ellipsis />
-                        <TypingText
-                            channelId={id}
-                            userIds={typingUserIds}
-                            variant="text-sm/medium"
-                            boldVariant="text-sm/bold"
-                            color={showUnread ? 'TEXT_DEFAULT' : 'TEXT_MUTED'}
-                        />
-                    </View>
-                ) : spans && message ? (
-                    // ChannelRowPreview's markup: emoji, mentions and inline formatting, drawn natively.
-                    <SpanTextView
-                        spans={spans}
-                        theme={chatTheme}
-                        color={
-                            showUnread
-                                ? theme.colors.TEXT_DEFAULT
-                                : theme.colors.TEXT_MUTED
-                        }
-                        fontSize={previewVariant.fontSize}
-                        lineHeight={previewVariant.lineHeight}
-                        prefix={previewPrefix(message, userId, dm.isGroup)}
-                        trailingIcon={previewIcon(message, userId)}
-                        lineClamp={1}
-                        style={{ height: previewVariant.lineHeight }}
-                    />
-                ) : null}
+                <ConversationPreview
+                    id={id}
+                    message={fresh ? message : undefined}
+                    isGroup={dm.isGroup}
+                    showUnread={showUnread}
+                />
             </View>
             <View style={styles.trailing}>
                 {lastMessageId ? (
@@ -187,8 +230,11 @@ function ConversationRow({ id }: { id: string }) {
                         {relativeTime(snowflakeTimestamp(lastMessageId), now)}
                     </Text>
                 ) : null}
+                {/* MessagesItemChannelContentIcon: muted wins over pinned. */}
                 {muted ? (
                     <Icon name="BellSlashIcon" size="xs" color="TEXT_MUTED" />
+                ) : pinned ? (
+                    <Icon name="PinIcon" size="xs" color="ICON_MUTED" />
                 ) : null}
                 {mentions > 0 ? (
                     <Badge count={mentions} />
@@ -201,6 +247,35 @@ function ConversationRow({ id }: { id: string }) {
 }
 
 const renderItem = ({ item }: { item: string }) => <ConversationRow id={item} />
+
+/**
+ * Returns the private channel ids in list order. PrivateChannelSortStore: pinned conversations (isMessagesFavorite)
+ * first, then each group by its newest message. One that never had a message sorts by its creation.
+ * Guild messages change lastMessageIds too, but the sorted list stays shallow-equal, so only a real reorder re-renders.
+ */
+function useConversationIds(): string[] {
+    const session = useSession()
+    const privateIds = useSessionStore(channelsStore, state => state.privateIds)
+    const privateSettings = useSessionStore(
+        settingsStore,
+        state => state.guildSettings[PRIVATE_SETTINGS_KEY],
+    )
+    return useSessionStore(
+        readStatesStore,
+        useShallow(state => {
+            const channels = session.get(channelsStore).getState().channels
+            const newest = (id: string) =>
+                state.lastMessageIds[id] ?? channels[id]?.last_message_id ?? id
+            const pinned = (id: string) =>
+                isFavorite(privateSettings, id) ? 1 : 0
+            return [...privateIds].sort(
+                (a, b) =>
+                    pinned(b) - pinned(a) ||
+                    compareSnowflakes(newest(b), newest(a)),
+            )
+        }),
+    )
+}
 
 const SKELETON_ROWS = 12
 
@@ -275,22 +350,10 @@ export function MessagesTab() {
         setTabFocused(focused)
         return () => setTabFocused(false)
     }, [focused, setTabFocused])
-    const privateIds = useSessionStore(channelsStore, state => state.privateIds)
-    const session = useSession()
+    const ids = useConversationIds()
     const ready = useSessionReady()
-    // Most recent conversation first; one that never had a message sorts by its creation. Guild messages change
-    // lastMessageIds too, but the sorted id list stays shallow-equal, so this only re-renders on a real reorder.
-    const ids = useSessionStore(
-        readStatesStore,
-        useShallow(state => {
-            const channels = session.get(channelsStore).getState().channels
-            const newest = (id: string) =>
-                state.lastMessageIds[id] ?? channels[id]?.last_message_id ?? id
-            return [...privateIds].sort((a, b) =>
-                compareSnowflakes(newest(b), newest(a)),
-            )
-        }),
-    )
+    const { theme } = useUnistyles()
+    const fadingEdge = useFadingEdge(theme.space.PX_24)
 
     // ChannelsUnreadBars: conversations with mentions or unreads the bars can point at.
     // Every private channel notifies, so an unread one shows unless it is muted.
@@ -357,12 +420,18 @@ export function MessagesTab() {
             </Pressable>
             <View style={styles.listContainer}>
                 <ConversationPlaceholders>
-                    <FlashList
+                    <AnimatedFlashList
                         ref={listRef}
                         data={ids}
                         renderItem={renderItem}
                         keyExtractor={id => id}
                         contentContainerStyle={styles.content}
+                        {...fadingEdge.scrollProps}
+                        scrollEventThrottle={16}
+                        renderScrollComponent={FadingEdgeScrollView}
+                        overrideProps={{
+                            animatedProps: fadingEdge.animatedProps,
+                        }}
                         onViewableItemsChanged={
                             unreadBars.onViewableItemsChanged
                         }

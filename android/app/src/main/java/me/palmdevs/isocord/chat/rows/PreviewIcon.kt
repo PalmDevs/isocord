@@ -14,7 +14,7 @@ import me.palmdevs.isocord.chat.media.cachedPainter
 
 /** PreviewIcon names (src/features/chat/rows/messagePreview.ts) and their drawables. */
 @DrawableRes
-private fun previewIconRes(name: String): Int? = when (name) {
+internal fun previewIconRes(name: String): Int? = when (name) {
   "image" -> R.drawable.preview_image
   "video" -> R.drawable.preview_video
   "audio" -> R.drawable.preview_audio
@@ -26,7 +26,13 @@ private fun previewIconRes(name: String): Int? = when (name) {
   else -> null
 }
 
-/** ChannelRowPreview's PreviewIcon: 12dp (messageTypeIconSizeNew "xxs"), 4dp after the text, in the text colour. */
+/** ChannelRowPreview's PreviewIcon size: messageTypeIconSizeNew "xxs". */
+internal val PREVIEW_ICON_SIZE = 12.dp
+
+/** The space between the text and the PreviewIcon. */
+internal val PREVIEW_ICON_GAP = 4.dp
+
+/** ChannelRowPreview's PreviewIcon, after the text, in the text colour. */
 @Composable
 fun PreviewIcon(name: String, color: Color, modifier: Modifier = Modifier) {
   val res = previewIconRes(name) ?: return
@@ -34,6 +40,6 @@ fun PreviewIcon(name: String, color: Color, modifier: Modifier = Modifier) {
     painter = cachedPainter(res),
     contentDescription = null,
     colorFilter = ColorFilter.tint(color),
-    modifier = modifier.padding(start = 4.dp).size(12.dp),
+    modifier = modifier.padding(start = PREVIEW_ICON_GAP).size(PREVIEW_ICON_SIZE),
   )
 }

@@ -1,50 +1,47 @@
 package me.palmdevs.isocord.chat
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.view.MotionEvent
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import com.facebook.react.bridge.Arguments
-import com.facebook.react.bridge.ReactContext
-import com.facebook.react.bridge.WritableMap
-import com.facebook.react.uimanager.UIManagerHelper
-import com.facebook.react.uimanager.events.Event
-import com.facebook.react.uimanager.events.NativeGestureUtil
-import me.palmdevs.isocord.chat.rows.PreviewIcon
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import coil3.SingletonImageLoader
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.ReactContext
+import com.facebook.react.bridge.WritableMap
+import com.facebook.react.uimanager.UIManagerHelper
+import com.facebook.react.uimanager.events.Event
+import com.facebook.react.uimanager.events.NativeGestureUtil
+import me.palmdevs.isocord.chat.list.ChatActions
+import me.palmdevs.isocord.chat.list.LocalChatActions
 import me.palmdevs.isocord.chat.list.LocalChatFonts
 import me.palmdevs.isocord.chat.list.LocalChatTheme
 import me.palmdevs.isocord.chat.media.buildImageLoader
 import me.palmdevs.isocord.chat.rows.ChatTheme
-import me.palmdevs.isocord.chat.rows.Span
-import me.palmdevs.isocord.chat.rows.SpanText
 import me.palmdevs.isocord.chat.rows.MessageText
-import me.palmdevs.isocord.chat.list.ChatActions
-import me.palmdevs.isocord.chat.list.LocalChatActions
+import me.palmdevs.isocord.chat.rows.Span
+import me.palmdevs.isocord.chat.rows.SpanLine
 import me.palmdevs.isocord.core.DisposeAfterDetach
 
 /**
- * The Android view behind `IsocordSpanTextView`. Inline, spans are one line of text ([SpanText]) and the trailing
- * icon, and every touch passes through. In [markdown] mode they are a message body ([MessageText]: blocks, quotes,
- * code), and touches on a link are taken, the rest left to the JS pressable around it.
+ * The Android view behind `IsocordSpanTextView`. Inline, spans are one line of text and the trailing icon
+ * ([SpanLine], drawn without a composition), and every touch passes through. In [markdown] mode they are a message
+ * body ([MessageText]: blocks, quotes, code) in a ComposeView, and touches on a link are taken, the rest left to the
+ * JS pressable around it.
  * JS gives it a height, from `onContentHeight` when it has to follow the text.
  */
 class SpanTextView(context: Context) : FrameLayout(context) {
@@ -60,6 +57,13 @@ class SpanTextView(context: Context) : FrameLayout(context) {
   var lineClamp by mutableIntStateOf(0)
   var trailingIcon by mutableStateOf<String?>(null)
   var markdown by mutableStateOf(false)
+
+  /** [lineClamp] as Compose's line limit. */
+  private val maxLines get() = if (lineClamp > 0) lineClamp else Int.MAX_VALUE
+
+  private val line = SpanLine(this)
+  /** The markdown composition, only while [markdown] is on. */
+  private var composeView: ComposeView? = null
 
   private var reportedHeight = -1
   private var truncated = false
@@ -78,81 +82,74 @@ class SpanTextView(context: Context) : FrameLayout(context) {
     layoutContent()
   }
 
-  private val dbgCreated = System.currentTimeMillis()
-  private var dbgLayouts = 0
-  private var dbgLaidOut = false
-
   init {
-    android.util.Log.d("DEBUG-st7k", "init start ${System.currentTimeMillis()}")
+    setWillNotDraw(false)
     SingletonImageLoader.setSafe(::buildImageLoader)
-    val fonts = ChatFonts(context.assets)
-    addView(
-      ComposeView(context).apply {
-        setViewCompositionStrategy(DisposeAfterDetach)
-        setContent {
-          // The cached measure of this view and its inner AndroidComposeView misses Compose's own size changes.
-          Box(Modifier.onSizeChanged { remeasure() }) { Content(fonts) }
-        }
-      },
-      LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
+  }
+
+  /** Applies a batch of prop changes: lays out the inline line, or hosts the markdown composition. */
+  fun onPropsUpdated() {
+    if (markdown) {
+      if (composeView == null) addComposeView()
+      return
+    }
+    composeView?.let {
+      removeView(it)
+      composeView = null
+      // The markdown height was the last one reported.
+      reportedHeight = -1
+      line.reset()
+    }
+    // Laid out in onDraw, once the batch's layout has set the final width.
+    invalidate()
+  }
+
+  private fun layoutLine() {
+    val input = SpanLine.Input(
+      spans = spans,
+      theme = theme,
+      color = color?.let(::Color) ?: theme.textDefault,
+      fontSize = fontSize,
+      lineHeight = lineHeight,
+      prefix = prefix,
+      maxLines = maxLines,
+      trailingIcon = trailingIcon,
     )
-    android.util.Log.d("DEBUG-st7k", "init end ${System.currentTimeMillis()} (+${System.currentTimeMillis() - dbgCreated} ms)")
+    if (!line.update(input, width) || width <= 0) return
+    truncated = line.truncated
+    reportHeight(line.height)
+  }
+
+  private fun addComposeView() {
+    val fonts = ChatFonts.shared(context)
+    val view = ComposeView(context).apply {
+      setViewCompositionStrategy(DisposeAfterDetach)
+      setContent {
+        // The cached measure of this view and its inner AndroidComposeView misses Compose's own size changes.
+        Box(Modifier.onSizeChanged { remeasure() }) { Markdown(fonts) }
+      }
+    }
+    composeView = view
+    addView(view, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
   }
 
   @Composable
-  private fun Content(fonts: ChatFonts) {
-    val style = TextStyle(
-      color = color?.let(::Color) ?: theme.textDefault,
-      fontSize = fontSize.sp,
-      lineHeight = lineHeight.sp,
-      // Every text-*/medium and heading-*/normal variant is ggsans-Medium.
-      fontWeight = FontWeight.Medium,
-      fontFamily = fonts.sans,
-    )
-    // ChannelRowPreview: the author label is part of the same text, in the same style.
-    val prefixText = remember(prefix) { prefix?.takeIf { it.isNotEmpty() }?.let(::AnnotatedString) }
-    val maxLines = if (lineClamp > 0) lineClamp else Int.MAX_VALUE
-    if (markdown) {
-      // MessageText draws in the theme's default text colour.
-      val textTheme = remember(theme, color) { color?.let { theme.copy(textDefault = Color(it)) } ?: theme }
-      CompositionLocalProvider(
-        LocalChatTheme provides textTheme,
-        LocalChatFonts provides fonts,
-        LocalChatActions provides actions,
-        LocalHeldLink provides heldLink,
-      ) {
-        val dbgDensity = androidx.compose.ui.platform.LocalDensity.current
-        androidx.compose.runtime.SideEffect {
-          with(dbgDensity) {
-            android.util.Log.d(
-              "DEBUG-st7k",
-              "clamp density=$density fontScale=$fontScale line=${lineHeight.sp.toPx()}px x3=${(lineHeight.sp * 3).toPx()}px clamp=${(lineHeight.sp * 3).toDp().toPx()}px maxLines=$maxLines",
-            )
-          }
-        }
-        MessageText(spans, fontSize = fontSize.sp, lineHeight = lineHeight.sp, maxLines = maxLines)
-      }
-      return
-    }
-    CompositionLocalProvider(LocalChatTheme provides theme, LocalChatFonts provides fonts) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        SpanText(
-          spans, style, maxLines, prefixText,
-          modifier = Modifier.weight(1f, fill = false),
-          onTextLayout = {
-            if (!dbgLaidOut) android.util.Log.d("DEBUG-st7k", "first text layout ${System.currentTimeMillis()} (+${System.currentTimeMillis() - dbgCreated} ms)")
-            dbgLaidOut = true
-            truncated = it.hasVisualOverflow
-          },
-        )
-        trailingIcon?.let { PreviewIcon(it, style.color) }
-      }
+  private fun Markdown(fonts: ChatFonts) {
+    // MessageText draws in the theme's default text colour.
+    val textTheme = remember(theme, color) { color?.let { theme.copy(textDefault = Color(it)) } ?: theme }
+    CompositionLocalProvider(
+      LocalChatTheme provides textTheme,
+      LocalChatFonts provides fonts,
+      LocalChatActions provides actions,
+      LocalHeldLink provides heldLink,
+    ) {
+      MessageText(spans, fontSize = fontSize.sp, lineHeight = lineHeight.sp, maxLines = maxLines)
     }
   }
 
   /** Flags the ComposeView and its inner view for a fresh measure, then measures and lays out. */
   private fun remeasure() {
-    var view: android.view.View? = getChildAt(0)
+    var view: android.view.View? = composeView
     while (view != null) {
       view.forceLayout()
       view = (view as? android.view.ViewGroup)?.getChildAt(0)
@@ -164,9 +161,7 @@ class SpanTextView(context: Context) : FrameLayout(context) {
   }
 
   private fun measureContent() {
-    dbgLayouts++
-    if (dbgLayouts % 10 == 0) android.util.Log.d("DEBUG-st7k", "measureContent #$dbgLayouts ${System.currentTimeMillis()}")
-    val child = getChildAt(0) ?: return
+    val child = composeView ?: return
     val width = right - left
     if (width <= 0) return
     child.measure(
@@ -181,7 +176,6 @@ class SpanTextView(context: Context) : FrameLayout(context) {
     val key = height * 2 + if (truncated) 1 else 0
     if (key == reportedHeight) return
     reportedHeight = key
-    android.util.Log.d("DEBUG-st7k", "emit height $height truncated=$truncated ${System.currentTimeMillis()}")
     val density = resources.displayMetrics.density
     emit("topContentHeight") {
       putDouble("height", (height / density).toDouble())
@@ -207,21 +201,38 @@ class SpanTextView(context: Context) : FrameLayout(context) {
   }
 
   private fun layoutContent() {
+    val child = composeView ?: return
     measureContent()
-    val child = getChildAt(0) ?: return
     child.layout(0, 0, child.measuredWidth, child.measuredHeight)
   }
 
+  // A recycled row gets new props and then a new width in the same frame. Measuring here does it once.
+  // A size change redraws the view on its own.
+  override fun onDraw(canvas: Canvas) {
+    if (markdown) return
+    layoutLine()
+    line.draw(canvas)
+  }
+
+  override fun verifyDrawable(who: Drawable): Boolean = super.verifyDrawable(who) || line.owns(who)
+
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
+    line.setAnimating(true)
     layoutPosted = false
     requestLayout()
+  }
+
+  override fun onDetachedFromWindow() {
+    super.onDetachedFromWindow()
+    line.setAnimating(false)
   }
 
   // React Native ignores layout requests from native children; Compose's own (loaded images) are honoured.
   override fun requestLayout() {
     super.requestLayout()
-    if (!layoutPosted) {
+    // Also runs from the superclass constructor, before composeView is set.
+    if (composeView != null && !layoutPosted) {
       layoutPosted = true
       post(measureAndLayout)
     }

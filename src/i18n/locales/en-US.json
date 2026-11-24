@@ -791,6 +791,8 @@
   "channelActions.notificationSettings": "Notification Settings",
   "channelActions.pinChannel": "Pin Channel to Top",
   "channelActions.unpinChannel": "Unpin Channel",
+  "channelActions.pin": "Pin",
+  "channelActions.unpin": "Unpin",
   "channelActions.copyChannelId": "Copy Channel ID",
   "channelActions.profile": "Profile",
   "channelActions.closeDm": "Close DM",

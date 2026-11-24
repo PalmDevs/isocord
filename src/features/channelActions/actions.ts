@@ -1,7 +1,7 @@
 import { ChannelType } from '../../core/discord/channelType'
 import { channelPermalink } from '../../core/discord/permalink'
 import { t } from '../../i18n'
-import { isThread } from '../../stores/channels/channels'
+import { isPrivate, isThread } from '../../stores/channels/channels'
 import {
     canDuplicateChannel,
     canEditChannel,
@@ -55,12 +55,26 @@ function dmActions({ session, channel }: ChannelActionEnv): ChannelAction[] {
     ]
 }
 
-/** The "channel-actions" section: Pin Channel to Top, then Copy Link. Invite and the opt-in rows are left out. */
+/**
+ * The "channel-actions" section: Pin Channel to Top, then Copy Link. A DM or group DM gets Pin or Unpin
+ * (setMessagesFavorite). Invite and the opt-in rows are left out.
+ */
 function linkActions({
     session,
     channel,
     pinned,
 }: ChannelActionEnv): ChannelAction[] {
+    if (isPrivate(channel))
+        return [
+            {
+                key: 'pin',
+                label: t(
+                    pinned ? 'channelActions.unpin' : 'channelActions.pin',
+                ),
+                icon: 'PinIcon',
+                onPress: () => setPinned(session, channel, !pinned),
+            },
+        ]
     if (!isGuildChannel(channel) || isCategory(channel)) return []
     const copyLink: ChannelAction = {
         key: 'copyLink',

@@ -1,6 +1,7 @@
 package me.palmdevs.isocord.chat.media
 
 import android.content.Context
+import android.content.res.Resources
 import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
@@ -118,7 +119,10 @@ private val resourceBitmaps = ConcurrentHashMap<Int, ImageBitmap>()
  */
 @Composable
 internal fun cachedPainter(@DrawableRes id: Int): Painter {
-  val resources = LocalContext.current.resources
-  val bitmap = resourceBitmaps.getOrPut(id) { ImageBitmap.imageResource(resources, id) }
+  val bitmap = resourceBitmap(LocalContext.current.resources, id)
   return remember(bitmap) { BitmapPainter(bitmap) }
 }
+
+/** Returns the shared bitmap of a raster drawable, for drawing outside a composition. */
+internal fun resourceBitmap(resources: Resources, @DrawableRes id: Int): ImageBitmap =
+  resourceBitmaps.getOrPut(id) { ImageBitmap.imageResource(resources, id) }
