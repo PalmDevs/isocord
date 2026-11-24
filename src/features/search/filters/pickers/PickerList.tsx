@@ -26,15 +26,10 @@ export function PickerList({
     rows,
     submitRef,
     loading = false,
-    onPressIn,
-    tapAllowed,
 }: {
     rows: PickerRow[]
     submitRef: RefObject<(() => void) | null>
     loading?: boolean
-    /** useSteadyRows' guard: a tap that started just after the rows changed is ignored. */
-    onPressIn?: () => void
-    tapAllowed?: () => boolean
 }) {
     const first = rows.find(row => !row.disabled)
     useEffect(() => {
@@ -71,10 +66,7 @@ export function PickerList({
                     trailing={row.trailing}
                     disabled={row.disabled}
                     accessibilityLabel={row.accessibilityLabel}
-                    onPressIn={onPressIn}
-                    onPress={() => {
-                        if (tapAllowed?.() ?? true) row.onPress()
-                    }}
+                    onPress={row.onPress}
                 />
             )}
         />

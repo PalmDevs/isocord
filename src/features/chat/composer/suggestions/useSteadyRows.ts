@@ -1,9 +1,6 @@
 // TODO: Move this out of the chat feature
 
-import { useEffect, useRef, useState } from 'react'
-
-/** Time after the rows change in which a tap that starts is ignored. */
-const TAP_GUARD_MS = 250
+import { useState } from 'react'
 
 /**
  * Merges `items` into the rows on screen: kept rows hold their order, new ones fill the empty slots above them,
@@ -23,10 +20,9 @@ function merge<T extends { key: string }>(
 }
 
 /**
- * Returns the rows to draw for `items`, and a guard for their taps.
+ * Returns the rows to draw for `items`.
  * While `query` stays the same, a change comes from the network (members arriving from the gateway), so the rows
  * on screen stay put: the box grows from its bottom edge, and new rows only take slots that move nothing.
- * `tapAllowed` is false for a tap that started just after the rows changed.
  * Not in the reference, which re-ranks in place and moves rows under the finger.
  */
 export function useSteadyRows<T extends { key: string }>(
@@ -44,18 +40,5 @@ export function useSteadyRows<T extends { key: string }>(
         setHeld({ query, items, shown })
     }
 
-    const changedAt = useRef(0)
-    const pressedAt = useRef(0)
-    const keys = shown?.map(item => item.key).join(',')
-    useEffect(() => {
-        if (keys !== undefined) changedAt.current = Date.now()
-    }, [keys])
-
-    return {
-        shown,
-        onPressIn: () => {
-            pressedAt.current = Date.now()
-        },
-        tapAllowed: () => pressedAt.current - changedAt.current >= TAP_GUARD_MS,
-    }
+    return shown
 }

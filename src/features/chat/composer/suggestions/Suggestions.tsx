@@ -323,21 +323,17 @@ export function Suggestions({
     const query = suggestion?.query
     const visibleRows =
         query === undefined ? MAX_VISIBLE_ROWS : MAX_VISIBLE_EMOJI_ROWS
-    const steady = useSteadyRows(
+    const list = useSteadyRows(
         suggestion && !suggestion.bar ? suggestion.items : null,
         typed,
         visibleRows,
     )
-    const list = steady.shown
     const stickers = suggestion?.stickers ?? []
     const rows = (items: Item[]) =>
         items.map(item => (
             <RipplePressable
                 key={item.key}
-                onPressIn={steady.onPressIn}
-                onPress={() => {
-                    if (steady.tapAllowed()) pick(item)
-                }}
+                onPress={() => pick(item)}
                 style={styles.row}
             >
                 <ItemContent item={item} />

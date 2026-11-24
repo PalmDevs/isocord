@@ -62,15 +62,8 @@ export function UserPicker({
     })
     const idRows = useIdRows({ kind, context, query, onPick, submitRef })
     // Members arriving from the gateway for the same text join the list without moving the rows on screen.
-    const steady = useSteadyRows([...idRows, ...rows], query, USER_VISIBLE_ROWS)
-    return (
-        <PickerList
-            rows={steady.shown ?? []}
-            submitRef={submitRef}
-            onPressIn={steady.onPressIn}
-            tapAllowed={steady.tapAllowed}
-        />
-    )
+    const shown = useSteadyRows([...idRows, ...rows], query, USER_VISIBLE_ROWS)
+    return <PickerList rows={shown ?? []} submitRef={submitRef} />
 }
 
 /**
