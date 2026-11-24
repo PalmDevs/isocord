@@ -25,6 +25,7 @@ export function showLongPressUrlActionSheet(
     url: string,
     goToChannel?: () => void,
 ): void {
+    // The reference has no icons (hasIcons: false). Icons here help scan the rows.
     const contact = url.match(CONTACT_LINK)
     const contactOptions: SimpleActionSheetOption[] = contact
         ? [
@@ -34,6 +35,7 @@ export function showLongPressUrlActionSheet(
                           ? 'chat.linkOptions.copyEmail'
                           : 'chat.linkOptions.copyPhone',
                   ),
+                  icon: contact[1] === 'mailto' ? 'EnvelopeIcon' : 'PhoneIcon',
                   onPress: () =>
                       copy(contact[2] ?? '', 'chat.linkOptions.linkCopied'),
               },
@@ -41,6 +43,7 @@ export function showLongPressUrlActionSheet(
                   ? [
                         {
                             label: t('chat.linkOptions.sendText'),
+                            icon: 'ChatIcon' as const,
                             onPress: () =>
                                 void Linking.openURL(
                                     url.replace('tel:', 'sms:'),
@@ -53,27 +56,30 @@ export function showLongPressUrlActionSheet(
     showSimpleActionSheet({
         key: 'long-press-url',
         header: { title: t('chat.linkOptions.title'), subtitle: url },
-        hasIcons: false,
         options: [
             ...(goToChannel
                 ? [
                       {
                           label: t('chat.linkOptions.goToChannel'),
+                          icon: 'ChatArrowRightIcon' as const,
                           onPress: goToChannel,
                       },
                   ]
                 : []),
             {
                 label: t('chat.linkOptions.openLink'),
+                icon: 'LinkExternalSmallIcon',
                 onPress: () => void openLink(url),
             },
             {
                 label: t('chat.linkOptions.copyLink'),
+                icon: 'LinkIcon',
                 onPress: () => copy(url, 'chat.linkOptions.linkCopied'),
             },
             ...contactOptions,
             {
                 label: t('chat.linkOptions.shareLink'),
+                icon: 'ShareIcon',
                 onPress: () =>
                     void Share.share({ message: url }).catch(() => {}),
             },

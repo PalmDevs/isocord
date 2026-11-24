@@ -50,16 +50,21 @@ fun Modifier.chatPress(
   val click by rememberUpdatedState(onClick)
   val longClick by rememberUpdatedState(onLongClick)
   val placed = remember { Placed() }
-  return indication(source, indication).onPlaced { placed.coordinates = it }.pointerInput(source) {
+  val held = LocalHeldLink.current
+  return indication(source, indication).onPlaced { placed.coordinates = it }.pointerInput(source, held) {
     awaitEachGesture {
       // Unconsumed only, and consumed here: a nested target (a reaction chip) keeps the outer ones quiet.
-      val down = awaitFirstDown()
+      // A text link consumes its down for the tap. The innermost held target still takes it (onLongPressLink).
+      val down = awaitFirstDown(requireUnconsumed = false)
+      if (down.isConsumed && !(longClick != null && held.claim())) return@awaitEachGesture
+      // A touch a nested part took (a held link) is not the target's own press: no ripple.
+      val touchConsumed = down.isConsumed
       down.consume()
       // The press (and its ripple) waits for the tap timeout, as a View's pressed state does in a scrolling
       // parent (View.CheckForTap): a swipe or scroll that claims the touch before then shows no ripple at all.
       var press: PressInteraction.Press? = null
       fun pressIn() {
-        if (press == null) press = PressInteraction.Press(down.position).also { source.tryEmit(it) }
+        if (press == null && !touchConsumed) press = PressInteraction.Press(down.position).also { source.tryEmit(it) }
       }
       var released = false
       try {
@@ -75,9 +80,10 @@ fun Modifier.chatPress(
           Outcome.Held -> {
             released = true
             longClick?.invoke()
-            // Swallow the rest of this touch so nothing else reads the release as a tap.
+            // Swallow the rest of this touch so nothing else reads the release as a tap. The Initial pass reaches
+            // this target before its children, so a held link sees the release consumed and does not open.
             while (true) {
-              val event = awaitPointerEvent()
+              val event = awaitPointerEvent(PointerEventPass.Initial)
               event.changes.forEach { it.consume() }
               if (event.changes.none { it.pressed }) break
             }
@@ -157,6 +163,12 @@ private class Placed {
 class HeldLink {
   var url: String? = null
 
+  /** Whether a press target took this touch's link. */
+  var claimed = false
+
+  /** Returns whether a link is held and no other target took it yet, and takes it. */
+  fun claim(): Boolean = (url != null && !claimed).also { if (it) claimed = true }
+
   /** Returns the held link and forgets it. */
   fun take(): String? = url.also { url = null }
 }
@@ -175,6 +187,7 @@ fun Modifier.holdsLink(linkAt: (Offset) -> String?): Modifier {
     awaitEachGesture {
       val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
       held.url = find(down.position)
+      held.claimed = false
       try {
         waitForUpOrCancellation(PointerEventPass.Initial)
       } finally {
