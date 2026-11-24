@@ -3,6 +3,7 @@ import { ApiError } from '../../core/api/rest'
 import { logger } from '../../core/log'
 import { defineStore } from '../../core/session'
 import { channelsStore, holdThread, isThread } from './channels'
+import { threadsStore } from './threads'
 import type { Session } from '../../core/session'
 import type { Channel } from './channels'
 
@@ -18,6 +19,39 @@ export const linkedChannelsStore = defineStore('linkedChannels', session => {
     return asked
 })
 
+/** Fetches a channel and holds it when it is a thread. Resolves whether it was held. */
+async function fetchThread(session: Session, id: string): Promise<boolean> {
+    const channel = await session.rest.get<Channel>(Endpoint.channel(id))
+    // The reference only adds threads (THREAD_CREATE). It would hold any other channel already.
+    if (!isThread(channel)) return false
+    holdThread(session, channel)
+    return true
+}
+
+/**
+ * Holds a tapped channel the client does not hold, from the active threads or the API. Resolves whether it can open.
+ * The reference navigates to the channel route, which loads the thread (handleMessagesTapChannel).
+ */
+export async function holdLinkedChannel(
+    session: Session,
+    id: string,
+): Promise<boolean> {
+    if (session.get(channelsStore).getState().channels[id]) return true
+    const active = session.get(threadsStore).getState().active[id]
+    if (active) {
+        holdThread(session, active)
+        return true
+    }
+    try {
+        return await fetchThread(session, id)
+    } catch (error) {
+        // No access or no such channel.
+        if (!(error instanceof ApiError))
+            log.warn(`Could not load linked channel: ${error}`)
+        return false
+    }
+}
+
 /**
  * LazyLoadedThreadManager.loadThread: fetches channels the client does not hold, such as archived or unjoined threads
  * and posts. A thread the user can see is held, which rebuilds the rows that link to it. One they cannot see stays
@@ -30,17 +64,11 @@ export function loadLinkedChannels(session: Session, ids: Iterable<string>) {
     for (const id of ids) {
         if (channels[id] || asked.has(id)) continue
         asked.add(id)
-        session.rest
-            .get<Channel>(Endpoint.channel(id))
-            // The reference only adds threads (THREAD_CREATE); any other channel it would hold already.
-            .then(channel => {
-                if (isThread(channel)) holdThread(session, channel)
-            })
-            .catch(error => {
-                // No access or no such channel stays unknown. Anything else may work at the next build.
-                if (error instanceof ApiError) return
-                log.warn(`Could not load linked channel: ${error}`)
-                asked.delete(id)
-            })
+        fetchThread(session, id).catch(error => {
+            // No access or no such channel stays unknown. Anything else may work at the next build.
+            if (error instanceof ApiError) return
+            log.warn(`Could not load linked channel: ${error}`)
+            asked.delete(id)
+        })
     }
 }

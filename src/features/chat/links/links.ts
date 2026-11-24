@@ -5,6 +5,7 @@ import { logger } from '../../../core/log'
 import { openLink, warmUpBrowser } from '../../../core/openLink'
 import { t } from '../../../i18n'
 import { channelsStore } from '../../../stores/channels/channels'
+import { holdLinkedChannel } from '../../../stores/channels/linkedChannels'
 import {
     joinThread,
     leaveThread,
@@ -147,7 +148,7 @@ export function handleChatLink(url: string, context: LinkContext): void {
             if (channelId) retryMessage(session, channelId, link.nonce)
             return
         case 'channel':
-            openLinkedChannel(link, context)
+            void openLinkedChannel(link, context)
             return
         case 'emoji':
             void openEmojiInfo(link.emoji)
@@ -290,12 +291,13 @@ const messageOf = (
  * Here it opens in a panel stacked over this chat.
  * A stacked chat that links on switches the stacked panel in place.
  */
-function openLinkedChannel(
+async function openLinkedChannel(
     link: ChatLink & { kind: 'channel' },
     { session, channelId, openChannel, scrollToMessage }: LinkContext,
-): void {
+): Promise<void> {
     const { channelId: target, messageId } = link
-    if (!session.get(channelsStore).getState().channels[target]) {
+    // An active or archived thread the client does not hold yet is held first, as the Threads tab does.
+    if (!(await holdLinkedChannel(session, target))) {
         // Another server's channel we are not in, or one we cannot see. The reference lurks the server; here the
         // channel cannot be shown.
         toast(t('chat.mention.noAccess'), 'no-access')
