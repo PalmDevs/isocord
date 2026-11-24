@@ -110,6 +110,8 @@ export interface RowContext {
     forumPostStarter?: Message
     /** Why a user's messages fold into a group (message.blocked, message.ignored). Absent where nothing folds. */
     hiddenReason?: (userId: string) => HiddenReason | undefined
+    /** A message of the loaded history, by id. Set by `buildRows` from the channel's messages. */
+    loadedMessage?: (messageId: string) => Message | undefined
 }
 
 export type HiddenReason = 'blocked' | 'ignored'
@@ -447,8 +449,14 @@ function makeEnv(context: RowContext, canView: RowEnv['canView']): RowEnv {
 function replyRow(message: Message, env: RowEnv): ReplyRow | undefined {
     if (message.type !== MessageType.REPLY) return undefined
     const { guild, members } = env.context
-    const reference = message.referenced_message
     const ref = message.message_reference
+    // ReferencedMessageStore processMessage: a reply sent without its message takes the loaded one.
+    const reference =
+        message.referenced_message === undefined &&
+        ref?.message_id &&
+        (ref.channel_id ?? message.channel_id) === message.channel_id
+            ? env.context.loadedMessage?.(ref.message_id)
+            : message.referenced_message
     // Tapping the preview jumps to the replied-to message (see links.ts).
     const url = ref?.message_id
         ? chatLink.channel(
@@ -948,7 +956,8 @@ export function* buildRowsIncrementally(
 ): Generator<void, ChatRow[]> {
     if (!state)
         return [{ type: 'loading', key: 'loading-initial', placeholder: true }]
-    const memo = rowMemo(context)
+    const loaded = new Map(state.messages.map(message => [message.id, message]))
+    const memo = rowMemo({ ...context, loadedMessage: id => loaded.get(id) })
     const env = makeEnv(memo.context, memo.canView)
     const rows: ChatRow[] = []
     const addDividers = dividerAdder(rows, state, context.ackedId)

@@ -20,7 +20,12 @@ const MAPS = [
     'polls',
 ] as const
 /** Context callbacks whose answers a row reads. */
-const CALLS = ['canReact', 'swipeActions', 'hiddenReason'] as const
+const CALLS = [
+    'canReact',
+    'swipeActions',
+    'hiddenReason',
+    'loadedMessage',
+] as const
 type Source = (typeof MAPS)[number] | (typeof CALLS)[number] | 'canView'
 
 /** The key of a read that walked a whole map. */
@@ -71,6 +76,8 @@ function current(context: RowContext, { source, key }: Read): unknown {
             return context[source]?.(key as Message)
         case 'hiddenReason':
             return context.hiddenReason?.(key as string)
+        case 'loadedMessage':
+            return context.loadedMessage?.(key as string)
         case 'canView':
             return can(context.session, key as string, Permission.VIEW_CHANNEL)
     }
