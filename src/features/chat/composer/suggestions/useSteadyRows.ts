@@ -19,6 +19,16 @@ function merge<T extends { key: string }>(
     return [...added.slice(0, room), ...kept, ...added.slice(room)]
 }
 
+/** Returns whether two row lists hold the same keys in the same order. */
+function sameKeys<T extends { key: string }>(
+    a: T[] | null,
+    b: T[] | null,
+): boolean {
+    if (a === b) return true
+    if (!a || !b || a.length !== b.length) return false
+    return a.every((item, index) => item.key === b[index]?.key)
+}
+
 /**
  * Returns the rows to draw for `items`.
  * While `query` stays the same, a change comes from the network (members arriving from the gateway), so the rows
@@ -31,14 +41,15 @@ export function useSteadyRows<T extends { key: string }>(
     visible: number,
 ) {
     const [held, setHeld] = useState({ query, items, shown: items })
-    let shown = held.shown
-    if (held.items !== items) {
-        shown =
-            items && held.shown && query !== null && held.query === query
-                ? merge(held.shown, items, visible)
-                : items
+    if (held.items === items && held.query === query) return held.shown
+
+    const shown =
+        items && held.shown && query !== null && held.query === query
+            ? merge(held.shown, items, visible)
+            : items
+    // Compare keys rather than array identity so unmemoised callers do not re-trigger state updates during render.
+    if (held.query !== query || !sameKeys(held.shown, shown))
         setHeld({ query, items, shown })
-    }
 
     return shown
 }
