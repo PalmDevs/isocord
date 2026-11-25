@@ -106,11 +106,11 @@ class MainApplication : Application(), ReactApplication {
 /**
  * The reference's mounting-mode experiment at mode 3 (MainApplication$reactNativeInitializationTask$1$1).
  * Every other flag keeps the stable value that loadReactNative sets.
+ * 
+ * enablePropsUpdateReconciliationAndroid is omitted: it drops FlashList cell container opacity updates.
  */
 private object DiscordMountingFlags : ReactNativeNewArchitectureFeatureFlagsDefaults() {
   override fun enableAccumulatedUpdatesInRawPropsAndroid() = true
-
-  override fun enablePropsUpdateReconciliationAndroid() = true
 
   // The reference's usePullModelOnAndroid is a fork flag. React Native's own pull model.
   override fun enableMountingCoordinatorPullModelAndroid() = true
