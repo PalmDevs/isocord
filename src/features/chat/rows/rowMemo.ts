@@ -1,5 +1,5 @@
 import { Permission } from '../../../core/discord/permissions'
-import { can } from '../../../stores/permissions'
+import { can, canViewChannel } from '../../../stores/permissions'
 import type { Message } from '../../../stores/readStates'
 import type { RowContext } from './buildRows'
 import type { ChatRow } from './rows'
@@ -78,8 +78,12 @@ function current(context: RowContext, { source, key }: Read): unknown {
             return context.hiddenReason?.(key as string)
         case 'loadedMessage':
             return context.loadedMessage?.(key as string)
-        case 'canView':
-            return can(context.session, key as string, Permission.VIEW_CHANNEL)
+        case 'canView': {
+            const channel = context.channels[key as string]
+            return channel
+                ? canViewChannel(context.session, channel)
+                : can(context.session, key as string, Permission.VIEW_CHANNEL)
+        }
     }
     const map = context[source]
     return key === WHOLE ? map : map?.[key as string]

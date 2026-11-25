@@ -1,6 +1,7 @@
+import { ChannelType } from '../core/discord/channelType'
 import { computePermissions, Permission } from '../core/discord/permissions'
 import { useSession, useSessionStore } from '../core/react'
-import { channelsStore } from './channels/channels'
+import { channelsStore, isThread } from './channels/channels'
 import { guildsStore } from './guilds'
 import type { Session } from '../core/session'
 import type { Channel } from './channels/channels'
@@ -50,6 +51,29 @@ export function can(
     permission: bigint,
 ): boolean {
     return (channelPermissions(session, channelId) & permission) === permission
+}
+
+/** Returns whether the user can view `channel`. */
+export function canViewChannel(session: Session, channel: Channel): boolean {
+    if (!channel.guild_id) return true
+    const guild = session.get(guildsStore).getState().guilds[channel.guild_id]
+    if (!guild) return false
+    const thread = isThread(channel) || channel.thread_metadata !== undefined
+    const source = thread
+        ? channel.parent_id
+            ? session.get(channelsStore).getState().channels[channel.parent_id]
+            : undefined
+        : channel
+    if (!source) return false
+    const permissions = computePermissions(guild, source, session.userId)
+    if ((permissions & Permission.VIEW_CHANNEL) === 0n) return false
+    if (
+        channel.type === ChannelType.PRIVATE_THREAD &&
+        channel.member === undefined &&
+        (permissions & Permission.MANAGE_THREADS) === 0n
+    )
+        return false
+    return true
 }
 
 /** Returns `channelPermissions`, updated when the channel, its parent or its guild change. */

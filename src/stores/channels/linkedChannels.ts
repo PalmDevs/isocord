@@ -2,6 +2,7 @@ import { Endpoint } from '../../core/api/paths'
 import { ApiError } from '../../core/api/rest'
 import { logger } from '../../core/log'
 import { defineStore } from '../../core/session'
+import { canViewChannel } from '../permissions'
 import { channelsStore, holdThread, isThread } from './channels'
 import { threadsStore } from './threads'
 import type { Session } from '../../core/session'
@@ -19,11 +20,11 @@ export const linkedChannelsStore = defineStore('linkedChannels', session => {
     return asked
 })
 
-/** Fetches a channel and holds it when it is a thread. Resolves whether it was held. */
+/** Fetches a channel and holds it when it is a viewable thread. Resolves whether it was held. */
 async function fetchThread(session: Session, id: string): Promise<boolean> {
     const channel = await session.rest.get<Channel>(Endpoint.channel(id))
     // The reference only adds threads (THREAD_CREATE). It would hold any other channel already.
-    if (!isThread(channel)) return false
+    if (!isThread(channel) || !canViewChannel(session, channel)) return false
     holdThread(session, channel)
     return true
 }
@@ -36,9 +37,11 @@ export async function holdLinkedChannel(
     session: Session,
     id: string,
 ): Promise<boolean> {
-    if (session.get(channelsStore).getState().channels[id]) return true
+    const existing = session.get(channelsStore).getState().channels[id]
+    if (existing) return canViewChannel(session, existing)
     const active = session.get(threadsStore).getState().active[id]
     if (active) {
+        if (!canViewChannel(session, active)) return false
         holdThread(session, active)
         return true
     }
