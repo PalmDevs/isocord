@@ -173,7 +173,13 @@ object DiscordRest {
           .method(method, body?.toString()?.toByteArray()?.toRequestBody(JSON))
           .apply { account.requestHeaders().forEach { (name, value) -> header(name, value) } }
           .build()
-      OkHttpClientProvider.getOkHttpClient().newCall(request).execute().use { if (it.isSuccessful) it.body?.string() ?: "" else null }
+      OkHttpClientProvider.getOkHttpClient().newCall(request).execute().use {
+        if (it.isSuccessful) it.body?.string() ?: ""
+        else {
+          Log.w(TAG, "$method $path failed: ${it.code}")
+          null
+        }
+      }
     } catch (e: IOException) {
       Log.w(TAG, "request failed: ${e.javaClass.simpleName}")
       null

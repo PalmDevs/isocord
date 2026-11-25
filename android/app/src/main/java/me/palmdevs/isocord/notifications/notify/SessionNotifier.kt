@@ -12,6 +12,7 @@ import me.palmdevs.isocord.notifications.gateway.RawMessage
 import me.palmdevs.isocord.notifications.gateway.RawRelationship
 import me.palmdevs.isocord.notifications.gateway.ReactionAdd
 import me.palmdevs.isocord.notifications.gateway.ScheduledEvent
+import me.palmdevs.isocord.notifications.gateway.ScheduledEventUser
 
 /**
  * What a session's dispatches notify, by one set of rules for both sessions: the background one (GatewayService) and
@@ -48,6 +49,8 @@ class SessionNotifier(
         cancel(AlertTag.friend(id))
       }
       "MESSAGE_REACTION_ADD" -> onReaction(dispatch.decode(ReactionAdd.serializer()), state, account, replayed)
+      "GUILD_SCHEDULED_EVENT_USER_ADD", "GUILD_SCHEDULED_EVENT_USER_REMOVE" ->
+        state.onEventUser(dispatch.decode(ScheduledEventUser.serializer()), dispatch.type == "GUILD_SCHEDULED_EVENT_USER_ADD")
       "GUILD_SCHEDULED_EVENT_UPDATE" -> onEvent(dispatch.decode(ScheduledEvent.serializer()), state, account, replayed)
     }
     return false

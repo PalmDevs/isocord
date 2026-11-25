@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.serialization.builtins.ListSerializer
 import me.palmdevs.isocord.MainActivity
 import me.palmdevs.isocord.R
+import me.palmdevs.isocord.network.ChannelType
 import me.palmdevs.isocord.network.ReadStateType
 import me.palmdevs.isocord.notifications.notify.AccountConfig
 import me.palmdevs.isocord.notifications.notify.MessageNotifier
@@ -150,20 +151,46 @@ class GatewayService : Service(), GatewayListener {
             .mapNotNull { entry -> entry.lastMessageId()?.let { entry.id to it } }
             .toMap(),
         )
+        subscribeForums()
       }
-      "GUILD_CREATE", "GUILD_UPDATE" -> state.onGuild(dispatch.decode(RawGuild.serializer()))
+      "GUILD_CREATE" -> {
+        val guild = dispatch.decode(RawGuild.serializer())
+        state.onGuild(guild)
+        if (guild.channels.orEmpty().any { it.type in ChannelType.FORUMS }) {
+          gateway?.subscribeThreads(listOf(guild.id))
+        }
+      }
+      "GUILD_UPDATE" -> state.onGuild(dispatch.decode(RawGuild.serializer()))
       "GUILD_DELETE" -> dispatch.decode(RawGuild.serializer()).let { if (!it.unavailable) state.onGuildDelete(it.id) }
-      "CHANNEL_CREATE", "CHANNEL_UPDATE", "THREAD_UPDATE" -> state.onChannel(dispatch.decode(RawChannel.serializer()))
+      "CHANNEL_CREATE" -> {
+        val channel = dispatch.decode(RawChannel.serializer())
+        state.onChannel(channel)
+        if (channel.type in ChannelType.FORUMS && channel.guild_id != null) {
+          gateway?.subscribeThreads(listOf(channel.guild_id))
+        }
+      }
+      "CHANNEL_UPDATE", "THREAD_UPDATE" -> state.onChannel(dispatch.decode(RawChannel.serializer()))
       "CHANNEL_DELETE", "THREAD_DELETE" -> state.onChannelDelete(dispatch.decode(ChannelRef.serializer()).id)
       "THREAD_LIST_SYNC" -> dispatch.decode(ThreadListSync.serializer()).let { sync -> sync.threads.forEach { state.onChannel(it, sync.guild_id) } }
       "GUILD_MEMBER_UPDATE" -> state.onMemberUpdate(dispatch.decode(MemberUpdate.serializer()))
       "GUILD_ROLE_CREATE", "GUILD_ROLE_UPDATE", "GUILD_ROLE_DELETE" -> state.onRole(dispatch.decode(RoleEvent.serializer()))
       "USER_GUILD_SETTINGS_UPDATE" -> state.onGuildSettings(dispatch.decode(RawGuildSettings.serializer()))
       "SESSIONS_REPLACE" -> state.onSessions(dispatch.decode(ListSerializer(RawSession.serializer())))
+      "GUILD_SCHEDULED_EVENT_USER_ADD", "GUILD_SCHEDULED_EVENT_USER_REMOVE" ->
+        state.onEventUser(dispatch.decode(ScheduledEventUser.serializer()), dispatch.type == "GUILD_SCHEDULED_EVENT_USER_ADD")
       // Read on another device or in the app: its notification goes (handleMessageAck).
       "MESSAGE_ACK" -> dispatch.decode(MessageAck.serializer()).let { MessageNotifier.ack(this, it.channel_id, it.message_id) }
       else -> account?.let { notifier.onDispatch(dispatch, state, it) }
     }
+  }
+
+  /** Subscribes to `threads` for guilds with forum or media channels so THREAD_CREATE arrives. */
+  private fun subscribeForums() {
+    val guildIds =
+      state.channels.values.mapNotNullTo(HashSet()) { channel ->
+        channel.guildId?.takeIf { channel.type in ChannelType.FORUMS }
+      }
+    gateway?.subscribeThreads(guildIds)
   }
 
   private fun statusNotification(account: AccountConfig?, connected: Boolean) =

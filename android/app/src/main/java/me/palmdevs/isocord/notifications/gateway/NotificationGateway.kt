@@ -285,6 +285,19 @@ class NotificationGateway(private val account: AccountConfig, private val listen
     socket?.send(buildJsonObject { put("op", op); put("d", d) }.toString())
   }
 
+  /** Subscribes to `threads` for [guildIds] so THREAD_CREATE arrives for new forum posts. */
+  fun subscribeThreads(guildIds: Collection<String>) {
+    if (guildIds.isEmpty()) return
+    send(
+      GatewayOp.GUILD_SUBSCRIPTIONS_BULK,
+      buildJsonObject {
+        putJsonObject("subscriptions") {
+          for (id in guildIds) putJsonObject(id) { put("threads", true) }
+        }
+      },
+    )
+  }
+
   /** GatewaySocket's IDENTIFY, as the app sends it (socket.ts), with the background's properties and an idle presence. */
   private fun identify() {
     seq = 0

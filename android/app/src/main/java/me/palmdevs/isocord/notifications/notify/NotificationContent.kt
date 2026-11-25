@@ -302,5 +302,5 @@ fun eventAlert(event: ScheduledEvent, state: NotificationState, account: Account
     subText = state.guilds[event.guild_id]?.name,
     iconUrl = guildIconUrl(event.guild_id, state.guilds[event.guild_id]?.icon),
     link = event.channel_id?.let { Links.channel(event.guild_id, it) },
-    interestIn = EventRef(event.guild_id, event.id),
+    interestIn = if (state.isInterestedInEvent(event.id)) null else EventRef(event.guild_id, event.id),
   )

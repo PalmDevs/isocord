@@ -17,6 +17,7 @@ object GatewayOp {
   const val INVALID_SESSION = 9
   const val HELLO = 10
   const val HEARTBEAT_ACK = 11
+  const val GUILD_SUBSCRIPTIONS_BULK = 37
   const val QOS_HEARTBEAT = 40
 }
 

@@ -238,3 +238,7 @@ class ScheduledEvent(
 /** GET /users/@me/scheduled-events: the events the account is interested in. */
 @Serializable
 class EventInterest(val guild_scheduled_event_id: String)
+
+/** GUILD_SCHEDULED_EVENT_USER_ADD and _REMOVE: a user's RSVP change. */
+@Serializable
+class ScheduledEventUser(val guild_scheduled_event_id: String, val user_id: String, val guild_id: String? = null)

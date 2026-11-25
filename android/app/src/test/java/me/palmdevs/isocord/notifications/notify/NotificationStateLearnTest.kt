@@ -1,6 +1,9 @@
 package me.palmdevs.isocord.notifications.notify
 
 import me.palmdevs.isocord.network.ChannelType
+import me.palmdevs.isocord.network.NotificationLevel
+import me.palmdevs.isocord.notifications.gateway.RawChannel
+import me.palmdevs.isocord.notifications.gateway.ScheduledEventUser
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,5 +43,38 @@ class NotificationStateLearnTest {
     learn(state, muted, unchanged = false)
     learn(state, null, unchanged = false)
     assertFalse(state.guildMuted(GUILD))
+  }
+
+  @Test
+  fun forumPostNotifiesWhenAllMessages() {
+    val state = NotificationState("me")
+    state.onChannel(RawChannel(id = "forum", type = ChannelType.GUILD_FORUM, guild_id = GUILD))
+    state.learn(
+      DispatchContext(
+        guildId = GUILD,
+        guild = GuildInfo(name = "Guild", defaultNotifications = NotificationLevel.ALL_MESSAGES, myRoles = emptySet(), roleNames = emptyMap()),
+      )
+    )
+    assertTrue(
+      state.forumPostNotifies(
+        RawChannel(id = "post", type = ChannelType.PUBLIC_THREAD, guild_id = GUILD, parent_id = "forum", newly_created = true, owner_id = "other")
+      )
+    )
+    assertFalse(
+      state.forumPostNotifies(
+        RawChannel(id = "own", type = ChannelType.PUBLIC_THREAD, guild_id = GUILD, parent_id = "forum", newly_created = true, owner_id = "me")
+      )
+    )
+  }
+
+  @Test
+  fun eventInterestTracksSelfOnly() {
+    val state = NotificationState("me")
+    state.onEventUser(ScheduledEventUser(guild_scheduled_event_id = "ev1", user_id = "other"), added = true)
+    assertFalse(state.isInterestedInEvent("ev1"))
+    state.onEventUser(ScheduledEventUser(guild_scheduled_event_id = "ev1", user_id = "me"), added = true)
+    assertTrue(state.isInterestedInEvent("ev1"))
+    state.onEventUser(ScheduledEventUser(guild_scheduled_event_id = "ev1", user_id = "me"), added = false)
+    assertFalse(state.isInterestedInEvent("ev1"))
   }
 }

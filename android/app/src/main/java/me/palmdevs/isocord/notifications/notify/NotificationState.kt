@@ -28,6 +28,7 @@ import me.palmdevs.isocord.notifications.gateway.RawSession
 import me.palmdevs.isocord.notifications.gateway.RawUser
 import me.palmdevs.isocord.notifications.gateway.Ready
 import me.palmdevs.isocord.notifications.gateway.RoleEvent
+import me.palmdevs.isocord.notifications.gateway.ScheduledEventUser
 
 private const val TAG = "IsocordNotifyState"
 
@@ -85,12 +86,15 @@ class NotificationState(selfId: String = "") {
   private val relationships = HashMap<String, Int>()
   /** By guild id, null for direct messages. */
   private val guildSettings = HashMap<String?, GuildSettings>()
+  /** Events the account has marked Interested during this session. */
+  private val interestedEvents = HashSet<String>()
 
   fun onReady(ready: Ready) {
     guilds.clear()
     channels.clear()
     users.clear()
     guildSettings.clear()
+    interestedEvents.clear()
     selfId = ready.user.id
     self = user(ready.user)
     for (raw in ready.users) users[raw.id] = user(raw)
@@ -116,6 +120,15 @@ class NotificationState(selfId: String = "") {
   fun onRelationshipRemove(id: String) {
     relationships.remove(id)
   }
+
+  /** Tracks the account's own scheduled-event RSVP changes. */
+  fun onEventUser(event: ScheduledEventUser, added: Boolean) {
+    if (event.user_id != selfId) return
+    if (added) interestedEvents.add(event.guild_scheduled_event_id)
+    else interestedEvents.remove(event.guild_scheduled_event_id)
+  }
+
+  fun isInterestedInEvent(eventId: String) = eventId in interestedEvents
 
   /** What the app's stores know around a dispatch JS forwards, in place of what they replace. */
   fun learn(context: DispatchContext) {

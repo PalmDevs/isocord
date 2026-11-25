@@ -358,6 +358,8 @@ interface GuildSubscription {
 interface Subscriptions {
     /** Guilds subscribed to with `typing`, `activities` and `threads` (GuildSubscriptions' _typing and the like). */
     guilds: Set<string>
+    /** Guilds subscribed to for `threads` only (forum post notifications). */
+    threadGuilds: Set<string>
     /** By guild id, then channel id, oldest first. */
     channels: Map<string, Map<string, Ranges>>
     /** By guild id: thread ids, oldest first. */
@@ -373,6 +375,7 @@ const subscriptionsOf = (session: Session) => {
     if (!held) {
         held = {
             guilds: new Set(),
+            threadGuilds: new Set(),
             channels: new Map(),
             threads: new Map(),
             pending: {},
@@ -438,14 +441,30 @@ export function subscribeToGuild(session: Session, guildId: string): void {
     enqueue(session, guildId, { typing: true, activities: true, threads: true })
 }
 
+/** Subscribes to `threads` only for a guild, so THREAD_CREATE arrives for forum posts. */
+export function subscribeToGuildThreads(
+    session: Session,
+    guildId: string,
+): void {
+    const { guilds, threadGuilds } = subscriptionsOf(session)
+    if (guilds.has(guildId) || threadGuilds.has(guildId)) return
+    threadGuilds.add(guildId)
+    enqueue(session, guildId, { threads: true })
+}
+
 /**
  * GuildSubscriptionsStore.handleConnectionOpenOrResumed: after a reconnect the server has forgotten every
  * subscription, and what was asked for while the connection was down was never sent. Each guild's whole state is
  * asked for again in one message, of every guild or only of `only`.
  */
 function resubscribe(session: Session, only?: string): void {
-    const { guilds, channels, threads } = subscriptionsOf(session)
-    const ids = new Set([...guilds, ...channels.keys(), ...threads.keys()])
+    const { guilds, threadGuilds, channels, threads } = subscriptionsOf(session)
+    const ids = new Set([
+        ...guilds,
+        ...threadGuilds,
+        ...channels.keys(),
+        ...threads.keys(),
+    ])
     for (const guildId of ids) {
         if (only && guildId !== only) continue
         if (guilds.has(guildId))
@@ -454,6 +473,8 @@ function resubscribe(session: Session, only?: string): void {
                 activities: true,
                 threads: true,
             })
+        else if (threadGuilds.has(guildId))
+            enqueue(session, guildId, { threads: true })
         send(session, guildId, {
             channels: channels.get(guildId),
             thread_member_lists: threads.get(guildId),
