@@ -9,6 +9,7 @@ import { formatBytes } from '../../core/format'
 import { DAY } from '../../core/time'
 import { t } from '../../i18n'
 import { rgbInt } from './color'
+import { chatLink } from './links/chatLink'
 import { formatNumericDate, formatTime, sameDay } from './timestamp'
 import type {
     Attachment,
@@ -138,6 +139,12 @@ function calendar(iso: string): string {
 
 const httpUrl = (url: string | undefined) =>
     url && /^https?:\/\//i.test(url) ? url : undefined
+
+/** Wraps an embed's link as masked so untrusted hosts confirm first (handleMessagesTapURLLink). */
+const maskedUrl = (url: string | undefined) => {
+    const target = httpUrl(url)
+    return target && chatLink.masked(target)
+}
 
 /** The reference's hosted players with a play button (shouldPlayVideoInline) and how it names a provider (getEffectiveVideoProvider). */
 function hostedPlayer(embed: Embed): boolean {
@@ -287,15 +294,15 @@ function embedRow(
         source,
         color: rgbInt(embed.color),
         provider: embed.provider?.name,
-        providerUrl: httpUrl(embed.provider?.url),
+        providerUrl: maskedUrl(embed.provider?.url),
         authorName: embed.author?.name,
         authorIconUrl: embed.author?.proxy_icon_url,
-        authorUrl: httpUrl(embed.author?.url),
+        authorUrl: maskedUrl(embed.author?.url),
         // A title that links to the embed's url keeps no links of its own (parseEmbedTitleWithoutLinks).
         title: embed.title
             ? spans(embed.title, httpUrl(embed.url) ? 'plain' : 'links')
             : undefined,
-        url: httpUrl(embed.url),
+        url: maskedUrl(embed.url),
         description: embed.description ? spans(embed.description) : [],
         fields: (embed.fields ?? []).map(field => ({
             name: spans(field.name, 'links'),
