@@ -29,6 +29,7 @@ import me.palmdevs.isocord.chat.media.originOf
 import me.palmdevs.isocord.chat.media.proxied
 import me.palmdevs.isocord.chat.rows.Attachment
 import me.palmdevs.isocord.chat.rows.Component
+import me.palmdevs.isocord.chat.rows.LocalComponentsMediaLink
 import me.palmdevs.isocord.chat.rows.LocalComponentsMessage
 import me.palmdevs.isocord.chat.rows.Media
 import me.palmdevs.isocord.core.LinkKind
@@ -50,7 +51,8 @@ private fun rememberMediaPress(componentId: Int, item: Int): MediaPress? {
   val messageId = LocalComponentsMessage.current
   if (messageId == null || componentId < 0) return null
   val actions = LocalChatActions.current
-  val link = "${Links.SCHEME}${LinkKind.COMPONENT_MEDIA}/$messageId/$componentId/$item"
+  val linkKind = LocalComponentsMediaLink.current
+  val link = "${Links.SCHEME}$linkKind/$messageId/$componentId/$item"
   return MediaPress(
     open = { origin -> actions.onLinkPress("$link?${Links.ORIGIN_PARAM}=$origin") },
     hold = { actions.onMediaLongPress(messageId, link) },

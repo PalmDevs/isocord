@@ -49,6 +49,7 @@ class ConstantsModule(context: ReactApplicationContext) : NativeIsocordConstants
       "embedMedia" to LinkKind.EMBED_MEDIA,
       "embedText" to LinkKind.EMBED_TEXT,
       "file" to LinkKind.FILE,
+      "forwardComponentMedia" to LinkKind.FORWARD_COMPONENT_MEDIA,
       "forwardEmbedMedia" to LinkKind.FORWARD_EMBED_MEDIA,
       "forwardEmbedText" to LinkKind.FORWARD_EMBED_TEXT,
       "forwardFile" to LinkKind.FORWARD_FILE,

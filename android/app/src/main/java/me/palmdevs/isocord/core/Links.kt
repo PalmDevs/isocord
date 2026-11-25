@@ -33,6 +33,7 @@ object LinkKind {
   const val EMBED_TEXT = "embed-text"
   /** `file/<message>/<attachment>`: a file or audio attachment card. */
   const val FILE = "file"
+  const val FORWARD_COMPONENT_MEDIA = "forward-component-media"
   const val FORWARD_EMBED_MEDIA = "forward-embed-media"
   const val FORWARD_EMBED_TEXT = "forward-embed-text"
   const val FORWARD_FILE = "forward-file"

@@ -31,6 +31,7 @@ interface ApiSnapshot {
     timestamp?: string
     embeds?: NonNullable<Message['embeds']>
     attachments?: NonNullable<Message['attachments']>
+    components?: ApiComponent[]
 }
 /** A message with the fields the API sends that the store's `Message` type leaves out. */
 export interface RichMessage extends Message {
@@ -138,18 +139,21 @@ export function richParts(
             message.state ? undefined : helpers.pollState(message.id),
         )
     const { interactions } = helpers
-    const components = componentRows(m.components, {
+    const componentContext = {
         messageId: message.id,
         spans: helpers.spans,
-        interactive: interactions !== undefined && !message.state,
-        interaction: interactions?.byMessage[message.id],
-        selections: interactions?.selections[message.id],
         lookup: {
             users: helpers.users,
             guild: helpers.chatGuild,
             channels: helpers.channels,
             nameOf: helpers.nameOf,
         },
+    }
+    const components = componentRows(m.components, {
+        ...componentContext,
+        interactive: interactions !== undefined && !message.state,
+        interaction: interactions?.byMessage[message.id],
+        selections: interactions?.selections[message.id],
     })
     if (components.length) parts.components = components
 
@@ -163,11 +167,19 @@ export function richParts(
             ? calendarFormatCompact(new Date(sent))
             : undefined
         const origin = forwardOrigin(message, ref, helpers)
+        // createMessageContent sets shouldDisableInteractiveComponents for forwards.
+        const snapshotComponents = componentRows(snapshot.components, {
+            ...componentContext,
+            interactive: false,
+        })
         parts.forward = {
             label: t('chat.forwarded'),
             content: helpers.spans(snapshot.content ?? ''),
             attachments: attachmentRows(snapshot.attachments),
             embeds: helpers.embeds(snapshot.embeds ?? []),
+            ...(snapshotComponents.length
+                ? { components: snapshotComponents }
+                : {}),
             ...(origin && {
                 origin: origin.origin,
                 originIconUrl: origin.iconUrl,

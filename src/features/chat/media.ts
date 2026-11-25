@@ -26,7 +26,6 @@ import type {
 
 // MediaFormatTesters.isAudioFile, Android variant.
 const AUDIO = /\.(mp3|m4a|wav|ogg|opus|flac)$/i
-const pathOf = (url: string) => url.split('?', 1)[0] ?? ''
 
 /*
  * Image URLs are the plain proxy URLs. Only the native list knows how large a tile is once laid out, so it
@@ -180,6 +179,7 @@ export function cornerThumbnail(embed: Embed): boolean {
     return (
         embed.thumbnail != null &&
         !isInline(embed) &&
+        embed.video == null &&
         type !== 'video' &&
         type !== 'article'
     )
@@ -244,11 +244,10 @@ function embedRow(
         video?.proxy_url && video.width && video.height
             ? { url: video.proxy_url, width: video.width, height: video.height }
             : undefined
-    // Hosted players (YouTube, ...) cannot be played here; a file can.
+    // Hosted players (YouTube, ...) cannot be played here; a proxied file can (transformEmbeds).
+    const hasVideo = Boolean(video)
     const playsInline =
-        (type === 'video' || type === 'gifv') &&
-        Boolean(video?.proxy_url) &&
-        (type === 'gifv' || isVideoFile(pathOf(videoUrl ?? '')))
+        (hasVideo || type === 'gifv') && Boolean(video?.proxy_url)
     if (isInline(embed)) {
         // Tenor and Giphy gifv: a still plus the looping MP4 that replaces it.
         const poster =
@@ -275,7 +274,7 @@ function embedRow(
         )
     }
     // Video and article previews show their thumbnail large; other embeds tuck it into the corner.
-    const large = type === 'video' || type === 'article'
+    const large = hasVideo || type === 'video' || type === 'article'
     const footer = [
         embed.footer?.text,
         embed.timestamp && calendar(embed.timestamp),
@@ -317,7 +316,7 @@ function embedRow(
         videoUrl: playsInline ? videoUrl : undefined,
         // The reference draws the play button only on YouTube and TikTok videos that have no file.
         playLink:
-            type === 'video' &&
+            (hasVideo || type === 'video') &&
             !video?.proxy_url &&
             bigImage &&
             hostedPlayer(embed)

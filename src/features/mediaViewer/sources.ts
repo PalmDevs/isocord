@@ -47,8 +47,6 @@ export interface ViewerSource {
     kind: 'image' | 'video' | 'gif'
 }
 
-// Video files the proxy serves, which play here (media.ts).
-const VIDEO = /\.(mp4|webm|mov|qt)$/i
 const GIF = /\.gif$/i
 const pathOf = (url: string) => url.split('?', 1)[0] ?? ''
 
@@ -108,11 +106,8 @@ function embedSource(
     if (!media) return undefined
     const video = embed.video
     const videoUrl = video?.proxy_url
-    const file =
-        videoUrl &&
-        (embed.type === 'gifv' ||
-            (embed.type === 'video' && VIDEO.test(pathOf(videoUrl))))
-    const hosted = embed.type === 'video' && !videoUrl ? video?.url : undefined
+    const file = Boolean(videoUrl && (embed.type === 'gifv' || video))
+    const hosted = video && !videoUrl ? video.url : undefined
     const provider = hosted
         ? YOUTUBE.test(hosted)
             ? 'youtube'

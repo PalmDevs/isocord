@@ -278,6 +278,7 @@ export interface ForwardRow {
     content: Span[]
     attachments: AttachmentRow[]
     embeds: EmbedRow[]
+    components?: ComponentRow[]
     /**
      * MessageForward.getForwardInfo footerInfo.originLabel: "#channel" (or the DM's name) when the source is in the
      * same server or DM space and readable, else the source server's name. No footer without it.

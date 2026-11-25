@@ -52,6 +52,7 @@ data class Forward(
   val content: List<Span> = emptyList(),
   val attachments: List<Attachment> = emptyList(),
   val embeds: List<Embed> = emptyList(),
+  val components: List<Component> = emptyList(),
   /** getForwardInfo footerInfo.originLabel: "#channel", or the server's name for another server. No footer without it. */
   val origin: String? = null,
   /** footerInfo.originIconUrl: the server's icon when the source is in another server. */
@@ -156,6 +157,9 @@ fun ForwardView(forward: Forward) {
     AttachmentList(forward.messageId, forward.attachments, link = LinkKind.FORWARD_MEDIA)
     forward.embeds.forEachIndexed { index, embed ->
       EmbedView(embed, forward.messageId, index, link = LinkKind.FORWARD_EMBED_MEDIA)
+    }
+    forward.components.takeIf { it.isNotEmpty() }?.let {
+      ComponentsView(it, forward.messageId, link = LinkKind.FORWARD_COMPONENT_MEDIA)
     }
     forward.origin?.let { ForwardBreadcrumb(forward, it) }
   }

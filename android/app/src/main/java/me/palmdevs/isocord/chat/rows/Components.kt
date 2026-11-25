@@ -51,6 +51,7 @@ import me.palmdevs.isocord.chat.rows.components.ComponentFile
 import me.palmdevs.isocord.chat.rows.components.ComponentGallery
 import me.palmdevs.isocord.chat.rows.components.ComponentSelect
 import me.palmdevs.isocord.chat.rows.components.ComponentThumbnail
+import me.palmdevs.isocord.core.LinkKind
 
 /** A select's picked option (`SelectedOptionRow` in rows.ts). */
 @Immutable
@@ -112,10 +113,11 @@ private const val INLINE_ACCESSORY_SHARE = 0.35f
 
 /** The message whose components these are: their media opens in the viewer through it. */
 internal val LocalComponentsMessage = staticCompositionLocalOf<String?> { null }
+internal val LocalComponentsMediaLink = staticCompositionLocalOf { LinkKind.COMPONENT_MEDIA }
 
 @Composable
-fun ComponentsView(components: List<Component>, messageId: String) {
-  CompositionLocalProvider(LocalComponentsMessage provides messageId) {
+fun ComponentsView(components: List<Component>, messageId: String, link: String = LinkKind.COMPONENT_MEDIA) {
+  CompositionLocalProvider(LocalComponentsMessage provides messageId, LocalComponentsMediaLink provides link) {
     Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(COMPONENT_GAP)) {
       components.forEach { ComponentView(it, inContainer = false) }
     }

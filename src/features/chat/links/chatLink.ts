@@ -313,6 +313,7 @@ export function parseChatLink(url: string): ChatLink | undefined {
                 ? { kind: 'timestamp', text: decodeURIComponent(first) }
                 : undefined
         case linkKind.componentMedia:
+        case linkKind.forwardComponentMedia:
             // <messageId>/<component id>/<item>
             return first && second
                 ? {
@@ -322,7 +323,7 @@ export function parseChatLink(url: string): ChatLink | undefined {
                           component: Number(second),
                           item: Number(third ?? 0),
                       },
-                      forward: false,
+                      forward: kind === linkKind.forwardComponentMedia,
                       origin: originOf(query),
                   }
                 : undefined

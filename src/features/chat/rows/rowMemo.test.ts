@@ -172,3 +172,110 @@ test('reports unknown channels again when a row is reused', () => {
     expect(first.has(ChannelId.VOICE)).toBe(true)
     expect(reported()).toEqual(first)
 })
+
+test('builds components in forwarded snapshots as non-interactive', () => {
+    setSystemTime(NOW)
+    const state: ChannelMessages = {
+        messages: [
+            {
+                id: '999',
+                channel_id: ChannelId.GENERAL,
+                author: fixtures.USERS[0]!,
+                timestamp: '2026-11-23T09:00:00Z',
+                content: '',
+                message_reference: {
+                    type: 1,
+                    guild_id: fixtures.GUILD.id,
+                    channel_id: ChannelId.GENERAL,
+                    message_id: '998',
+                },
+                message_snapshots: [
+                    {
+                        message: {
+                            content: '',
+                            timestamp: '2026-11-23T08:00:00Z',
+                            components: [
+                                {
+                                    type: 17,
+                                    components: [
+                                        { type: 10, content: 'Snapshot text' },
+                                    ],
+                                },
+                                {
+                                    type: 1,
+                                    components: [
+                                        {
+                                            type: 2,
+                                            style: 1,
+                                            label: 'Click',
+                                            custom_id: 'btn',
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    },
+                ],
+            } as ChannelMessages['messages'][number],
+        ],
+        hasMore: false,
+        loading: false,
+        error: false,
+    }
+    const [row] = buildRows(state, context())
+    expect(row?.type).toBe('message')
+    if (row?.type !== 'message') return
+    expect(row.forward?.components).toHaveLength(2)
+    expect(row.forward?.components?.[0]).toMatchObject({
+        type: 'container',
+        children: [{ type: 'text', spans: [{ text: 'Snapshot text' }] }],
+    })
+    expect(row.forward?.components?.[1]).toMatchObject({
+        type: 'row',
+        children: [{ type: 'button', label: 'Click', url: undefined }],
+    })
+})
+
+test('rich embeds with a video show the thumbnail as the video poster', () => {
+    setSystemTime(NOW)
+    const state: ChannelMessages = {
+        messages: [
+            {
+                id: '1000',
+                channel_id: ChannelId.GENERAL,
+                author: fixtures.USERS[0]!,
+                timestamp: '2026-11-23T09:00:00Z',
+                content: 'https://fixupx.com/example/status/1',
+                embeds: [
+                    {
+                        type: 'rich',
+                        description: 'video post',
+                        thumbnail: {
+                            url: 'https://pbs.twimg.com/thumb.jpg',
+                            proxy_url: 'https://media.discordapp.net/thumb.jpg',
+                            width: 1280,
+                            height: 720,
+                        },
+                        video: {
+                            url: 'https://video.twimg.com/vid.mp4',
+                            proxy_url: 'https://media.discordapp.net/vid.mp4',
+                            width: 1280,
+                            height: 720,
+                        },
+                    },
+                ],
+            },
+        ],
+        hasMore: false,
+        loading: false,
+        error: false,
+    }
+    const [row] = buildRows(state, context())
+    expect(row?.type).toBe('message')
+    if (row?.type !== 'message') return
+    expect(row.embeds[0]).toMatchObject({
+        thumbnail: undefined,
+        image: { url: 'https://media.discordapp.net/thumb.jpg' },
+        videoUrl: 'https://media.discordapp.net/vid.mp4',
+    })
+})

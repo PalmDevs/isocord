@@ -23,6 +23,7 @@ export interface Spec extends TurboModule {
             embedMedia: string
             embedText: string
             file: string
+            forwardComponentMedia: string
             forwardEmbedMedia: string
             forwardEmbedText: string
             forwardFile: string
