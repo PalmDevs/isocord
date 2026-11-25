@@ -2,6 +2,7 @@ import { Endpoint } from '../../core/api/paths'
 import { APPLICATION_MANAGEABLE_TYPES } from '../../core/discord/channelType'
 import { logger } from '../../core/log'
 import { channelsStore } from './channels'
+import type { ForumTagPayload } from '../../core/discord/forum'
 import type { PermissionOverwrite } from '../../core/discord/permissions'
 import type { Session } from '../../core/session'
 import type { Channel } from './channels'
@@ -39,6 +40,10 @@ export interface ChannelEdit {
     type?: number
     /** Minutes of inactivity before new threads are hidden. */
     default_auto_archive_duration?: number
+    /** Forum and media channels: available tags. */
+    available_tags?: ForumTagPayload[]
+    /** Forum posts: applied tag IDs. */
+    applied_tags?: string[]
     /** A data URI, or null to remove the icon of a group DM. */
     icon?: string | null
 }
@@ -80,8 +85,10 @@ export function updateChannel(
     session: Session,
     channelId: string,
     edit: ChannelEdit,
-): Promise<unknown> {
-    return session.rest.patch(Endpoint.channel(channelId), { body: edit })
+): Promise<Channel> {
+    return session.rest.patch<Channel>(Endpoint.channel(channelId), {
+        body: edit,
+    })
 }
 
 /** Creates a guild channel and returns it. The gateway's CHANNEL_CREATE puts it in the store. */

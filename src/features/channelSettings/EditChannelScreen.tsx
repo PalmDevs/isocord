@@ -33,6 +33,13 @@ import {
     InvitesRow,
     PermissionsRow,
 } from './ChannelSettings'
+import {
+    areAppliedTagsEqual,
+    areAvailableTagsEqual,
+    ForumChannelTagsSetting,
+    ForumPostTagsSetting,
+    toTagPayloads,
+} from './ForumTagsSetting'
 import { threadAccess, useIsForumPost, useManagedChannel } from './permissions'
 import { ChannelSettingsScaffold, HeaderSubmit } from './Scaffold'
 import { SlowmodeSetting } from './SlowmodeSetting'
@@ -44,6 +51,7 @@ import {
 } from './ThreadSettings'
 import { isPostPinned } from './threadActions'
 import { useCanToggleAnnouncement } from './useCanToggleAnnouncement'
+import type { ForumTag } from '../../core/discord/forum'
 import type { MessageKey } from '../../i18n'
 import type { ChannelEdit } from '../../stores/channels/channelActions'
 import type { Channel } from '../../stores/channels/channels'
@@ -60,6 +68,8 @@ interface Form {
     autoArchive: number
     defaultAutoArchive: number
     invitable: boolean
+    availableTags: ForumTag[]
+    appliedTags: string[]
 }
 
 const formOf = (channel: Channel): Form => ({
@@ -75,6 +85,8 @@ const formOf = (channel: Channel): Form => ({
     defaultAutoArchive:
         channel.default_auto_archive_duration ?? DEFAULT_AUTO_ARCHIVE_DURATION,
     invitable: threadMetadataOf(channel)?.invitable ?? false,
+    availableTags: channel.available_tags ?? [],
+    appliedTags: channel.applied_tags ?? [],
 })
 
 /** The fields of the form that differ from the channel. A channel without a field does not show it, so it is left out. */
@@ -94,6 +106,16 @@ function changesOf(channel: Channel, form: Form): ChannelEdit {
     if (form.defaultAutoArchive !== held.defaultAutoArchive)
         edit.default_auto_archive_duration = form.defaultAutoArchive
     if (form.invitable !== held.invitable) edit.invitable = form.invitable
+    if (
+        THREADS_ONLY_CHANNEL_TYPES.has(channel.type) &&
+        !areAvailableTagsEqual(form.availableTags, held.availableTags)
+    )
+        edit.available_tags = toTagPayloads(form.availableTags)
+    if (
+        isThread(channel) &&
+        !areAppliedTagsEqual(form.appliedTags, held.appliedTags)
+    )
+        edit.applied_tags = form.appliedTags
     return edit
 }
 
@@ -334,6 +356,23 @@ function EditChannelForm({ channel }: { channel: Channel }) {
                 forumPost={forumPost}
                 onChange={setForm}
             />
+            {!thread && forumLike && (
+                <ForumChannelTagsSetting
+                    channelId={channel.id}
+                    tags={form.availableTags}
+                    onChange={availableTags =>
+                        setForm({ ...form, availableTags })
+                    }
+                />
+            )}
+            {thread && forumPost && (
+                <ForumPostTagsSetting
+                    post={channel}
+                    appliedTags={form.appliedTags}
+                    moderator={access.moderator}
+                    onChange={appliedTags => setForm({ ...form, appliedTags })}
+                />
+            )}
             {!thread && (
                 <ChannelRows
                     channel={channel}

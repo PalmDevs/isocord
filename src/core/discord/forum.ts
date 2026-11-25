@@ -31,9 +31,25 @@ export const THREAD_SEARCH_MAX_OFFSET = 9975
 /** Tags needed before `tag_setting` means anything. */
 export const MIN_TAGS_TO_MATCH = 2
 
+/** Max `available_tags` on a forum or media channel (docs.discord.food). */
+export const MAX_FORUM_TAGS = 20
+/** Max characters in a forum tag's `name` (docs.discord.food). */
+export const MAX_FORUM_TAG_NAME_LENGTH = 20
+/** Max `applied_tags` on a forum post (docs.discord.food). */
+export const MAX_APPLIED_TAGS = 5
+
 /** ForumTag: one of a thread-only channel's `available_tags`. */
 export interface ForumTag {
     id: string
+    name: string
+    emoji_id?: string | null
+    emoji_name?: string | null
+    moderated?: boolean
+}
+
+/** One tag in `PATCH /channels/{id}`'s `available_tags`: `id` is omitted for a new tag. */
+export interface ForumTagPayload {
+    id?: string
     name: string
     emoji_id?: string | null
     emoji_name?: string | null
