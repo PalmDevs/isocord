@@ -33,8 +33,9 @@ export function ProfileBio({
     const chatTheme = useChatTheme('transparent')
     const [height, setHeight] = useState(0)
     const nodes = parseMarkdown(bio)
-    const users = useSessionStore(usersStore, state => state.users)
-    const spans = resolve(session, nodes, users, guildId)
+    const spans = useSessionStore(usersStore, ({ users }) =>
+        resolve(session, nodes, users, guildId),
+    )
     const variant = theme.text['text-md/normal']
     return (
         <SpanTextView
