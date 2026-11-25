@@ -1,3 +1,4 @@
+import { SettingsAppearanceCustomThemeScreen } from './appearance/CustomThemeScreen'
 import {
     SettingsAccessibilityScreen,
     SettingsAdvancedScreen,
@@ -23,6 +24,7 @@ export const settingsFeature: Feature = {
         settingsAppearance: SettingsAppearanceScreen,
         settingsAppearanceLightMode: SettingsAppearanceLightModeScreen,
         settingsAppearanceDarkMode: SettingsAppearanceDarkModeScreen,
+        settingsAppearanceCustomTheme: SettingsAppearanceCustomThemeScreen,
         settingsAccessibility: SettingsAccessibilityScreen,
         settingsChat: SettingsChatScreen,
         settingsSwipeRightToLeft: SettingsSwipeRightToLeftScreen,

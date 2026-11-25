@@ -1,4 +1,10 @@
-import { useEffect, useEffectEvent, useState } from 'react'
+import {
+    useEffect,
+    useEffectEvent,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from 'react'
 import { View } from 'react-native'
 import { useAnimatedReaction } from 'react-native-reanimated'
 import { StyleSheet } from 'react-native-unistyles'
@@ -18,6 +24,7 @@ import { useChatHistory, useChatRows } from './hooks/useChatData'
 import { useChatScroll } from './hooks/useChatScroll'
 import { useReadSession } from './hooks/useReadSession'
 import { ThreadBars } from './threadBars/ThreadBars'
+import type { HostInstance } from 'react-native'
 import type { SharedValue } from 'react-native-reanimated'
 import type { SearchTab } from '../search/types'
 
@@ -87,15 +94,23 @@ function ChatPanelContent({
     swipeOpensDetails,
 }: Props) {
     const inputReady = useComposerInputReady(visible, panelX)
+    // Measured before the frame is drawn, so the placeholder's gradient lines up from its first frame.
+    const container = useRef<HostInstance>(null)
+    const list = useRef<HostInstance>(null)
+    const [listTop, setListTop] = useState(0)
+    useLayoutEffect(() => {
+        if (showRows || !container.current) return
+        list.current?.measureLayout(container.current, (_x, y) => setListTop(y))
+    })
     return (
-        <View style={styles.container}>
+        <View ref={container} style={styles.container}>
             <ChatHeader
                 channelId={channelId}
                 onBack={onBack}
                 onOpenDetails={onOpenDetails}
             />
             <ThreadBars channelId={channelId} />
-            <View style={styles.list}>
+            <View ref={list} style={styles.list}>
                 {mountList && (
                     <View
                         collapsable={false}
@@ -119,7 +134,10 @@ function ChatPanelContent({
                     </View>
                 )}
                 {!showRows && (
-                    <ChatListPlaceholder showSkeleton={showSkeleton} />
+                    <ChatListPlaceholder
+                        showSkeleton={showSkeleton}
+                        top={listTop}
+                    />
                 )}
             </View>
             <Composer inputReady={prepareComposer ? undefined : inputReady} />

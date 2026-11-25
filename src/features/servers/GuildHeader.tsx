@@ -31,6 +31,7 @@ import { t } from '../../i18n'
 import { channelsStore } from '../../stores/channels/channels'
 import { can } from '../../stores/permissions'
 import { useServersPanels } from './useServersPanels'
+import type { ReactNode } from 'react'
 import type { HostInstance } from 'react-native'
 import type { SharedValue } from 'react-native-reanimated'
 import type { Guild } from '../../stores/guilds'
@@ -218,12 +219,18 @@ export function GuildHeader({
     scrollY,
     bannerHeight,
     onHeight,
+    backdrop,
 }: {
     guild: Guild
     scrollY: SharedValue<number>
     bannerHeight: number
     /** The header's height, which the list leaves room for above its first row. */
     onHeight: (height: number) => void
+    /**
+     * The panel's gradient, so the sticky header hides the channels below it on a gradient theme.
+     * shortcut: lined up with the panel, not the header's offset below a banner, add it if the seam shows.
+     */
+    backdrop: ReactNode
 }) {
     // Measured before the frame is drawn, so the list's room follows a server switch in the same frame. onLayout
     // arrived a few frames later, and until then the first rows sat under the header. onLayout still covers
@@ -249,6 +256,7 @@ export function GuildHeader({
             onLayout={event => onHeight(event.nativeEvent.layout.height)}
             style={[styles.container, position]}
         >
+            {backdrop}
             <RipplePressable
                 accessibilityRole="button"
                 accessibilityHint={t('servers.header.optionsHint')}
@@ -319,6 +327,8 @@ const styles = StyleSheet.create(theme => ({
         gap: theme.space.PX_8,
         paddingTop: theme.space.PX_16,
         backgroundColor: theme.colors.PANEL_BG,
+        // Clips the backdrop, which is as big as the screen.
+        overflow: 'hidden',
     },
     header: {
         flexDirection: 'row',

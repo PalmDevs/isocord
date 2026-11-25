@@ -236,7 +236,10 @@ const styles = StyleSheet.create(theme => ({
             theme.modules.mobile.CHAT_INPUT_CONTEXT_BAR_PADDING_HORIZONTAL,
         paddingVertical:
             theme.modules.mobile.CHAT_INPUT_CONTEXT_BAR_PADDING_VERTICAL,
-        backgroundColor: theme.colors.MOBILE_FLOATING_ACCESSORY_BACKGROUND,
+        // Match the composer card on gradient themes; MOBILE_FLOATING_ACCESSORY_BACKGROUND lacks a gradient rule.
+        backgroundColor: theme.background
+            ? theme.colors.MOBILE_CHATINPUT_BACKGROUND_DEFAULT
+            : theme.colors.MOBILE_FLOATING_ACCESSORY_BACKGROUND,
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: theme.colors.BORDER_MUTED,
     },

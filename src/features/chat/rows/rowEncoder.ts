@@ -56,9 +56,10 @@ export function useChatTheme(variant: ThemeVariant = 'chat'): string {
     const { theme } = useUnistyles()
     if (variant === 'mediaFooter') return MEDIA_FOOTER_THEME
     const colors = chatTheme(theme)
-    return JSON.stringify(
-        variant === 'transparent' ? { ...colors, background: 0 } : colors,
-    )
+    // On a gradient theme the chat panel below already draws its see-through background.
+    const transparent =
+        variant === 'transparent' || theme.background !== undefined
+    return JSON.stringify(transparent ? { ...colors, background: 0 } : colors)
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useContext } from 'react'
-import { blendColors, isOpaqueColor } from './colors'
+import { useUnistyles } from 'react-native-unistyles'
+import { blendColors, isOpaqueColor, toHex } from './colors'
 import { ButtonThemeContext } from './components/buttons/buttonTheme'
 import type { ButtonTheme } from './components/buttons/buttonTheme'
 
@@ -15,6 +16,10 @@ export function useSurfaceColor(
     themeOverride?: ButtonTheme | null,
 ): string {
     const contextTheme = useContext(ButtonThemeContext)
+    const { theme: appTheme } = useUnistyles()
+    // A floating surface is opaque: on a gradient theme a see-through colour is flattened over the backdrop.
+    if (!isOpaqueColor(baseColor) && appTheme.backdrop)
+        baseColor = toHex(blendColors(baseColor, appTheme.backdrop, 1, false))
     const theme =
         themeOverride === null ? undefined : (themeOverride ?? contextTheme)
     if (!theme || !isOpaqueColor(baseColor)) return baseColor

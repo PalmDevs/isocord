@@ -125,7 +125,11 @@ export function NavigatorHeader({
 const styles = StyleSheet.create((theme, runtime) => ({
     container: (backgroundColor: SemanticColor, safeArea: boolean) => ({
         height: (safeArea ? runtime.insets.top : 0) + NAV_BAR_HEIGHT,
-        backgroundColor: theme.colors[backgroundColor],
+        // On a gradient theme the screen below already draws its colour. Not `undefined`: a theme change
+        // restyles in place, and an absent value keeps the old colour.
+        backgroundColor: theme.background
+            ? 'transparent'
+            : theme.colors[backgroundColor],
         borderBottomWidth: 1,
         borderBottomColor: theme.colors.BORDER_SUBTLE,
     }),

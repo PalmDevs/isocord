@@ -7,6 +7,7 @@ import me.palmdevs.isocord.chat.list.ChatViewManager
 import me.palmdevs.isocord.chat.media.ProxyImageViewManager
 import me.palmdevs.isocord.chat.search.SearchResultsViewManager
 import me.palmdevs.isocord.chat.viewer.MediaViewerViewManager
+import me.palmdevs.isocord.core.CutoutViewManager
 
 class ChatPackage : ReactPackage {
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
@@ -18,6 +19,7 @@ class ChatPackage : ReactPackage {
       SpanTextViewManager(),
       MediaViewerViewManager(),
       ProxyImageViewManager(),
+      CutoutViewManager(),
       me.palmdevs.isocord.expressions.ExpressionGridViewManager(),
       me.palmdevs.isocord.expressions.gifs.GifGridViewManager(),
       ListPlaceholdersViewManager(),

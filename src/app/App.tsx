@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { beginSection, endSection } from '../core/trace'
 import './features'
 import {
+    DefaultTheme,
     NavigationContainer,
     useNavigationContainerRef,
 } from '@react-navigation/native'
@@ -24,6 +25,7 @@ import { startCurrentSession } from '../core/react'
 import { SessionProvider } from '../core/SessionProvider'
 import { ModalScreen } from '../design/components/overlays/ModalStack'
 import { usePanelBackEvents } from '../design/components/overlays/usePanelBackPreview'
+import { ThemedGradient } from '../design/components/ThemedGradient'
 import { AuthNavigator } from '../features/auth/AuthNavigator'
 import { MainTabs } from '../features/main/MainTabs'
 import { beginMainWait } from './startupTrace'
@@ -43,6 +45,12 @@ declare module '@react-navigation/native' {
 }
 
 const log = logger('App')
+
+/** Screens and tab scenes draw their own backgrounds. An opaque default would hide the gradient theme. */
+const NAVIGATION_THEME = {
+    ...DefaultTheme,
+    colors: { ...DefaultTheme.colors, background: 'transparent' },
+}
 AppState.addEventListener('change', state => log.info(`State: ${state}`))
 
 const ANDROID_16_API = 36
@@ -68,8 +76,21 @@ function AndroidBackHost({ children }: { children: ReactNode }) {
 
 let renderTraced: 'pending' | 'open' | 'done' = 'pending'
 
-const renderStackScreen = ({ children }: { children: ReactNode }) => (
-    <ModalScreen style={styles.screen}>{children}</ModalScreen>
+/** The root screen, which draws over the shared gradient. */
+const MAIN_SCREEN = 'main'
+
+// A pushed screen draws its own gradient: during the transition the screen below is still drawn under it.
+const renderStackScreen = ({
+    route,
+    children,
+}: {
+    route: { name: string }
+    children: ReactNode
+}) => (
+    <ModalScreen style={styles.screen}>
+        {route.name !== MAIN_SCREEN && <ThemedGradient />}
+        {children}
+    </ModalScreen>
 )
 
 export function App() {
@@ -94,6 +115,10 @@ export function App() {
     const { theme } = useUnistyles()
     return (
         <GestureHandlerRootView style={styles.root}>
+            {/* The gradient theme's background, under every screen: ThemedGradient `mix`, as the screens' own dims
+                draw it. Shows wherever no screen draws, like the gap between two sliding screens or a tab still
+                mounting. Tabs, pushed screens and panels draw their own copy, so each hides what is below it. */}
+            <ThemedGradient overlays={[theme.colors.BACKGROUND_BASE_LOWEST]} />
             {/*
              * The bars follow the app's theme rather than the system's; without this entry, closing a screen
              * that sets its own (the media viewer) falls back to the system's night mode.
@@ -107,6 +132,7 @@ export function App() {
                             <SessionProvider fallback={<AuthNavigator />}>
                                 <NavigationContainer
                                     ref={navigation}
+                                    theme={NAVIGATION_THEME}
                                     onStateChange={() =>
                                         log.debug(
                                             `Screen: ${navigation.getCurrentRoute()?.name}`,
@@ -121,7 +147,7 @@ export function App() {
                                         }}
                                     >
                                         <Stack.Screen
-                                            name="main"
+                                            name={MAIN_SCREEN}
                                             component={MainTabs}
                                         />
                                         {features.flatMap(feature =>

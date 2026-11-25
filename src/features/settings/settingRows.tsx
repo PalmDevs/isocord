@@ -132,7 +132,8 @@ function SettingRow({
         case 'slider':
             return <SliderSetting node={node} />
         case 'radio':
-            // Radios are groups of their own; SettingsList renders them.
+        case 'swatches':
+            // Radios and swatches are groups of their own; SettingsList renders them.
             return null
     }
 }

@@ -462,9 +462,15 @@ export function ChannelList({
         scrollY.set(event.contentOffset.y)
         scheduleOnRN(updateVisibleRange)
     })
-    // ChannelsUnreadBar: top edge follows the bottom of the sticky guild header.
+    // ChannelsUnreadBar: top edge follows the bottom of the sticky guild header. A transform, not `top`: a layout
+    // prop commits and lays out the whole tree on every scroll event.
     const barTop = useAnimatedStyle(() => ({
-        top: headerHeight + Math.max(0, bannerHeight - scrollY.get()),
+        transform: [
+            {
+                translateY:
+                    headerHeight + Math.max(0, bannerHeight - scrollY.get()),
+            },
+        ],
     }))
 
     const renderBar = (edge: 'top' | 'bottom') => {
@@ -484,7 +490,9 @@ export function ChannelList({
                         }),
                     )
                 }
-                style={edge === 'top' ? barTop : styles.barBottom}
+                style={
+                    edge === 'top' ? [styles.barTop, barTop] : styles.barBottom
+                }
             />
         )
     }
@@ -523,6 +531,7 @@ const styles = StyleSheet.create(theme => ({
     content: { paddingBottom: theme.space.PX_24 },
     // ChannelsUnreadBars: overlay bounded by the list panel.
     listContainer: { flex: 1 },
+    barTop: { top: 0 },
     barBottom: { bottom: 0 },
     empty: { padding: theme.space.PX_16, textAlign: 'center' },
     spacer: { height: theme.space.PX_8 },

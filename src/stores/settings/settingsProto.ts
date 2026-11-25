@@ -10,7 +10,6 @@ import {
     writeVarintField,
 } from '../../core/protobuf'
 import type { ProtoField } from '../../core/protobuf'
-import type { ThemeId } from '../../design/tokens'
 
 // The PreloadedUserSettings protobuf: one descriptor per setting, for reading, saving and the optimistic apply.
 
@@ -36,8 +35,6 @@ export interface SettingDescriptor<T> {
     codec: Codec<T>
     /** The value when the category comes without the field. Absent keeps the current value. */
     default?: T
-    /** Other fields of the category cleared by the same save. */
-    clears?: readonly number[]
 }
 
 type Descriptors<State> = {
@@ -94,22 +91,6 @@ const stringValueCodec: Codec<string> = {
         ),
 }
 
-/** preloaded_user_settings Theme by ThemeId (saveClientTheme, PROTO_THEME_MAP_MOBILE_REFRESH the other way). */
-const PROTO_THEMES: Record<ThemeId, bigint> = {
-    dark: 1n,
-    light: 2n,
-    darker: 3n,
-    midnight: 4n,
-}
-
-const themeCodec: Codec<ThemeId> = {
-    read: raw =>
-        (Object.keys(PROTO_THEMES) as ThemeId[]).find(
-            id => PROTO_THEMES[id] === raw,
-        ),
-    write: (field, value) => writeVarintField(field, PROTO_THEMES[value]),
-}
-
 /** The chat related user settings (PreloadedUserSettings.text_and_images) the expression picker depends on. */
 export interface TextAndImagesSettings {
     /** Default skin tone: a modifier character, empty for none. */
@@ -129,8 +110,6 @@ export interface UserSettings {
     developerMode?: boolean
     /** ShowInAppNotifications: in-app notifications for new messages. Unset means on. */
     showInAppNotifications?: boolean
-    /** The account's theme, synced across clients. */
-    theme?: ThemeId
     /** The account's chosen language. Unset means the system's. */
     locale?: string
     /** StatusSettings.status: the chosen status, empty or "unknown" for online. */
@@ -144,8 +123,6 @@ export const USER_SETTINGS: Descriptors<UserSettings> = {
     // ChatGestureSettings: UNSET (0) means REPLY.
     swipeRightToLeftMode: { path: [13, 13], codec: enumCodec, default: 0 },
     developerMode: { path: [13, 2], codec: boolCodec, default: false },
-    // `client_theme_settings` (3) is cleared, so no gradient or custom theme from another client stays over it.
-    theme: { path: [13, 1], codec: themeCodec, clears: [3] },
     showInAppNotifications: {
         path: [7, 1],
         codec: boolValueCodec,

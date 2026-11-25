@@ -1,4 +1,3 @@
-import { useUnistyles } from 'react-native-unistyles'
 import { useStore } from 'zustand'
 import { useSession, useSessionStore } from '../../core/react'
 import { TableRowTrailingText } from '../../design/components/table/TableRow'
@@ -18,11 +17,9 @@ export function useSettingContext(): SettingContext {
     const themeState = useStore(themeStore)
     const systemNotifications = useStore(systemNotificationsStore)
     const chatGestures = useStore(chatGesturesStore)
-    const { theme } = useUnistyles()
     return {
         session,
         settings,
-        themeId: theme.id,
         themeState,
         systemNotifications,
         chatGestures,

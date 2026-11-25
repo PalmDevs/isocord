@@ -118,7 +118,7 @@ export function Composer({ inputReady }: { inputReady?: boolean }) {
                 {/* Gives way to the typing indicator's scrim while it is up. */}
                 <ChatInputScrim
                     height={mobile.CHAT_INPUT_FLOATING_SCRIM_GRADIENT_HEIGHT}
-                    color={theme.colors.BACKGROUND_BASE_LOWER}
+                    color={theme.scrim ?? theme.colors.BACKGROUND_BASE_LOWER}
                     style={scrimStyle}
                 />
                 <TypingIndicator

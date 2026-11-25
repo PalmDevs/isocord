@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native-unistyles'
 import { SearchField } from '../../design/components/inputs/SearchField'
 import { NavigatorHeader } from '../../design/components/layout/NavigatorHeader'
 import { TableRowGroup } from '../../design/components/table/TableRowGroup'
+import { ThemeSwatches } from './appearance/ThemeSwatches'
 import { SETTING_RENDERER_CONFIG } from './config'
 import { isBlocked, useSettingSearchStore } from './search'
 import { HighlightableRow, RadioSetting } from './settingRows'
@@ -37,6 +38,17 @@ function SettingsList({
                     helperText={section.subLabel}
                 />
             )
+        if (firstNode.type === 'swatches')
+            return (
+                <ThemeSwatches
+                    key={id}
+                    title={firstNode.title()}
+                    value={firstNode.value(context)}
+                    customs={context.themeState.customs}
+                    mode={firstNode.mode}
+                    onChange={value => firstNode.onValueChange(context, value)}
+                />
+            )
         return (
             <TableRowGroup
                 key={id}
@@ -59,10 +71,16 @@ function SettingsList({
 export function SettingsScaffold({
     title,
     trailing,
+    pinned,
+    footer,
     children,
 }: {
     title: string
     trailing?: ReactNode
+    /** Kept in view between the header and the form. */
+    pinned?: ReactNode
+    /** Kept in view under the form. */
+    footer?: ReactNode
     children: ReactNode
 }) {
     const navigation = useNavigation()
@@ -74,6 +92,7 @@ export function SettingsScaffold({
                 trailing={trailing}
                 backgroundColor="MOBILE_ACTIONSHEET_BACKGROUND"
             />
+            {pinned}
             <ScrollView
                 contentContainerStyle={styles.content}
                 keyboardShouldPersistTaps="always"
@@ -81,6 +100,7 @@ export function SettingsScaffold({
             >
                 {children}
             </ScrollView>
+            {footer != null && <View style={styles.footer}>{footer}</View>}
         </View>
     )
 }
@@ -145,11 +165,18 @@ const styles = StyleSheet.create((theme, runtime) => ({
     // SettingListRenderer.tsx: SettingList container uses MOBILE_ACTIONSHEET_BACKGROUND.
     container: {
         flex: 1,
-        backgroundColor: theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
+        // Our own, the reference's is flat: on a gradient theme the gradient below shows through ThemedGradient `mix`.
+        backgroundColor: theme.background
+            ? theme.colors.BACKGROUND_BASE_LOWEST
+            : theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
     },
     content: {
         padding: theme.space.PX_16,
         paddingBottom: runtime.insets.bottom + theme.space.PX_32,
         gap: theme.space.PX_24,
+    },
+    footer: {
+        padding: theme.space.PX_16,
+        paddingBottom: runtime.insets.bottom + theme.space.PX_16,
     },
 }))

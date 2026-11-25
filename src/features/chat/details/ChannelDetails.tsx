@@ -273,7 +273,10 @@ const styles = StyleSheet.create((theme, runtime) => ({
     // detailsContainer: the action sheet background, below the status bar.
     container: {
         flex: 1,
-        backgroundColor: theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
+        // Our own, the reference's is flat: on a gradient theme the gradient below shows through ThemedGradient `mix`.
+        backgroundColor: theme.background
+            ? theme.colors.BACKGROUND_BASE_LOWEST
+            : theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
         paddingTop: runtime.insets.top,
     },
     header: { paddingBottom: theme.space.PX_12, zIndex: 10 },

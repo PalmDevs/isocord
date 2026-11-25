@@ -1,6 +1,7 @@
 import { GestureDetector } from 'react-native-gesture-handler'
 import Animated from 'react-native-reanimated'
 import { StyleSheet } from 'react-native-unistyles'
+import { ThemedGradient } from '../../../design/components/ThemedGradient'
 import type { ComponentProps, ReactNode } from 'react'
 import type { usePanGesture } from 'react-native-gesture-handler'
 
@@ -25,11 +26,14 @@ export function PanelLayer({
     const panel = (
         <Animated.View
             collapsable={false}
+            pointerEvents={accessible ? 'auto' : 'none'}
             style={[styles.panel, style]}
             importantForAccessibility={
                 accessible ? 'auto' : 'no-hide-descendants'
             }
         >
+            {/* Hides the chat below on a gradient theme. The panels draw their own see-through colour. */}
+            <ThemedGradient />
             {children}
         </Animated.View>
     )

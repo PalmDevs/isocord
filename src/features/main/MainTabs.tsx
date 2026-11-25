@@ -15,6 +15,7 @@ import { useSession, useSessionStore } from '../../core/react'
 import { StatusAvatar } from '../../design/components/avatars/StatusAvatar'
 import { Badge } from '../../design/components/Badge'
 import { Text } from '../../design/components/Text'
+import { ThemedGradient } from '../../design/components/ThemedGradient'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
 import { channelsStore, isPrivate } from '../../stores/channels/channels'
@@ -37,11 +38,26 @@ import { useSharedContent } from '../share'
 import { YouTab } from '../you/YouTab'
 import { resolveInitialTab, saveLastTab } from './lastTab'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
+import type { ReactNode } from 'react'
 import type { IconName } from '../../design/icons/Icon'
 import type { MessageKey } from '../../i18n'
 import type { ShareParams } from '../share'
 
 const Tab = createBottomTabNavigator()
+
+/** The window's origin: a tab's gradient spans the window, lined up with the guild header's copy. */
+const WINDOW_ORIGIN = { x: 0, y: 0 }
+
+/**
+ * Each tab draws its own gradient, so it hides the tab it replaces. The navigator keeps the tab left shown under the
+ * new one for a few frames, and see-through tabs stacked their dims into near black.
+ */
+const renderTabScene = ({ children }: { children: ReactNode }) => (
+    <View style={styles.scene}>
+        <ThemedGradient offset={WINDOW_ORIGIN} />
+        {children}
+    </View>
+)
 
 const TABS: Record<string, { label: MessageKey; icon: IconName }> = {
     servers: { label: 'tabs.servers', icon: 'ServerIcon' },
@@ -316,6 +332,7 @@ export function MainTabs() {
                             headerShown: false,
                             inactiveBehavior: 'none',
                         }}
+                        screenLayout={renderTabScene}
                     >
                         <Tab.Screen name="servers" component={ServersTab} />
                         <Tab.Screen name="messages" component={MessagesTab} />
@@ -332,6 +349,7 @@ export function MainTabs() {
 }
 
 const styles = StyleSheet.create((theme, runtime) => ({
+    scene: { flex: 1, overflow: 'hidden' },
     bar: {
         flexDirection: 'row',
         paddingBottom: runtime.insets.bottom,

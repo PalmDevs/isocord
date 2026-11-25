@@ -84,5 +84,10 @@
     "react-native-edge-to-edge@1.8.2": "patches/react-native-edge-to-edge@1.8.2.patch",
     "react-native-screens@5.0.0-beta.1": "patches/react-native-screens@5.0.0-beta.1.patch",
     "@shopify/flash-list@2.3.3": "patches/@shopify%2Fflash-list@2.3.3.patch"
+  },
+  "reanimated": {
+    "staticFeatureFlags": {
+      "ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS": true
+    }
   }
 }

@@ -1,16 +1,22 @@
+import { blendColors, toHex } from '../../design/colors'
 import { rawColors } from '../../design/tokens/generated/rawColors'
 import { argb } from './color'
 import type { UnistylesThemes } from 'react-native-unistyles'
 
 type Colors = UnistylesThemes[keyof UnistylesThemes]['colors']
+type Gradient = UnistylesThemes['gradient']['gradient']
+
+const PERCENT = 100
 
 /** Colours the native renderer needs, resolved from the current theme. Decoded as ChatTheme in ChatRows.kt. */
 export function chatTheme({
     colors,
     isDark,
+    gradient,
 }: {
     colors: Colors
     isDark: boolean
+    gradient?: Gradient
 }) {
     return {
         // Picks a super reaction's dark or light palette (ReactionView: ThemeManager.isThemeDark).
@@ -151,6 +157,25 @@ export function chatTheme({
         feedbackCritical: argb(colors.ICON_FEEDBACK_CRITICAL),
         // ForumPostActionBarView's footer divider.
         postActionsDivider: argb(colors.BORDER_SUBTLE),
+        // Screen-aligned gradient with BACKGROUND_BASE_LOWER composited over it, for the pinned post actions bar.
+        postActionsGradient: gradient
+            ? {
+                  angle: gradient.angle,
+                  colors: gradient.colors.map(color =>
+                      argb(
+                          toHex(
+                              blendColors(
+                                  colors.BACKGROUND_BASE_LOWER,
+                                  color,
+                                  1,
+                                  false,
+                              ),
+                          ),
+                      ),
+                  ),
+                  stops: gradient.stops.map(stop => stop / PERCENT),
+              }
+            : undefined,
     }
 }
 

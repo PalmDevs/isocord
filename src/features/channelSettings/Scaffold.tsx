@@ -73,7 +73,10 @@ export function HeaderSubmit({
 const styles = StyleSheet.create((theme, runtime) => ({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
+        // Our own, the reference's is flat: on a gradient theme the gradient below shows through ThemedGradient `mix`.
+        backgroundColor: theme.background
+            ? theme.colors.BACKGROUND_BASE_LOWEST
+            : theme.colors.MOBILE_ACTIONSHEET_BACKGROUND,
     },
     content: {
         padding: theme.space.PX_16,

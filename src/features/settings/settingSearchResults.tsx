@@ -27,7 +27,7 @@ import type { SettingContext, SettingKey } from './config'
 // SettingRenderer's SettingSearchResultIcon: the group's first result shows its top-level setting's icon.
 function SearchResultIcon({ setting }: { setting: SettingKey | null }) {
     const node = setting && SETTING_RENDERER_CONFIG[setting]
-    if (!node?.icon || node.type === 'radio')
+    if (!node?.icon || node.type === 'radio' || node.type === 'swatches')
         return <View style={styles.iconSpacer} />
     return <TableRowIcon name={node.icon} />
 }

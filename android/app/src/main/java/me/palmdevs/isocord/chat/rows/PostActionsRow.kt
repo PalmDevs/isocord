@@ -16,10 +16,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -28,6 +39,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import me.palmdevs.isocord.R
 import me.palmdevs.isocord.chat.chatPress
 import me.palmdevs.isocord.chat.list.LocalChatActions
@@ -70,10 +84,19 @@ fun PostActionsRow(row: ChatRow.PostActions) {
  * divider. Drawn in the list and pinned to its top.
  */
 @Composable
-fun PostActionsBar(row: ChatRow.PostActions, modifier: Modifier = Modifier) {
+fun PostActionsBar(
+  row: ChatRow.PostActions,
+  modifier: Modifier = Modifier,
+  gradient: ChatGradient? = null,
+) {
   val theme = LocalChatTheme.current
   val actions = LocalChatActions.current
-  Column(modifier.fillMaxWidth().background(theme.background)) {
+  val backgroundModifier = if (gradient != null && gradient.colors.size >= 2) {
+    Modifier.screenAlignedGradient(gradient)
+  } else {
+    Modifier.background(theme.background)
+  }
+  Column(modifier.fillMaxWidth().then(backgroundModifier)) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -97,6 +120,33 @@ fun PostActionsBar(row: ChatRow.PostActions, modifier: Modifier = Modifier) {
     }
     Box(Modifier.fillMaxWidth().height(FOOTER_DIVIDER).background(theme.postActionsDivider))
   }
+}
+
+/** Draws a CSS-angle linear gradient aligned to the window height, matching ThemedGradient. */
+@Composable
+private fun Modifier.screenAlignedGradient(gradient: ChatGradient): Modifier {
+  val root = LocalView.current.rootView
+  var offsetY by remember { mutableFloatStateOf(0f) }
+  val rad = Math.toRadians(gradient.angle.toDouble())
+  val dx = sin(rad).toFloat()
+  val dy = -cos(rad).toFloat()
+  val stops = remember(gradient) { gradient.stops.zip(gradient.colors).toTypedArray() }
+  return this
+    .onPlaced { offsetY = it.positionInWindow().y }
+    .drawBehind {
+      val width = root.width.takeIf { it > 0 }?.toFloat() ?: size.width
+      val height = root.height.takeIf { it > 0 }?.toFloat() ?: size.height
+      val halfLength = (abs(width * dx) + abs(height * dy)) / 2f
+      val centerX = width / 2f
+      val centerY = height / 2f - offsetY
+      drawRect(
+        Brush.linearGradient(
+          colorStops = stops,
+          start = Offset(centerX - dx * halfLength, centerY - dy * halfLength),
+          end = Offset(centerX + dx * halfLength, centerY + dy * halfLength),
+        ),
+      )
+    }
 }
 
 /** IconButton size sm, variant secondary: the icon on the secondary control's fill and border, and its text if any (Button sm). */

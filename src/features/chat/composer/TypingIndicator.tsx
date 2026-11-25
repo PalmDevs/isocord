@@ -94,7 +94,10 @@ export function TypingIndicator({
                 // Coloured inline: a unistyles colour next to an animated style keeps the old theme.
                 style={[
                     styles.solidScrim,
-                    { backgroundColor: theme.colors.BACKGROUND_BASE_LOWER },
+                    {
+                        backgroundColor:
+                            theme.scrim ?? theme.colors.BACKGROUND_BASE_LOWER,
+                    },
                     fade,
                 ]}
             />
@@ -106,7 +109,7 @@ export function TypingIndicator({
                         theme.modules.mobile
                             .CHAT_INPUT_FLOATING_INLINE_FULL_GRADIENT_HEIGHT
                     }
-                    color={theme.colors.BACKGROUND_BASE_LOWER}
+                    color={theme.scrim ?? theme.colors.BACKGROUND_BASE_LOWER}
                     style={fade}
                 />
                 <Animated.View

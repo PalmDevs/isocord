@@ -8,6 +8,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import me.palmdevs.isocord.core.decodeOrNull
 
+/** Screen-aligned linear gradient for pinned bars on a gradient theme. */
+@Immutable
+@Serializable
+data class ChatGradient(
+  val angle: Float,
+  val colors: List<Color>,
+  val stops: List<Float>,
+)
+
 /** The colours of the native chat (`chatTheme` in theme.ts). */
 @Immutable
 @Serializable
@@ -128,6 +137,8 @@ data class ChatTheme(
   val feedbackCritical: Color = Color.Red,
   /** ForumPostActionBarView's footer divider under the forum post action bar. */
   val postActionsDivider: Color = Color.DarkGray,
+  /** Screen-aligned gradient for the pinned forum post action bar on a gradient theme. */
+  val postActionsGradient: ChatGradient? = null,
 )
 
 /** Parses the `theme` prop; the defaults when it is missing or bad. */

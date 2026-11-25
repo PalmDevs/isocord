@@ -7,7 +7,11 @@ import {
 import { logout } from '../../core/api/auth'
 import { CLIENT } from '../../core/constants'
 import { showConfirmModal } from '../../design/components/modals/showAlert'
-import { setModeTheme, setSameAsDeviceTheme } from '../../design/tokens'
+import {
+    setModeTheme,
+    setSameAsDeviceTheme,
+    setTheme,
+} from '../../design/tokens'
 import { t } from '../../i18n'
 import { notificationKind } from '../../native/NativeIsocordConstants'
 import { setChatGesture } from '../../stores/settings/chatGestures'
@@ -17,7 +21,6 @@ import {
     setNewNotifications,
     setShowInAppNotifications,
     setSwipeRightToLeftMode,
-    setTheme,
 } from '../../stores/settings/settingsActions'
 import {
     canSaveSettings,
@@ -28,11 +31,12 @@ import {
     setNotifyEveryMessage,
     setSystemNotifications,
 } from '../systemNotifications'
+import { themeName } from './appearance/themeNames'
 import { FONT_SCALES, fontScaleStore } from './fontScale'
 import type { Session } from '../../core/session'
 import type { TableRowVariant } from '../../design/components/table/TableRow'
 import type { IconName } from '../../design/icons/Icon'
-import type { SystemTheme, ThemeId, ThemeState } from '../../design/tokens'
+import type { SystemTheme, ThemeChoice, ThemeState } from '../../design/tokens'
 import type { MessageKey } from '../../i18n'
 import type { ChatGestureState } from '../../stores/settings/chatGestures'
 import type { SettingsState } from '../../stores/settings/settingsStore'
@@ -42,7 +46,6 @@ import type { NotificationKind } from '../systemNotifications'
 export interface SettingContext {
     session: Session
     settings: SettingsState
-    themeId: ThemeId
     themeState: ThemeState
     systemNotifications: {
         enabled: boolean
@@ -150,6 +153,16 @@ export type SettingNode = SettingBase &
               onValueChange: (context: SettingContext, value: string) => void
               disabled?: (context: SettingContext) => boolean
           }
+        | {
+              type: 'swatches'
+              /** The device mode these swatches pick for, none for the app's theme. */
+              mode?: SystemTheme
+              value: (context: SettingContext) => ThemeChoice
+              onValueChange: (
+                  context: SettingContext,
+                  value: ThemeChoice,
+              ) => void
+          }
         | { type: 'pressable'; onPress: (context: SettingContext) => void }
         | {
               type: 'slider'
@@ -190,33 +203,19 @@ const notifKind = (
 /** Account settings can only be saved once READY has given the current ones. */
 const cannotSave = ({ settings }: SettingContext) => !canSaveSettings(settings)
 
-/** The reference's mobile theme picker (getSegmentedControlItems) offers Light, Dark and Onyx; Ash is the desktop one and Isocord's default. */
-const THEMES: { id: ThemeId; label: () => string }[] = [
-    { id: 'light', label: () => t('settings.theme.light') },
-    { id: 'dark', label: () => t('settings.theme.ash') },
-    { id: 'darker', label: () => t('settings.theme.dark') },
-    { id: 'midnight', label: () => t('settings.theme.onyx') },
-]
-
-const themeName = (id: ThemeId) =>
-    THEMES.find(theme => theme.id === id)?.label()
-
-const themeOptions = () =>
-    THEMES.map(theme => ({ value: theme.id, label: theme.label() }))
-
 const sameAsDevice = ({ themeState }: SettingContext) => themeState.sameAsDevice
 
-/** The theme one device mode uses: the picker screens of LightModeThemeSetting and DarkModeThemeSetting, as radios. */
+/** The theme one device mode uses: the picker screens of LightModeThemeSetting and DarkModeThemeSetting, as swatches. */
 const modeThemePicker = (
     mode: SystemTheme,
     parent: SettingKey,
 ): SettingNode => ({
-    type: 'radio',
+    type: 'swatches',
     parent,
+    mode,
     title: () => t('settings.theme'),
-    options: themeOptions,
     value: ({ themeState }) => themeState[mode],
-    onValueChange: (_context, value) => setModeTheme(mode, value as ThemeId),
+    onValueChange: (_context, value) => setModeTheme(mode, value),
 })
 
 // AndroidFontScaleSetting's useFontScaleSliderProps: the slider moves through FONT_SCALES by index.
@@ -261,7 +260,10 @@ export const SETTING_RENDERER_CONFIG: Record<SettingKey, SettingNode> = {
         trailing: context =>
             sameAsDevice(context)
                 ? t('settings.theme.automatic')
-                : themeName(context.themeId),
+                : themeName(
+                      context.themeState.theme,
+                      context.themeState.customs,
+                  ),
     },
     // SameAsDeviceThemeSetting
     SAME_AS_DEVICE_THEME: {
@@ -272,17 +274,14 @@ export const SETTING_RENDERER_CONFIG: Record<SettingKey, SettingNode> = {
         value: sameAsDevice,
         onValueChange: (_context, value) => setSameAsDeviceTheme(value),
     },
-    // AppearanceThemePickerSetting opens a picker screen; here the themes are a radio group in place.
-    // The single theme is the account's, synced across clients (handleSaveTheme).
+    // AppearanceThemePickerSetting opens a picker screen. Here the themes are swatches in place.
+    // Kept on the device only, never synced to the account.
     APPEARANCE_THEME_PICKER: {
-        type: 'radio',
+        type: 'swatches',
         parent: 'APPEARANCE',
         title: () => t('settings.theme'),
-        options: themeOptions,
-        value: ({ themeId }) => themeId,
-        onValueChange: ({ session }, value) =>
-            setTheme(session, value as ThemeId),
-        disabled: cannotSave,
+        value: ({ themeState }) => themeState.theme,
+        onValueChange: (_context, value) => setTheme(value),
         predicate: context => !sameAsDevice(context),
     },
     // LightModeThemeSetting
@@ -291,7 +290,8 @@ export const SETTING_RENDERER_CONFIG: Record<SettingKey, SettingNode> = {
         parent: 'APPEARANCE',
         title: () => t('settings.theme.lightMode'),
         screen: 'settingsAppearanceLightMode',
-        trailing: ({ themeState }) => themeName(themeState.light),
+        trailing: ({ themeState }) =>
+            themeName(themeState.light, themeState.customs),
         predicate: sameAsDevice,
     },
     LIGHT_MODE_THEME: modeThemePicker('light', 'LIGHT_MODE_THEME_PICKER'),
@@ -301,7 +301,8 @@ export const SETTING_RENDERER_CONFIG: Record<SettingKey, SettingNode> = {
         parent: 'APPEARANCE',
         title: () => t('settings.theme.darkMode'),
         screen: 'settingsAppearanceDarkMode',
-        trailing: ({ themeState }) => themeName(themeState.dark),
+        trailing: ({ themeState }) =>
+            themeName(themeState.dark, themeState.customs),
         predicate: sameAsDevice,
     },
     DARK_MODE_THEME: modeThemePicker('dark', 'DARK_MODE_THEME_PICKER'),

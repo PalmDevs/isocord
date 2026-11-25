@@ -24,7 +24,6 @@ import {
 import { accountFlagsOf, applyProto, settingsStore } from './settingsStore'
 import { parseGuildSettings, unreadSettingOf } from './userGuildSettings'
 import type { Session } from '../../core/session'
-import type { ThemeId } from '../../design/tokens'
 import type {
     CustomStatus,
     GuildFolder,
@@ -93,9 +92,9 @@ function saveSetting<T>(
     if (!categories) return
     const [category, number] = descriptor.path
     const current = categories[category]
-    const kept = [number, ...(descriptor.clears ?? [])].reduce(
-        withoutField,
+    const kept = withoutField(
         current ? base64ToBytes(current) : new Uint8Array(),
+        number,
     )
     const message = concatBytes([kept, writeSetting(descriptor, value)])
     const proto = bytesToBase64(writeBytesField(category, message))
@@ -114,10 +113,6 @@ export const setDeveloperMode = (session: Session, value: boolean) =>
 /** UserSettings.SwipeRightToLeftModeSetting. */
 export const setSwipeRightToLeftMode = (session: Session, mode: number) =>
     saveSetting(session, USER_SETTINGS.swipeRightToLeftMode, mode)
-
-/** saveClientTheme for a base theme. */
-export const setTheme = (session: Session, theme: ThemeId) =>
-    saveSetting(session, USER_SETTINGS.theme, theme)
 
 /** IgnoreProfileSpeedbumpDisabled: "Don't show this again" on an ignored user's speed bump. */
 export const setIgnoreProfileSpeedbumpDisabled = (

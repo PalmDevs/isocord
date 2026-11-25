@@ -295,7 +295,11 @@ private fun LazyItemScope.RowContent(row: ChatRow) {
 /** The forum post action bar pinned over the top of the list. Its touches stay off the rows under it. */
 @Composable
 private fun PinnedPostActions(row: ChatRow.PostActions) {
-  PostActionsBar(row, Modifier.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false) } })
+  PostActionsBar(
+    row,
+    Modifier.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false) } },
+    gradient = LocalChatTheme.current.postActionsGradient,
+  )
 }
 
 @Composable

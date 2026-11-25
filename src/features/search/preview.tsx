@@ -19,6 +19,7 @@ import {
     panelBackStyle,
     usePanelBackPreview,
 } from '../../design/components/overlays/usePanelBackPreview'
+import { ThemedGradient } from '../../design/components/ThemedGradient'
 import {
     DECELERATED_EASING,
     PANEL_CLOSE_MS,
@@ -196,6 +197,8 @@ export function SearchPreviewHost({
                                 collapsable={false}
                                 style={[styles.panel, panelStyle]}
                             >
+                                {/* Hides the list below on a gradient theme, like PanelLayer. */}
+                                <ThemedGradient />
                                 <ChatPreview
                                     key={`${shown.channelId}:${shown.messageId}`}
                                     channelId={shown.channelId}

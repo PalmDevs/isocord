@@ -172,12 +172,18 @@ export function ChatInputScrim({
     )
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((_theme, runtime) => ({
     slot: { alignItems: 'center', justifyContent: 'center' },
     pressed: { opacity: 0.5 },
-    scrim: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+    // Solid down to the screen's edge, behind the keyboard area and navigation bar below the input.
+    scrim: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: -runtime.screen.height,
+    },
     // Clips the row to the room it has been given so far.
     reveal: { overflow: 'hidden' },
     // Pinned to the top of that room, so the row rises with it from behind the card.
     revealContent: { position: 'absolute', top: 0, left: 0, right: 0 },
-})
+}))

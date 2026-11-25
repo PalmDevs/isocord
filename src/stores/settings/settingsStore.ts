@@ -3,7 +3,6 @@ import { AccountNotificationFlags } from '../../core/discord/notificationSetting
 import { logger } from '../../core/log'
 import { bytesToBase64 } from '../../core/protobuf'
 import { defineStore } from '../../core/session'
-import { setSyncedTheme } from '../../design/tokens'
 import { nextMuteEnd } from '../unreadPolicy'
 import {
     PRELOADED_SETTINGS,
@@ -203,11 +202,6 @@ export const settingsStore = defineStore(
         // LocaleStore: requests speak the account's language once known, the cached one until READY.
         store.subscribe(state => {
             if (state.locale) session.rest.identity.accountLocale = state.locale
-        })
-        // ThemeStore follows the account's theme, unless Same as Device Theme picks one.
-        store.subscribe((state, previous) => {
-            if (state.theme && state.theme !== previous.theme)
-                setSyncedTheme(state.theme)
         })
 
         dispatch.on('READY', ready => {

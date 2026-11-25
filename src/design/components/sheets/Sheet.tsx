@@ -40,6 +40,7 @@ import {
 import { RipplePressable } from '../buttons/RipplePressable'
 import { Backdrop } from '../overlays/Backdrop'
 import { Text } from '../Text'
+import { ThemedGradient } from '../ThemedGradient'
 import { TableRow, TableRowIcon } from '../table/TableRow'
 import { TableRowGroup } from '../table/TableRowGroup'
 import { SheetDrag } from './SheetDrag'
@@ -58,6 +59,8 @@ import type { SharedValue } from 'react-native-reanimated'
 
 /** ACTION_SHEET_START_HEIGHT_RATIO: the height a scrollable sheet opens at, as a share of the window. */
 const START_HEIGHT_RATIO = 0.6
+/** The sheet surface's own top left: its gradient hangs from there. */
+const SHEET_ORIGIN = { x: 0, y: 0 }
 /** ACTION_SHEET_MAX_WIDTH: on wide screens the sheet stays this wide and centred. */
 const MAX_WIDTH = 500
 const BACKGROUND_BLEED = NativeStyleSheet.hairlineWidth
@@ -68,6 +71,8 @@ const TOP_GAP = 56
 /** Release speed (px/s) above which a drag flings to the next snap point instead of the nearest. */
 const FLING_VELOCITY = 600
 const DRAG_SLOP = 10
+/** Longest a held sheet waits for its content before it slides in anyway (useDetailsPanel READY_TIMEOUT_MS). */
+const HOLD_TIMEOUT_MS = 400
 
 function animateTo(
     value: SharedValue<number>,
@@ -130,6 +135,8 @@ export interface BottomSheetProps {
     maxHeight?: number
     /** Open a scrollable sheet at `maxHeight`. */
     startExpanded?: boolean
+    /** Keeps the sheet closed while its content still mounts, which would drop the slide's frames. */
+    holdOpen?: boolean
     /** Peak opacity of the scrim behind the sheet. */
     backdropOpacity?: number
     /** Rendered on top of the scrim, behind the sheet. */
@@ -143,6 +150,8 @@ export interface BottomSheetProps {
     dismissAccessibilityLabel?: string
     /** Pinned below the content. */
     footer?: ReactNode
+    /** Called each time the sheet settles open: after its opening slide, or a drag that interrupted it. */
+    onOpen?: () => void
     /** Called when a scrollable sheet reaches its full height. */
     onExpand?: () => void
     /** Called once the sheet has finished closing, however it was closed. */
@@ -166,6 +175,7 @@ export function BottomSheet({
     startHeight,
     maxHeight,
     startExpanded = false,
+    holdOpen = false,
     backdropOpacity = 1,
     backdropChildren,
     header,
@@ -173,6 +183,7 @@ export function BottomSheet({
     handleDisabled = false,
     dismissAccessibilityLabel = t('common.close'),
     footer,
+    onOpen,
     onExpand,
     onDismiss,
     keyboardShouldPersistTaps,
@@ -194,11 +205,24 @@ export function BottomSheet({
         undefined,
         buttonTheme,
     )
+    // Our own, the reference's sheet is flat: on a gradient theme a plain sheet draws the gradient under
+    // ThemedGradient `mix`, like the screens. A sheet with its own background or a profile's colours keeps them.
+    const gradientSurface =
+        theme.background !== undefined &&
+        background == null &&
+        surfaceBg === theme.colors.MOBILE_ACTIONSHEET_BACKGROUND
 
     const limit = maxHeight ?? windowHeight - insets.top - TOP_GAP
     // A sheet without a scroll view sizes itself to its content, which is only known after layout.
     const [measured, setMeasured] = useState<number | null>(null)
-    const ready = scrollable || measured !== null
+    const [holdExpired, setHoldExpired] = useState(false)
+    useEffect(() => {
+        if (!holdOpen) return
+        const timer = setTimeout(() => setHoldExpired(true), HOLD_TIMEOUT_MS)
+        return () => clearTimeout(timer)
+    }, [holdOpen])
+    const ready =
+        (scrollable || measured !== null) && (!holdOpen || holdExpired)
     const lowSnap = scrollable
         ? Math.min(startHeight ?? windowHeight * START_HEIGHT_RATIO, limit)
         : Math.min(measured ?? 0, limit)
@@ -224,9 +248,9 @@ export function BottomSheet({
     const finished = useRef(false)
 
     // Kept in a ref so the exit animation, which outlives renders, always calls the latest callbacks.
-    const callbacks = useRef({ onDismiss, onClosed })
+    const callbacks = useRef({ onOpen, onDismiss, onClosed })
     useEffect(() => {
-        callbacks.current = { onDismiss, onClosed }
+        callbacks.current = { onOpen, onDismiss, onClosed }
     })
     // Stable identity: the animation effect depends on it.
     const finish = useCallback(() => {
@@ -235,6 +259,8 @@ export function BottomSheet({
         callbacks.current.onDismiss?.()
         callbacks.current.onClosed()
     }, [])
+    // Stable identity: the animation effect depends on it.
+    const opened = useCallback(() => callbacks.current.onOpen?.(), [])
 
     // Slides in once measured, slides out when asked to, and follows the content if it changes size.
     useEffect(() => {
@@ -255,7 +281,7 @@ export function BottomSheet({
                 visible,
                 closing ? 0 : target,
                 reducedMotion,
-                closing ? finish : undefined,
+                closing ? finish : opened,
             )
         })
     }, [
@@ -268,6 +294,7 @@ export function BottomSheet({
         dismissHeight,
         sheetHeight,
         finish,
+        opened,
     ])
 
     const settle = (isExpanded: boolean) => {
@@ -295,7 +322,7 @@ export function BottomSheet({
             scheduleOnRN(close)
             return
         }
-        animateTo(visible, target, reducedMotion)
+        animateTo(visible, target, reducedMotion, opened)
         scheduleOnRN(settle, highSnap > lowSnap && target === highSnap)
     }
     const drag = { height: visible, max: highSnap, release }
@@ -430,16 +457,21 @@ export function BottomSheet({
                 setMeasured(Math.ceil(event.nativeEvent.layout.height))
             }
         >
-            {chrome}
-            <View
-                style={[
-                    contentStyles,
-                    bodyStyles,
-                    { paddingBottom: footer ? 0 : bottomPadding },
-                ]}
-            >
-                {children}
-            </View>
+            <GestureDetector gesture={pan}>
+                <View>
+                    {chrome}
+                    <View
+                        style={[
+                            contentStyles,
+                            bodyStyles,
+                            { paddingBottom: footer ? 0 : bottomPadding },
+                        ]}
+                    >
+                        {children}
+                    </View>
+                </View>
+            </GestureDetector>
+            {/* Outside the pan: a footer list drags the sheet through its own SheetDrag, which leaves its scrolls alone. */}
             {footer != null && (
                 <View style={{ paddingBottom: bottomPadding }}>{footer}</View>
             )}
@@ -452,10 +484,21 @@ export function BottomSheet({
                 style={[
                     NativeStyleSheet.absoluteFill,
                     styles.sheetClip,
-                    { backgroundColor: surfaceBg },
+                    {
+                        backgroundColor: gradientSurface
+                            ? 'transparent'
+                            : surfaceBg,
+                    },
                     sheetSurfaceStyle,
                 ]}
             >
+                {gradientSurface && (
+                    // Window-sized from the sheet's top, so it doesn't stretch as the sheet is dragged.
+                    <ThemedGradient
+                        overlays={[theme.colors.BACKGROUND_BASE_LOWEST]}
+                        offset={SHEET_ORIGIN}
+                    />
+                )}
                 {background != null && (
                     <View
                         pointerEvents="none"
@@ -491,11 +534,7 @@ export function BottomSheet({
                     pointerEvents="box-none"
                     style={[styles.lift, liftStyle]}
                 >
-                    {scrollable ? (
-                        sheet
-                    ) : (
-                        <GestureDetector gesture={pan}>{sheet}</GestureDetector>
-                    )}
+                    {sheet}
                 </Animated.View>
             </View>
         </SheetDragContext>

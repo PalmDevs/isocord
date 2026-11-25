@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useWindowDimensions, View } from 'react-native'
 import { useSharedValue } from 'react-native-reanimated'
-import { StyleSheet } from 'react-native-unistyles'
+import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { logger } from '../../core/log'
 import { useSession, useSessionReady, useSessionStore } from '../../core/react'
 import { Skeleton, SkeletonPulse } from '../../design/components/Skeleton'
 import { Text } from '../../design/components/Text'
+import { ThemedGradient } from '../../design/components/ThemedGradient'
 import { t } from '../../i18n'
 import { splashContentNativeId } from '../../native/NativeIsocordConstants'
 import { guildsStore } from '../../stores/guilds'
@@ -84,21 +85,31 @@ export function ServersTab() {
     const shown = guild ?? fallbackGuild
 
     const scrollY = useSharedValue(0)
-    const [panelWidth, setPanelWidth] = useState(0)
+    const { theme } = useUnistyles()
+    const [panel, setPanel] = useState({ x: 0, y: 0, width: 0 })
     const [headerHeight, setHeaderHeight] = useState(0)
     const { height: windowHeight } = useWindowDimensions()
     const bannerHeight = shown
-        ? bannerHeightFor(shown, panelWidth, windowHeight)
+        ? bannerHeightFor(shown, panel.width, windowHeight)
         : 0
+    // ChannelListPanelBackdrop for the sticky header, which must hide the channels below it. The panel itself is
+    // see-through: ThemedGradient `mix` (70% black or 80% white) is the container's BACKGROUND_BASE_LOWEST rule.
+    const backdrop = (
+        <ThemedGradient
+            overlays={[
+                theme.colors.PANEL_BG,
+                theme.colors.BACKGROUND_BASE_LOWEST,
+            ]}
+            offset={panel}
+        />
+    )
 
     return (
         <View nativeID={splashContentNativeId} style={styles.container}>
             <GuildsBar />
             <View
                 style={styles.panel}
-                onLayout={event =>
-                    setPanelWidth(event.nativeEvent.layout.width)
-                }
+                onLayout={event => setPanel(event.nativeEvent.layout)}
             >
                 {shown ? (
                     <>
@@ -131,6 +142,7 @@ export function ServersTab() {
                             scrollY={scrollY}
                             bannerHeight={bannerHeight}
                             onHeight={setHeaderHeight}
+                            backdrop={backdrop}
                         />
                     </>
                 ) : !ready && !hasGuilds ? (
@@ -177,7 +189,10 @@ const styles = StyleSheet.create((theme, runtime) => ({
         borderTopWidth: 1,
         borderLeftWidth: 1,
         borderColor: theme.colors.BORDER_SUBTLE,
-        backgroundColor: theme.colors.BACKGROUND_BASE_LOWER,
+        // ChannelListPanelBackdrop's PANEL_BG tint over the container on a gradient theme.
+        backgroundColor: theme.background
+            ? theme.colors.PANEL_BG
+            : theme.colors.BACKGROUND_BASE_LOWER,
     },
     listTop: (height: number) => ({ height }),
     // GuildHeader's container, title row, search button and divider.

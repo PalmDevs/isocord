@@ -177,3 +177,104 @@ export function getContrastingColor(
     }
     return format(current)
 }
+
+/** Returns `color` as `#rrggbb`, or `#rrggbbaa` when not opaque. */
+export function toHex(color: string): string {
+    const [r, g, b, a] = parse(color)
+    const byte = (v: number) =>
+        Math.round(clampByte(v)).toString(16).padStart(2, '0')
+    return `#${byte(r)}${byte(g)}${byte(b)}${a < 1 ? byte(a * BYTE) : ''}`
+}
+
+/** chroma.luminance of a colour string. */
+export const relativeLuminance = (color: string) => luminance(parse(color))
+
+/** chroma.contrast of two colour strings. */
+export const contrastRatio = (a: string, b: string) =>
+    contrast(parse(a), parse(b))
+
+/** chroma.scale(colors).domain(stops)(at): RGB interpolation, clamped to the first and last stop. */
+export function scaleColor(colors: string[], stops: number[], at: number) {
+    const next = stops.findIndex(stop => stop >= at)
+    if (next <= 0) return colors[next === 0 ? 0 : colors.length - 1]!
+    const t = (at - stops[next - 1]!) / (stops[next]! - stops[next - 1]!)
+    return blendColors(colors[next]!, colors[next - 1]!, t, false)
+}
+
+type Hsl = [number, number, number]
+
+/** chroma's rgb2hsl. A grey's hue is 0, not NaN, so a hue slider keeps a number. */
+function toHsl([r, g, b]: Rgba): Hsl {
+    const [rn, gn, bn] = [r / BYTE, g / BYTE, b / BYTE]
+    const max = Math.max(rn, gn, bn)
+    const min = Math.min(rn, gn, bn)
+    const l = (max + min) / 2
+    const d = max - min
+    if (d === 0) return [0, 0, l]
+    const s = l < 0.5 ? d / (max + min) : d / (2 - max - min)
+    const h =
+        60 *
+        (rn === max
+            ? (gn - bn) / d
+            : gn === max
+              ? 2 + (bn - rn) / d
+              : 4 + (rn - gn) / d)
+    return [h < 0 ? h + 360 : h, s, l]
+}
+
+/** chroma's hsl2rgb, before it rounds. Its arithmetic is kept, since other formulas round differently at .5. */
+function fromHsl([h, s, l]: Hsl, alpha: number): Rgba {
+    if (s === 0) return [l * BYTE, l * BYTE, l * BYTE, alpha]
+    const t2 = l < 0.5 ? l * (1 + s) : l + s - l * s
+    const t1 = 2 * l - t2
+    const channel = (offset: number) => {
+        let t = h / 360 + offset
+        if (t < 0) t += 1
+        if (t > 1) t -= 1
+        if (6 * t < 1) return (t1 + (t2 - t1) * 6 * t) * BYTE
+        if (2 * t < 1) return t2 * BYTE
+        if (3 * t < 2) return (t1 + (t2 - t1) * (2 / 3 - t) * 6) * BYTE
+        return t1 * BYTE
+    }
+    return [channel(1 / 3), channel(0), channel(-1 / 3), alpha]
+}
+
+/** Returns a colour's HSV hue (degrees), saturation and value (chroma's hsv). */
+export function colorHsv(color: string): Hsl {
+    const rgba = parse(color)
+    const max = Math.max(rgba[0], rgba[1], rgba[2]) / BYTE
+    const min = Math.min(rgba[0], rgba[1], rgba[2]) / BYTE
+    return [toHsl(rgba)[0], max === 0 ? 0 : (max - min) / max, max]
+}
+
+/** chroma's set('hsl.s' | 'hsl.l'): a number sets the channel, `*k` multiplies it. */
+export type HslValue = number | string
+
+// Unclamped, as in chroma: a saturation past 1 still shifts the channels before they clip.
+const applyHsl = (current: number, value: HslValue | undefined) => {
+    if (value === undefined) return current
+    return typeof value === 'number' ? value : current * Number(value.slice(1))
+}
+
+/** Returns `color` with its HSL saturation and lightness set or scaled. */
+export function setHsl(
+    color: string,
+    saturation?: HslValue,
+    lightness?: HslValue,
+): string {
+    const rgba = parse(color)
+    const [h, s, l] = toHsl(rgba)
+    const [r, g, b] = fromHsl(
+        [h, applyHsl(s, saturation), applyHsl(l, lightness)],
+        rgba[3],
+    )
+    // Clipped before `format`, since `parse` drops a minus sign.
+    return toHex(format([clampByte(r), clampByte(g), clampByte(b), rgba[3]]))
+}
+
+/** Returns the opaque colour of a hue (degrees), saturation and lightness. */
+export const hslColor = (hue: number, saturation: number, lightness: number) =>
+    toHex(format(fromHsl([hue % 360, saturation, lightness], 1)))
+
+/** Returns a colour's HSL hue (degrees), saturation and lightness. */
+export const colorHsl = (color: string): Hsl => toHsl(parse(color))

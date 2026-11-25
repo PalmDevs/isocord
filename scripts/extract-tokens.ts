@@ -325,6 +325,69 @@ emit(
         `export const shadows: Record<string, Record<ShadowName, string>> = ${json(shadowsByTheme)};\n`,
 )
 
+// Gradient themes: each semantic colour's `gradient` rule (SemanticColorContext), raw colours resolved to hex.
+type GradientRule = { color: string } & Record<string, unknown>
+const gradientRules: Record<string, Record<'light' | 'dark', GradientRule>> = {}
+for (const [name, definition] of Object.entries(semantic)) {
+    const rule = (definition as { gradient?: (typeof gradientRules)[string] })
+        .gradient
+    if (!rule) continue
+    gradientRules[name] = {
+        light: {
+            ...rule.light,
+            color: rawColors[rule.light.color] ?? rule.light.color,
+        },
+        dark: {
+            ...rule.dark,
+            color: rawColors[rule.dark.color] ?? rule.dark.color,
+        },
+    }
+}
+
+// BACKGROUND_GRADIENT_PRESETS_MOBILE (ClientThemesConstants): parsed from source, it cannot run in a stub context.
+const presetSource = readFileSync(
+    join(
+        resolve(dataminingRoot),
+        'discord_app/modules/client_themes/ClientThemesConstants.tsx',
+    ),
+    'utf8',
+)
+const presetPattern =
+    /const (obj\d*) = \{\s*type: ClientThemesTypes\.ClientThemeType\.BACKGROUND_GRADIENT_PRESET,\s*id: preloaded_user_settings\.BackgroundGradientPresetId\.(\w+),\s*theme: (?:ThemeTypes\.)?(LIGHT|DARK),[\s\S]*?angle: ([\d.]+),[\s\S]*?midpointPercentage: ([\d.]+),\s*\};\s*const (items\d+) = \[([\s\S]*?)\];\s*\1\.colors = \6;/g
+const presets = [...presetSource.matchAll(presetPattern)]
+    // isSelectableGradientPreset
+    .filter(([, , id]) => id !== 'EASTER_EGG')
+    .map(([, , id, theme, angle, midpoint, , stops]) => ({
+        id: id!,
+        theme: theme === 'LIGHT' ? 'light' : 'darker',
+        angle: Number(angle),
+        midpoint: Number(midpoint),
+        colors: [...stops!.matchAll(/token: "(\w+)", stop: ([\d.]+)/g)].map(
+            ([, token, stop]) => {
+                const color = rawColors[token!]
+                if (!color) throw new Error(`Unknown gradient colour ${token}`)
+                return { color, stop: Number(stop) }
+            },
+        ),
+    }))
+// The mobile order: Blurple Twilight, the dark presets, then the light ones.
+const presetOrder = (theme: string, id: string) =>
+    id === 'BLURPLE_TWILIGHT' ? 0 : theme === 'darker' ? 1 : 2
+presets.sort((a, b) => presetOrder(a.theme, a.id) - presetOrder(b.theme, b.id))
+if (presets.length < 20)
+    throw new Error(`Parsed only ${presets.length} gradient presets`)
+emit(
+    'gradients.ts',
+    `import type { SemanticColor, ThemeId } from './semanticColors';\n` +
+        `export interface GradientRule { color: string; opacity?: number; lightness?: number | string; saturation?: number | string }\n` +
+        `export const gradientRules: Partial<Record<SemanticColor, Record<'light' | 'dark', GradientRule>>> = ${json(gradientRules)};\n` +
+        `export interface GradientPreset { id: string; theme: ThemeId; angle: number; midpoint: number; colors: { color: string; stop: number }[] }\n` +
+        `export const gradientPresets: GradientPreset[] = ${json(presets)};\n`,
+)
+
+console.log(
+    `gradients: ${Object.keys(gradientRules).length} rules, ${presets.length} presets`,
+)
 console.log(
     `tokens: ${Object.keys(rawColors).length} raw colors, ${Object.keys(semantic).length} semantic colors, ` +
         `${variants.length} text variants (${remappedVariants} remapped), ${Object.keys(shadows).length} shadows -> ${outDir}`,
