@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useSession, useSessionStore } from '../../core/react'
@@ -65,6 +66,11 @@ export function ChatList({
     )
     const newMessages = useNewMessages(channelId)
     const optInGuildId = useShowChannelOptInNotice(channelId)
+    const [topInset, setTopInset] = useState<{
+        channelId: string
+        height: number
+    }>()
+    const bannerTop = topInset?.channelId === channelId ? topInset.height : 0
     const openLink = (url: string) => {
         if (!acceptsActions) return
         handleChatLink(url, {
@@ -113,6 +119,9 @@ export function ChatList({
                     setAtBottom(session, scrollKey, atBottom)
                     read.onAtBottomChange(scrollKey, atBottom)
                 }}
+                onTopInsetChange={({
+                    nativeEvent: { scrollKey, topInset: inset },
+                }) => setTopInset({ channelId: scrollKey, height: inset })}
                 onMessageLongPress={event => {
                     if (!acceptsActions) return
                     handleMessageLongPress(
@@ -139,23 +148,28 @@ export function ChatList({
                 }}
                 onLinkPress={event => openLink(event.nativeEvent.url)}
             />
-            {/* The reference's StickyHeader over the list (ChatBanner): new messages win over the opt-in notice. The
-                bar is held until the list has settled where it opens, so a chat opened at the bottom (and read at
-                once) does not flash it. */}
-            {newMessages
-                ? read.opened && (
-                      <NewMessagesBar
-                          channelId={channelId}
-                          newMessages={newMessages}
-                          onPress={() => void scroll.scrollToNewMessages()}
-                      />
-                  )
-                : optInGuildId && (
-                      <OptInChannelBanner
-                          guildId={optInGuildId}
-                          channelId={channelId}
-                      />
-                  )}
+            {/* The reference's StickyHeader over the list (ChatViewStickyHeader, ChatBanner): ForumPostActionBar sits
+                above the banner, and new messages win over the opt-in notice. The bar is held until the list has
+                settled where it opens, so a chat opened at the bottom (and read at once) does not flash it. */}
+            <View
+                style={[styles.banner, { top: bannerTop }]}
+                pointerEvents="box-none"
+            >
+                {newMessages
+                    ? read.opened && (
+                          <NewMessagesBar
+                              channelId={channelId}
+                              newMessages={newMessages}
+                              onPress={() => void scroll.scrollToNewMessages()}
+                          />
+                      )
+                    : optInGuildId && (
+                          <OptInChannelBanner
+                              guildId={optInGuildId}
+                              channelId={channelId}
+                          />
+                      )}
+            </View>
             {messages?.error && messages.messages.length === 0 && (
                 <View style={styles.error}>
                     <Text color="TEXT_MUTED">{t('chat.loadFailed')}</Text>
@@ -172,6 +186,11 @@ export function ChatList({
 
 const styles = StyleSheet.create(theme => ({
     chat: { flex: 1 },
+    banner: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+    },
     error: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: theme.colors.BACKGROUND_BASE_LOWER,

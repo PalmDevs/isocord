@@ -55,6 +55,11 @@ export interface NativeProps extends ViewProps {
         scrollKey: string
         atBottom: boolean
     }>
+    /** dp at the top of the list occupied by a pinned header (such as ForumPostActionBar). */
+    onTopInsetChange?: CodegenTypes.DirectEventHandler<{
+        scrollKey: string
+        topInset: CodegenTypes.Double
+    }>
     /** `media`: the held media tile's link without its origin (`isocord://media/<id>/<index>`), or "" off media. */
     onMessageLongPress?: CodegenTypes.DirectEventHandler<{
         messageId: string

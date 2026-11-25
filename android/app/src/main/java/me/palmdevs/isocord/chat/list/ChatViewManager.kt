@@ -77,7 +77,7 @@ class ChatViewManager : SimpleViewManager<ChatView>(), IsocordChatViewManagerInt
   }
 
   override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> =
-    listOf("LoadOlder", "LoadNewer", "JumpToPresent", "LinkPress", "MessageLongPress", "MessageSwipe", "RowsDrawn", "AtBottomChange").associate {
+    listOf("LoadOlder", "LoadNewer", "JumpToPresent", "LinkPress", "MessageLongPress", "MessageSwipe", "RowsDrawn", "AtBottomChange", "TopInsetChange").associate {
       "top$it" to mapOf("registrationName" to "on$it")
     }
 

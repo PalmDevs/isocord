@@ -199,6 +199,12 @@ class ChatView(context: Context) : FrameLayout(context) {
                 putBoolean("atBottom", atBottom)
               }
             },
+            onTopInsetChange = { key, inset ->
+              emit("topTopInsetChange") {
+                putString("scrollKey", key)
+                putDouble("topInset", inset)
+              }
+            },
           )
         }
       },

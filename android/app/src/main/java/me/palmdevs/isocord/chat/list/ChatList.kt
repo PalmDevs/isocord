@@ -31,10 +31,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -141,6 +144,8 @@ fun ChatList(
   onRowsDrawn: (String) -> Unit,
   /** Whether the list rests at (within [AT_BOTTOM_BUFFER] of) the newest message, with the chat's `scrollKey`. */
   onAtBottomChange: (String, Boolean) -> Unit,
+  /** dp at the top of the list occupied by a pinned header, with the chat's `scrollKey`. */
+  onTopInsetChange: (String, Double) -> Unit = { _, _ -> },
   /** The height in px of the composer floating over the list, read while the list is measured; null without one. */
   composerHeight: () -> Int? = { null },
 ) {
@@ -148,7 +153,7 @@ fun ChatList(
   key(scrollKey) {
     ChatListContent(
       scrollKey, scrollTarget, jumpTarget, composerTarget, rows, theme, fonts, bottomInset + typing, maxOf(typing, typingInset),
-      onLoadOlder, onLoadNewer, onJumpToPresent, onLinkPress, onMessageLongPress, onMessageSwipe, onRowsDrawn, onAtBottomChange, composerHeight,
+      onLoadOlder, onLoadNewer, onJumpToPresent, onLinkPress, onMessageLongPress, onMessageSwipe, onRowsDrawn, onAtBottomChange, onTopInsetChange, composerHeight,
     )
   }
 }
@@ -172,6 +177,7 @@ private fun ChatListContent(
   onMessageSwipe: (String, String) -> Unit,
   onRowsDrawn: (String) -> Unit,
   onAtBottomChange: (String, Boolean) -> Unit,
+  onTopInsetChange: (String, Double) -> Unit,
   composerHeight: () -> Int?,
 ) {
   val state = rememberLazyListState()
@@ -207,6 +213,13 @@ private fun ChatListContent(
   val scrolling = rememberChatScrolling(state)
   val hasContent = rows.any { it !is ChatRow.Loading }
   val postActionsPinned = postActionsPinned(state, rows, changes, postActions)
+  var pinnedBarHeightPx by remember { mutableIntStateOf(0) }
+  val pinnedBarHeightDp = if (postActions != null && postActionsPinned) {
+    with(LocalDensity.current) { pinnedBarHeightPx.toDp().value.toDouble() }
+  } else {
+    0.0
+  }
+  LaunchedEffect(scrollKey, pinnedBarHeightDp) { onTopInsetChange(scrollKey, pinnedBarHeightDp) }
 
   RestoreScrollOnFirstRows(state, rows, changes, scrollKey, hasContent)
   val newerAnchorPending = rememberLoadNewerAnchor(state, rows, changes)
@@ -229,7 +242,9 @@ private fun ChatListContent(
       LazyColumn(state = state, reverseLayout = true, contentPadding = contentPadding, modifier = keepStill) {
         items(rows, key = { changes.lazyKey(it.key) }, contentType = { it::class }) { row -> AnimatedRow(row, changes, arrivals) }
       }
-      if (postActions != null && postActionsPinned) PinnedPostActions(postActions)
+      if (postActions != null && postActionsPinned) {
+        PinnedPostActions(postActions, Modifier.onSizeChanged { pinnedBarHeightPx = it.height })
+      }
       AnimatedVisibility(
         visible = showJump,
         enter = fadeIn(),
@@ -294,10 +309,10 @@ private fun LazyItemScope.RowContent(row: ChatRow) {
 
 /** The forum post action bar pinned over the top of the list. Its touches stay off the rows under it. */
 @Composable
-private fun PinnedPostActions(row: ChatRow.PostActions) {
+private fun PinnedPostActions(row: ChatRow.PostActions, modifier: Modifier = Modifier) {
   PostActionsBar(
     row,
-    Modifier.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false) } },
+    modifier.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false) } },
     gradient = LocalChatTheme.current.postActionsGradient,
   )
 }
