@@ -3,6 +3,7 @@ import { View } from 'react-native'
 import { useSession } from '../../../core/react'
 import { reactionChipHeight } from '../../../native/NativeIsocordConstants'
 import ReactionsView from '../../../native/ReactionsViewNativeComponent'
+import { parseChatLink } from '../links/chatLink'
 import { handleChatLink } from '../links/links'
 import { openFromChat } from '../links/openChannel'
 import { reactionRows } from '../rows/buildRows'
@@ -11,8 +12,8 @@ import type { Reaction } from '../../../stores/messages/messageTypes'
 import type { Message } from '../../../stores/readStates'
 
 /**
- * A message's reaction chips as the chat draws them (the native ReactionsView). Taps react, holds open the
- * reactions sheet. Sized by its chips on one line. Takes the touches itself, so a pressable around it stays quiet.
+ * A message's reaction chips as the chat draws them (the native ReactionsView). Taps react; holds are ignored.
+ * Sized by its chips on one line. Takes the touches itself, so a pressable around it stays quiet.
  */
 export function ReactionChips({
     message,
@@ -35,13 +36,15 @@ export function ReactionChips({
                 onContentSize={({ nativeEvent: { width, height } }) =>
                     setSize({ width, height })
                 }
-                onLinkPress={event =>
-                    handleChatLink(event.nativeEvent.url, {
+                onLinkPress={event => {
+                    const { url } = event.nativeEvent
+                    if (parseChatLink(url)?.kind === 'reactions') return
+                    handleChatLink(url, {
                         session,
                         channelId,
                         openChannel: openFromChat,
                     })
-                }
+                }}
                 style={size}
             />
         </View>
