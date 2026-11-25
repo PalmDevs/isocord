@@ -1,5 +1,6 @@
 package me.palmdevs.isocord.chat.list
 
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
@@ -8,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -193,4 +195,66 @@ internal fun rememberArrivals(
     arrivals.settle()
   }
   return arrivals
+}
+
+private class PendingAnchor(val index: Int, val nonce: Int)
+
+/**
+ * Returns the new index of the newest content row from [previous] when newer rows arrived ahead of a
+ * `loading-newer` row, -1 when the window was replaced, or null when no newer rows were inserted.
+ */
+internal fun newerAnchorIndex(
+  previous: List<ChatRow>?,
+  next: List<ChatRow>,
+  lazyKey: (String) -> String = { it },
+): Int? {
+  val hadNewer = (previous?.firstOrNull() as? ChatRow.Loading)?.placeholder == false
+  if (!hadNewer) return null
+  val prevKey = previous?.firstOrNull { it !is ChatRow.Loading }?.key?.let(lazyKey) ?: return null
+  val at = next.indexOfFirst { lazyKey(it.key) == prevKey }
+  if (at < 0) return -1
+  val firstContent = next.indexOfFirst { it !is ChatRow.Loading }
+  return if (firstContent >= 0 && at > firstContent) at else null
+}
+
+/**
+ * Anchors the list to the previous newest row when newer messages arrive while `loading-newer` is at index 0.
+ * Without this, `LazyColumn` stays on `loading-newer` and [LoadNewerEffect] keeps fetching to the bottom.
+ */
+@Composable
+internal fun rememberLoadNewerAnchor(
+  state: LazyListState,
+  rows: List<ChatRow>,
+  changes: ChatRowChanges,
+): () -> Boolean {
+  val previous = remember { arrayOfNulls<List<ChatRow>>(1) }
+  val nonce = remember { IntArray(1) }
+  var pending by remember { mutableStateOf<PendingAnchor?>(null) }
+
+  val prev = previous[0]
+  if (prev !== rows) {
+    previous[0] = rows
+    val anchor = newerAnchorIndex(prev, rows, changes::lazyKey)
+    if (anchor != null && anchor < 0) {
+      pending = null
+    } else if (anchor != null && Snapshot.withoutReadObservation { state.firstVisibleItemIndex == 0 }) {
+      pending = PendingAnchor(anchor, ++nonce[0])
+      state.requestScrollToItem(anchor, 0)
+    }
+  }
+
+  LaunchedEffect(pending?.nonce) {
+    val current = pending ?: return@LaunchedEffect
+    try {
+      // requestScrollToItem defers during a drag or fling, leaving index 0 visible or dropping the scroll.
+      if (state.firstVisibleItemIndex == 0) {
+        state.scroll(MutatePriority.PreventUserInput) {}
+        state.scrollToItem(current.index, 0)
+      }
+    } finally {
+      if (pending?.nonce == current.nonce) pending = null
+    }
+  }
+
+  return { pending != null }
 }

@@ -128,14 +128,22 @@ internal fun ScrollRequestEffect(
 }
 
 @Composable
-internal fun LoadNewerEffect(state: LazyListState, onLoadNewer: () -> Unit) {
+internal fun LoadNewerEffect(
+  state: LazyListState,
+  anchorPending: () -> Boolean = { false },
+  onLoadNewer: () -> Unit,
+) {
   // A detached window asks for newer messages when the newest visible row is close to the newest loaded one.
   val loadNewer by rememberUpdatedState(onLoadNewer)
   LaunchedEffect(state) {
     var requestedTotal = -1
     var requestedAt = 0L
-    snapshotFlow { state.layoutInfo.totalItemsCount to state.firstVisibleItemIndex }.collect { (total, first) ->
-      if (first > LOAD_NEWER_THRESHOLD) return@collect
+    snapshotFlow {
+      if (anchorPending()) null
+      else state.layoutInfo.totalItemsCount to state.firstVisibleItemIndex
+    }.collect { pair ->
+      val (total, first) = pair ?: return@collect
+      if (total == 0 || first > LOAD_NEWER_THRESHOLD) return@collect
       val now = System.nanoTime()
       if (total != requestedTotal || (now - requestedAt).nanoseconds > PAGE_RETRY) {
         requestedTotal = total

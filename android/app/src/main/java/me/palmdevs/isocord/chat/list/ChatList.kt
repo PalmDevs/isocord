@@ -209,6 +209,7 @@ private fun ChatListContent(
   val postActionsPinned = postActionsPinned(state, rows, changes, postActions)
 
   RestoreScrollOnFirstRows(state, rows, changes, scrollKey, hasContent)
+  val newerAnchorPending = rememberLoadNewerAnchor(state, rows, changes)
   val arrivals = rememberArrivals(state, rows, changes, atBottomBuffer, typingInsetPx)
 
   CompositionLocalProvider(
@@ -257,7 +258,7 @@ private fun ChatListContent(
   ScrollMemoryEffect(state, scrollKey, positioned)
   RowsDrawnEffect(hasContent, scrollKey, onRowsDrawn)
   ScrollRequestEffect(state, rows, scrollKey, scrollTarget, scrollMargin, highlight, scope)
-  if (hasNewer) LoadNewerEffect(state, onLoadNewer)
+  if (hasNewer) LoadNewerEffect(state, newerAnchorPending, onLoadNewer)
   LoadOlderEffect(state, rows, onLoadOlder)
 }
 
