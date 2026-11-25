@@ -12,7 +12,7 @@ import { guildsStore } from '../../../stores/guilds'
 import { membersStore } from '../../../stores/members'
 import { usersStore } from '../../../stores/users'
 import { handleChatLink } from '../links/links'
-import { openChannel } from '../links/openChannel'
+import { jumpFromDetails } from '../links/openChannel'
 import { mentionResolver } from '../rows/buildRows'
 import { parseMarkdown, toSpans } from '../rows/markdown'
 import { useChatTheme } from '../rows/rowEncoder'
@@ -163,10 +163,8 @@ export function ChannelTopic({
                             handleChatLink(event.nativeEvent.url, {
                                 session,
                                 channelId,
-                                openChannel: (id, messageId) => {
-                                    onBack()
-                                    openChannel(id, messageId)
-                                },
+                                openChannel: (id, messageId) =>
+                                    jumpFromDetails(id, messageId, onBack),
                             })
                         }
                         style={{

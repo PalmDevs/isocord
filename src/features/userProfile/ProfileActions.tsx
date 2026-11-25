@@ -14,7 +14,7 @@ import {
     useRelationshipType,
 } from '../../stores/relationships'
 import { isWebhookUser } from '../../stores/users'
-import { openChannel } from '../chat/links/openChannel'
+import { openFromChat } from '../chat/links/openChannel'
 import type { ButtonProps } from '../../design/components/buttons/Button'
 import type { User } from '../../stores/users'
 
@@ -44,7 +44,7 @@ export function ProfileActions({ user }: { user: User }) {
     const message = async () => {
         const channelId = await openDmChannel(session, userId)
         closeSheet()
-        openChannel(channelId)
+        openFromChat(channelId)
     }
     const messageButton = (
         <View style={styles.action}>

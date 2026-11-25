@@ -108,9 +108,8 @@ export function ChatPanels({
         active && !modalOpen ? topPanel : undefined,
         width,
     )
-    // The details are those of the chat on top: the stacked one while it shows.
-    const detailsChannelId =
-        stack.stack && stack.open ? stack.stack.channelId : chat.channelId
+    // The details are those of the chat on top: the topmost stacked one while it shows.
+    const detailsChannelId = stack.topOpen?.channelId ?? chat.channelId
     // Another channel, or the chat going away, takes the details with it.
     // biome-ignore lint/correctness/useExhaustiveDependencies: reset on every channel change
     useEffect(details.reset, [detailsChannelId])
@@ -127,7 +126,7 @@ export function ChatPanels({
     const animated = usePanelStyles(width, dragging, backPreview, {
         chat: chat.x,
         details: details.x,
-        stack: stack.x,
+        stack: stack.entries.map(entry => entry.x),
         create: create.x,
     })
     const closeChat = () => {
@@ -186,13 +185,16 @@ export function ChatPanels({
                     <PanelLayers
                         {...panels}
                         styles={animated}
+                        width={width}
+                        dragging={dragging}
+                        backPreview={backPreview}
                         closeGesture={closePan}
                         detailsChannelId={detailsChannelId}
                         detailsOnSwipe={detailsOnSwipe}
                         active={active}
                         onBack={closeChat}
-                        onStackRowsDrawn={id => {
-                            stack.onRowsDrawn(id)
+                        onStackRowsDrawn={(key, id) => {
+                            stack.onRowsDrawn(key, id)
                             create.onStackRowsDrawn(id)
                         }}
                     />

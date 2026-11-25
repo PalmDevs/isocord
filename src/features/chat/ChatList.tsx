@@ -14,7 +14,7 @@ import {
 import { useComposer, useComposerState } from './composer'
 import { composerStore } from './composer/state/composerStore'
 import { handleChatLink } from './links/links'
-import { openChannel } from './links/openChannel'
+import { openFromChat } from './links/openChannel'
 import { handleMessageLongPress, handleMessageSwipe } from './longPress'
 import { NewMessagesBar } from './NewMessagesBar'
 import { OptInChannelBanner } from './OptInChannelBanner'
@@ -71,7 +71,7 @@ export function ChatList({
             session,
             channelId,
             composer,
-            openChannel,
+            openChannel: openFromChat,
             scrollToMessage: scroll.scrollToMessage,
             openPins: onOpenPins,
         })
@@ -121,7 +121,7 @@ export function ChatList({
                         event.nativeEvent.messageId,
                         {
                             composer,
-                            openChannel: id => openChannel(id),
+                            openChannel: openFromChat,
                             openLink,
                             media: event.nativeEvent.media,
                         },

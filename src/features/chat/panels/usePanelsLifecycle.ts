@@ -30,14 +30,17 @@ export function usePanelsLifecycle(
 ) {
     // biome-ignore lint/correctness/useExhaustiveDependencies: only a width change should resync the position
     useEffect(() => {
-        for (const layer of [chat, details, stack, create])
+        for (const layer of [chat, details, ...stack.entries, create])
             layer.x.set(layer.openRef.current ? 0 : width)
     }, [width])
     // biome-ignore lint/correctness/useExhaustiveDependencies: drop and reset only use refs, setters and shared values
     useEffect(() => {
         if (
             (!chat.hasChannel || !tabFocused) &&
-            (chat.open || details.open || stack.stack || create.create)
+            (chat.open ||
+                details.open ||
+                stack.entries.length > 0 ||
+                create.create)
         ) {
             diag.debug(
                 `reset ${chat.channelId} hasChannel=${chat.hasChannel} tabFocused=${tabFocused}`,
@@ -53,7 +56,7 @@ export function usePanelsLifecycle(
         tabFocused,
         chat.open,
         details.open,
-        stack.stack,
+        stack.entries.length,
         create.create,
         width,
     ])
@@ -90,9 +93,12 @@ export function usePanelsBackHandler(
                       : stack.openRef.current
                         ? 'stack'
                         : 'chat'
-                const panel = panels[target]
-                takeOffset(target, panel.x)
-                panel.close()
+                const x =
+                    target === 'stack'
+                        ? stack.topOpenRef.current?.x
+                        : panels[target].x
+                if (x) takeOffset(target, x)
+                panels[target].close()
                 return true
             },
         )
@@ -112,16 +118,49 @@ export function usePanelsOpeners(
     active: boolean,
     { chat, details, stack, create }: Panels,
 ) {
+    const currentChannelId = () =>
+        stack.openRef.current
+            ? stack.topOpenRef.current?.channelId
+            : chat.channelId
+    const jumpInCurrent = (channelId: string, messageId?: string) => {
+        if (stack.openRef.current) stack.jumpTo(messageId)
+        else chat.openChat(channelId, messageId)
+    }
     const openFromDetails = (id: string) => {
         dismissComposers()
         details.slideAway(() => {
-            if (stack.openRef.current) stack.show(id)
+            if (stack.openRef.current) stack.replace(id)
             else openChannel(id)
         })
     }
+    const jumpFromChat = (channelId: string, messageId?: string) => {
+        if (channelId === currentChannelId()) {
+            jumpInCurrent(channelId, messageId)
+            return
+        }
+        stack.show(channelId, messageId)
+    }
+    const jumpFromDetails = (channelId: string, messageId?: string) => {
+        dismissComposers()
+        if (!chat.openRef.current) {
+            details.slideAway(() => openChannel(channelId, messageId))
+            return
+        }
+        if (channelId === currentChannelId()) {
+            details.close()
+            if (messageId) jumpInCurrent(channelId, messageId)
+            return
+        }
+        details.slideAway(() => stack.show(channelId, messageId))
+    }
     // Channel links in the chat on screen stack their channel over it (links.ts `channel`).
     useEffect(() => {
-        if (chat.open && active) return setOpener('stackedChat', stack.show)
+        if (chat.open && !details.open && active)
+            return setOpener('stackedChat', stack.show)
+    })
+    useEffect(() => {
+        if (chat.open && !details.open && active)
+            return setOpener('chatJump', jumpFromChat)
     })
     // The details can be open over the tab alone (the server header's search), with their Threads page.
     useEffect(() => {
@@ -131,5 +170,9 @@ export function usePanelsOpeners(
     useEffect(() => {
         if (details.open && active)
             return setOpener('detailsChannel', openFromDetails)
+    })
+    useEffect(() => {
+        if (details.open && active)
+            return setOpener('detailsJump', jumpFromDetails)
     })
 }

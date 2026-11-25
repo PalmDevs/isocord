@@ -31,7 +31,7 @@ import { viewerAction, viewerMotion } from '../../native/NativeIsocordConstants'
 import { findMessage, messagesStore } from '../../stores/messages/messages'
 import { parseChatLink } from '../chat/links/chatLink'
 import { handleChatLink } from '../chat/links/links'
-import { openChannel } from '../chat/links/openChannel'
+import { openFromChat } from '../chat/links/openChannel'
 import {
     buildMessageRow,
     standaloneRow,
@@ -205,7 +205,7 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
     const leave = (channelId: string, messageId?: string) => {
         closeMediaViewer(session)
         if (open.jump && messageId) open.jump(channelId, messageId)
-        else openChannel(channelId, messageId)
+        else openFromChat(channelId, messageId)
     }
     const options = (at: number) => {
         const source = open.sources[at]
@@ -303,6 +303,7 @@ function MediaViewer({ open }: { open: OpenMediaViewer }) {
                         channelId: message.channel_id,
                         openChannel: leave,
                         scrollToMessage: id => leave(message.channel_id, id),
+                        stack: false,
                     })
                 }}
             />

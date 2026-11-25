@@ -6,10 +6,14 @@ interface Openers {
     channel: (channelId: string, messageId?: string) => void
     /** Set by the panels whose chat is on screen: a channel in a panel stacked over that chat. */
     stackedChat: (channelId: string, messageId?: string) => void
+    /** Set by the panels whose chat is on screen: jump in place if on top, else stack a new panel. */
+    chatJump: (channelId: string, messageId?: string) => void
     /** Set by the panels on screen: the thread creation panel slid in over them. */
     threadCreation: (channelId: string, messageId?: string) => void
     /** Set by the panels while their channel details show: a channel picked there. */
     detailsChannel: (channelId: string) => void
+    /** Set by the panels while their channel details show: a jump from search or a link there. */
+    detailsJump: (channelId: string, messageId?: string) => void
     /** Set by the main tabs: a server's Channels & Roles, on one of its tabs. */
     channelBrowser: (guildId: string, tab: 'customize' | 'browse') => void
     /** Set by the main tabs: a text file's plain-text preview (openPlaintextFilePreview). */
@@ -88,4 +92,37 @@ export function openFromDetails(
     }
     onDismiss()
     openChannel(channelId)
+}
+
+/**
+ * Jumps to a channel or message from a search preview or link inside channel details: scrolls in place when it is
+ * already the channel on top, stacks a new panel over an open chat, or leaves via `onDismiss` when outside details.
+ */
+export function jumpFromDetails(
+    channelId: string,
+    messageId: string | undefined,
+    onDismiss: () => void,
+): void {
+    if (openers.detailsJump) {
+        openers.detailsJump(channelId, messageId)
+        return
+    }
+    onDismiss()
+    openChannel(channelId, messageId)
+}
+
+/**
+ * Opens a channel or message from inside a chat or an overlay over it: jumps in place when it is already the
+ * channel on top, stacks a new panel over an open chat, slides out of details, or opens in its tab.
+ */
+export function openFromChat(channelId: string, messageId?: string): void {
+    if (openers.detailsJump) {
+        openers.detailsJump(channelId, messageId)
+        return
+    }
+    if (openers.chatJump) {
+        openers.chatJump(channelId, messageId)
+        return
+    }
+    openChannel(channelId, messageId)
 }

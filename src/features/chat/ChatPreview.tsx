@@ -144,6 +144,7 @@ export function ChatPreview({
             channelId,
             openChannel: onJump,
             scrollToMessage: scrollTo,
+            stack: false,
         })
     return (
         <View style={styles.container}>

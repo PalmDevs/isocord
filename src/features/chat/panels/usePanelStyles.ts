@@ -12,7 +12,7 @@ import type { PanelBackPreview } from '../../../design/components/overlays/usePa
 
 const SCRIM_OPACITY = 0.5
 
-function scrimOpacity(x: SharedValue<number>, width: number) {
+export function scrimOpacity(x: SharedValue<number>, width: number) {
     'worklet'
     return interpolate(
         x.get(),
@@ -25,7 +25,7 @@ function scrimOpacity(x: SharedValue<number>, width: number) {
 interface PanelXs {
     chat: SharedValue<number>
     details: SharedValue<number>
-    stack: SharedValue<number>
+    stack: SharedValue<number>[]
     create: SharedValue<number>
 }
 
@@ -61,36 +61,34 @@ export function usePanelStyles(
             if (covered !== previous) scheduleOnRN(setListCovered, covered)
         },
     )
-    // The chat under the details, the stacked chat or the thread creation.
-    const chatStyle = useAnimatedStyle(() => ({
-        ...panelBackStyle(
-            chat.get(),
-            layer.get() === 'chat' ? offset.get() : 0,
-        ),
-        opacity:
-            !dragging.get() &&
-            offset.get() === 0 &&
-            (details.get() === 0 || stack.get() === 0 || create.get() === 0)
-                ? 0
-                : 1,
-    }))
+    // The chat under the details, the stacked chats or the thread creation.
+    const chatStyle = useAnimatedStyle(() => {
+        let stackCovered = false
+        for (let i = 0; i < stack.length; i++) {
+            if (stack[i]!.get() === 0) {
+                stackCovered = true
+                break
+            }
+        }
+        return {
+            ...panelBackStyle(
+                chat.get(),
+                layer.get() === 'chat' ? offset.get() : 0,
+            ),
+            opacity:
+                !dragging.get() &&
+                offset.get() === 0 &&
+                (details.get() === 0 || stackCovered || create.get() === 0)
+                    ? 0
+                    : 1,
+        }
+    })
     const detailsStyle = useAnimatedStyle(() =>
         panelBackStyle(
             details.get(),
             layer.get() === 'details' ? offset.get() : 0,
         ),
     )
-    // The stacked chat under the details.
-    const stackStyle = useAnimatedStyle(() => ({
-        ...panelBackStyle(
-            stack.get(),
-            layer.get() === 'stack' ? offset.get() : 0,
-        ),
-        opacity:
-            !dragging.get() && offset.get() === 0 && details.get() === 0
-                ? 0
-                : 1,
-    }))
     // The thread creation under the details. The stacked chat under it keeps drawing: a created thread's chat draws
     // there before the creation panel goes.
     const createStyle = useAnimatedStyle(() => ({
@@ -109,9 +107,6 @@ export function usePanelStyles(
     const detailsScrim = useAnimatedStyle(() => ({
         opacity: scrimOpacity(details, width),
     }))
-    const stackScrim = useAnimatedStyle(() => ({
-        opacity: scrimOpacity(stack, width),
-    }))
     const createScrim = useAnimatedStyle(() => ({
         opacity: scrimOpacity(create, width),
     }))
@@ -120,12 +115,10 @@ export function usePanelStyles(
         children,
         chat: chatStyle,
         details: detailsStyle,
-        stack: stackStyle,
         create: createStyle,
         scrims: {
             chat: chatScrim,
             details: detailsScrim,
-            stack: stackScrim,
             create: createScrim,
         },
     }

@@ -9,7 +9,7 @@ import { guildsStore } from '../../../stores/guilds'
 import { membersStore, requestMembers } from '../../../stores/members'
 import { usersStore } from '../../../stores/users'
 import { handleChatLink } from '../../chat/links/links'
-import { openChannel } from '../../chat/links/openChannel'
+import { jumpFromDetails } from '../../chat/links/openChannel'
 import { useChatTheme } from '../../chat/rows/rowEncoder'
 import { useOpenSearchPreview } from '../useOpenSearchPreview'
 import {
@@ -176,10 +176,8 @@ export function MessageResults({
             channelId: context.type === 'DMS' ? undefined : context.channelId,
             findMessage: id => messages?.find(message => message.id === id),
             // Leaving search for a message in its channel (useOnPressMessageItem).
-            openChannel: (channelId, messageId) => {
-                onDismiss()
-                openChannel(channelId, messageId)
-            },
+            openChannel: (channelId, messageId) =>
+                jumpFromDetails(channelId, messageId, onDismiss),
             openResult: openPreview,
         })
 

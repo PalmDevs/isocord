@@ -7,7 +7,7 @@ import { guildsStore } from '../../stores/guilds'
 import { membersStore } from '../../stores/members'
 import { usersStore } from '../../stores/users'
 import { handleChatLink } from '../chat/links/links'
-import { openChannel } from '../chat/links/openChannel'
+import { openFromChat } from '../chat/links/openChannel'
 import { mentionResolver } from '../chat/rows/buildRows'
 import { parseMarkdown, toSpans } from '../chat/rows/markdown'
 import { useChatTheme } from '../chat/rows/rowEncoder'
@@ -51,7 +51,7 @@ export function ProfileBio({
                     session,
                     openChannel: (id, messageId) => {
                         onLink()
-                        openChannel(id, messageId)
+                        openFromChat(id, messageId)
                     },
                 })
             }

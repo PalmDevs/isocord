@@ -4,7 +4,7 @@ import { useSession } from '../../../core/react'
 import { reactionChipHeight } from '../../../native/NativeIsocordConstants'
 import ReactionsView from '../../../native/ReactionsViewNativeComponent'
 import { handleChatLink } from '../links/links'
-import { openChannel } from '../links/openChannel'
+import { openFromChat } from '../links/openChannel'
 import { reactionRows } from '../rows/buildRows'
 import { useChatTheme } from '../rows/rowEncoder'
 import type { Reaction } from '../../../stores/messages/messageTypes'
@@ -39,7 +39,7 @@ export function ReactionChips({
                     handleChatLink(event.nativeEvent.url, {
                         session,
                         channelId,
-                        openChannel,
+                        openChannel: openFromChat,
                     })
                 }
                 style={size}

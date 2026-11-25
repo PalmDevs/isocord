@@ -28,7 +28,7 @@ import {
     STANDARD_EASING,
 } from '../../design/tokens/motion'
 import { ChatPreview } from '../chat/ChatPreview'
-import { openChannel } from '../chat/links/openChannel'
+import { jumpFromDetails } from '../chat/links/openChannel'
 import { SearchPreviewContext } from './useOpenSearchPreview'
 import type { ReactNode } from 'react'
 
@@ -143,8 +143,7 @@ export function SearchPreviewHost({
             x.set(width)
             setShown(undefined)
         }
-        onDismiss()
-        openChannel(channelId, messageId)
+        jumpFromDetails(channelId, messageId, onDismiss)
     }
 
     // Back closes the preview before anything under it (the last listener added runs first).

@@ -69,6 +69,8 @@ interface LinkContext {
     openPins?: () => void
     /** Search lists: a tapped result or author line opens the result's preview. */
     openResult?: (channelId: string, messageId: string) => void
+    /** Whether links to other channels stack over the chat on screen. True by default. */
+    stack?: boolean
 }
 
 /**
@@ -288,12 +290,17 @@ const messageOf = (
 /**
  * Opens a channel from a mention, message link, reply preview or forward footer.
  * The reference pushes another channel screen (navigationReplace: false, navigateToChannel) that swipes back.
- * Here it opens in a panel stacked over this chat.
- * A stacked chat that links on switches the stacked panel in place.
+ * Here each opens in a panel stacked over what is on screen.
  */
 async function openLinkedChannel(
     link: ChatLink & { kind: 'channel' },
-    { session, channelId, openChannel, scrollToMessage }: LinkContext,
+    {
+        session,
+        channelId,
+        openChannel,
+        scrollToMessage,
+        stack = true,
+    }: LinkContext,
 ): Promise<void> {
     const { channelId: target, messageId } = link
     // An active or archived thread the client does not hold yet is held first, as the Threads tab does.
@@ -311,7 +318,7 @@ async function openLinkedChannel(
     // The chat on screen only sets its params, jumping to the message (navigateToChannel, jumpToReferencedMessage).
     if (target === channelId) {
         if (messageId) scrollToMessage(messageId)
-    } else if (!openStackedChat(target, messageId))
+    } else if (!stack || !openStackedChat(target, messageId))
         // A message preview has no panels to stack on: the channel opens in its tab.
         openChannel(target, messageId)
 }

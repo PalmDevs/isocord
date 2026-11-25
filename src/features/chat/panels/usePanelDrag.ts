@@ -85,7 +85,16 @@ export function usePanelDrag({
     } = chat
     const { x: detailsX, setShown: setDetailsShown } = details
     const { closed: detailsClosed } = details
-    const { x: stackX, setShown: setStackShown, closed: stackClosed } = stack
+    const topStack = stack.topOpen
+    const fallbackStackX = useSharedValue(width)
+    const hasStack = topStack !== undefined
+    const stackX = topStack?.x ?? fallbackStackX
+    const setStackShown = (show: boolean) => {
+        if (topStack) stack.setEntryShown(topStack.key, show)
+    }
+    const stackClosed = () => {
+        if (topStack) stack.closed(topStack.key)
+    }
     const {
         x: createX,
         setShown: setCreateShown,
@@ -96,7 +105,7 @@ export function usePanelDrag({
     const dragsStack = useSharedValue(false)
     const dragsCreate = useSharedValue(false)
     const pan = usePanGesture({
-        enabled: enabled && !details.open && !waitingForRows,
+        enabled: enabled && !details.open && !waitingForRows && !stack.waiting,
         activeOffsetX: [
             open && !detailsOnSwipe ? -width : -PANEL_TOUCH_SLOP,
             PANEL_TOUCH_SLOP,
@@ -114,6 +123,7 @@ export function usePanelDrag({
             dragsStack.set(
                 !dragsDetails.get() &&
                     !dragsCreate.get() &&
+                    hasStack &&
                     stackX.get() < width,
             )
         },
