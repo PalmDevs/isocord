@@ -3,6 +3,7 @@ import { swipeAction, swipeMode } from '../../../native/NativeIsocordConstants'
 import { channelsStore } from '../../../stores/channels/channels'
 import { findMessage, messagesStore } from '../../../stores/messages/messages'
 import { heldMedia } from '../../mediaViewer/store'
+import { composerStore } from '../composer/state/composerStore'
 import { canReact, messageActionGroups, messageSwipeActions } from './actions'
 import { heldFile } from './fileActions'
 import { handleHeldPart } from './heldPart'
@@ -41,8 +42,12 @@ export function handleMessageSwipe(
     )(message)
     if (action === swipeAction.edit && allowed === swipeMode.replyEdit)
         composer.setEditing(message)
-    else if (action === swipeAction.reply && allowed)
-        composer.setReplyTo(message)
+    else if (action === swipeAction.reply && allowed) {
+        const replyingTo = session.get(composerStore).getState().replies[
+            channelId
+        ]?.messageId
+        composer.setReplyTo(replyingTo === messageId ? null : message)
+    }
 }
 
 /**
