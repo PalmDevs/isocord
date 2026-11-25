@@ -1,4 +1,5 @@
 import { FlashList } from '@shopify/flash-list'
+import { useState } from 'react'
 import { useWindowDimensions, View } from 'react-native'
 import { useSharedValue } from 'react-native-reanimated'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
@@ -72,8 +73,14 @@ function MutualsSheet({
     const { friends, guilds } = useProfileMutuals(userId, guildId)
     const { height } = useWindowDimensions()
     const atTop = useSharedValue(true)
+    // SegmentedControlPages: the other tab mounts once the sheet is open, not during its slide.
+    const [opened, setOpened] = useState(false)
+    // The slide waits for the selected list's rows: FlashList mounts them over several commits.
+    const [loaded, setLoaded] = useState(false)
     const listProps = {
         contentContainerStyle: styles.list,
+        // A frame after onLoad: the rows past the viewport render alongside it and mount first.
+        onLoad: () => requestAnimationFrame(() => setLoaded(true)),
         onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) =>
             atTop.set(event.nativeEvent.contentOffset.y <= 1),
         scrollEventThrottle: 16,
@@ -124,6 +131,8 @@ function MutualsSheet({
     })
     return (
         <ActionSheet
+            holdOpen={!loaded}
+            onOpen={() => setOpened(true)}
             header={
                 <View>
                     <BottomSheetTitleHeader
@@ -137,7 +146,11 @@ function MutualsSheet({
                     scrollAtTop={atTop}
                     style={{ height: height * LIST_HEIGHT_RATIO }}
                 >
-                    <TabsPages state={state} style={styles.pages} />
+                    <TabsPages
+                        state={state}
+                        holdNeighbours={!opened}
+                        style={styles.pages}
+                    />
                 </SheetDrag>
             }
         />
