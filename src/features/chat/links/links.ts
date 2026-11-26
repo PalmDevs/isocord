@@ -69,6 +69,8 @@ interface LinkContext {
     openPins?: () => void
     /** Search lists: a tapped result or author line opens the result's preview. */
     openResult?: (channelId: string, messageId: string) => void
+    /** Overrides `toggleRevealed` for a message preview, whose state is separate from the channel's. */
+    toggleRevealed?: (groupId: string) => void
     /** Whether links to other channels stack over the chat on screen. True by default. */
     stack?: boolean
 }
@@ -131,7 +133,8 @@ export function handleChatLink(url: string, context: LinkContext): void {
                 })
             return
         case 'reveal':
-            if (channelId) toggleRevealed(session, channelId, link.groupId)
+            if (context.toggleRevealed) context.toggleRevealed(link.groupId)
+            else if (channelId) toggleRevealed(session, channelId, link.groupId)
             return
         case 'component':
             if (channelId)

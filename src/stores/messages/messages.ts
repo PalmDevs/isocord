@@ -274,24 +274,66 @@ export const messagesStore = defineStore(
             })),
         )
         // MessageStore MESSAGE_DELETE: a deleted revealed message hands the reveal to the next newer one.
+        const nextRevealAfterDelete = (
+            messages: Message[],
+            revealed: string | undefined,
+            ids: Set<string>,
+        ): string | undefined => {
+            if (!revealed || !ids.has(revealed)) return revealed
+            const index = messages.findIndex(message => message.id === revealed)
+            // Newest first: the newer messages come before it.
+            return messages
+                .slice(0, Math.max(index, 0))
+                .reverse()
+                .find(message => !ids.has(message.id))?.id
+        }
         const passReveal = (channelId: string, ids: Set<string>) =>
             store.setState(state => {
                 const channel = state.channels[channelId]
-                const revealed = channel?.revealedId
-                if (!channel || !revealed || !ids.has(revealed)) return state
-                const index = channel.messages.findIndex(
-                    message => message.id === revealed,
-                )
-                // Newest first: the newer messages come before it.
-                const newer = channel.messages
-                    .slice(0, Math.max(index, 0))
-                    .reverse()
-                    .find(message => !ids.has(message.id))
+                const nextChannelReveal =
+                    channel?.revealedId && ids.has(channel.revealedId)
+                        ? nextRevealAfterDelete(
+                              channel.messages,
+                              channel.revealedId,
+                              ids,
+                          )
+                        : channel?.revealedId
+                const shown = state.preview
+                const nextPreviewReveal =
+                    shown?.channelId === channelId &&
+                    shown.revealedId &&
+                    ids.has(shown.revealedId)
+                        ? nextRevealAfterDelete(
+                              shown.messages,
+                              shown.revealedId,
+                              ids,
+                          )
+                        : shown?.revealedId
+                const channelChanged =
+                    channel && nextChannelReveal !== channel.revealedId
+                const previewChanged =
+                    shown && nextPreviewReveal !== shown.revealedId
+                if (!channelChanged && !previewChanged) return state
                 return {
-                    channels: {
-                        ...state.channels,
-                        [channelId]: { ...channel, revealedId: newer?.id },
-                    },
+                    ...(channelChanged
+                        ? {
+                              channels: {
+                                  ...state.channels,
+                                  [channelId]: {
+                                      ...channel,
+                                      revealedId: nextChannelReveal,
+                                  },
+                              },
+                          }
+                        : {}),
+                    ...(previewChanged
+                        ? {
+                              preview: {
+                                  ...shown,
+                                  revealedId: nextPreviewReveal,
+                              },
+                          }
+                        : {}),
                 }
             })
         dispatch.on('MESSAGE_DELETE', ({ id, channel_id }) => {
@@ -454,6 +496,32 @@ function setRevealed(
                 [channelId]: { ...channel, revealedId },
             },
         }
+    })
+}
+
+/** MessageActionCreators.revealMessage: opens a blocked or ignored messages group in the preview, or closes it. */
+export function togglePreviewRevealed(session: Session, groupId: string): void {
+    setPreviewRevealed(session, id => (id === groupId ? undefined : groupId))
+}
+
+/** MessageStore MESSAGE_REVEAL: opens the blocked or ignored messages group that holds a message in the preview. */
+export function revealPreviewMessage(
+    session: Session,
+    messageId: string,
+): void {
+    setPreviewRevealed(session, () => messageId)
+}
+
+function setPreviewRevealed(
+    session: Session,
+    next: (revealedId: string | undefined) => string | undefined,
+): void {
+    session.get(messagesStore).setState(state => {
+        const preview = state.preview
+        if (!preview) return state
+        const revealedId = next(preview.revealedId)
+        if (revealedId === preview.revealedId) return state
+        return { preview: { ...preview, revealedId } }
     })
 }
 

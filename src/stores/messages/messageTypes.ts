@@ -154,6 +154,8 @@ export interface MessagePreview {
     /** Older and newer history may exist on the server: the preview pages through it like the chat does. */
     hasMore: boolean
     hasMoreAfter: boolean
+    /** The blocked or ignored messages group shown open, by its oldest message (revealedMessageId). One at a time. */
+    revealedId?: string
     /** 'missing': the message is gone or cannot be read. */
     error?: 'missing' | 'failed'
 }

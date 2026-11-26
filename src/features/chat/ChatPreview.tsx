@@ -15,13 +15,18 @@ import {
     loadPreview,
     loadPreviewPage,
 } from '../../stores/messages/messagePreviews'
-import { messagesStore } from '../../stores/messages/messages'
+import {
+    messagesStore,
+    revealPreviewMessage,
+    togglePreviewRevealed,
+} from '../../stores/messages/messages'
+import { relationshipsStore } from '../../stores/relationships'
 import { usersStore } from '../../stores/users'
 import { ChatHeader } from './ChatPanel'
 import { handleChatLink } from './links/links'
 import { handleMessageLongPress } from './longPress'
 import { canReact } from './longPress/actions'
-import { buildRows } from './rows/buildRows'
+import { buildRows, hiddenReasonOf } from './rows/buildRows'
 import { encodeRows, useChatTheme } from './rows/rowEncoder'
 
 /** Makes every scroll request of the preview's list distinct. */
@@ -60,6 +65,10 @@ export function ChatPreview({
         guildId ? state.members[guildId] : undefined,
     )
     const users = useSessionStore(usersStore, state => state.users)
+    const relationships = useSessionStore(
+        relationshipsStore,
+        state => state.byId,
+    )
     const preview = useSessionStore(messagesStore, state =>
         state.preview?.channelId === channelId &&
         state.preview.messageId === messageId
@@ -81,8 +90,10 @@ export function ChatPreview({
         flash: true,
     }))
     const scrollTo = (id: string) => {
-        if (!preview?.messages.some(message => message.id === id))
-            return onJump(channelId, id)
+        const target = preview?.messages.find(message => message.id === id)
+        if (!target) return onJump(channelId, id)
+        if (hiddenReasonOf(relationships[target.author.id]))
+            revealPreviewMessage(session, id)
         setScrollTarget({
             scrollKey,
             messageId: id,
@@ -113,6 +124,7 @@ export function ChatPreview({
                           messages: loaded,
                           hasMore: preview.hasMore,
                           hasMoreAfter: preview.hasMoreAfter,
+                          revealedId: preview.revealedId,
                           loading: false,
                           error: false,
                       }
@@ -126,11 +138,23 @@ export function ChatPreview({
                     channel,
                     canReact: message => canReact(session, message),
                     onUnknownChannel: id => unknownChannels.add(id),
+                    hiddenReason: userId =>
+                        hiddenReasonOf(relationships[userId]),
                 },
             ),
         )
         return { rowsJson, unknownChannels }
-    }, [preview, loaded, session, guild, members, users, channels, channel])
+    }, [
+        preview,
+        loaded,
+        session,
+        guild,
+        members,
+        users,
+        channels,
+        channel,
+        relationships,
+    ])
     // A fetched channel lands in the channels store, which rebuilds the rows.
     useEffect(
         () => loadLinkedChannels(session, unknownChannels),
@@ -144,6 +168,7 @@ export function ChatPreview({
             channelId,
             openChannel: onJump,
             scrollToMessage: scrollTo,
+            toggleRevealed: groupId => togglePreviewRevealed(session, groupId),
             stack: false,
         })
     return (

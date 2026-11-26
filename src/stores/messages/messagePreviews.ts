@@ -1,6 +1,7 @@
 import { Endpoint } from '../../core/api/paths'
 import { ApiError } from '../../core/api/rest'
 import { compareSnowflakes } from '../../core/discord/snowflake'
+import { isBlockedOrIgnored, relationshipsStore } from '../relationships'
 import { messagesStore, PAGE_SIZE } from './messages'
 import { aroundEdges, upsertUsers } from './messageWindows'
 import type { Session } from '../../core/session'
@@ -58,6 +59,10 @@ export async function loadPreview(
         upsertUsers(session, messages)
         // As jumpToMessage: more on a side when that side came back full.
         const index = messages.findIndex(message => message.id === messageId)
+        const target = index >= 0 ? messages[index] : undefined
+        const relationship = target
+            ? session.get(relationshipsStore).getState().byId[target.author.id]
+            : undefined
         store.setState({
             preview: {
                 ...preview,
@@ -66,10 +71,11 @@ export async function loadPreview(
                 ...(index >= 0
                     ? aroundEdges(messages, index)
                     : { hasMore: false, hasMoreAfter: false }),
+                ...(isBlockedOrIgnored(relationship)
+                    ? { revealedId: messageId }
+                    : {}),
                 // The API answers with the messages near a deleted one as well.
-                error: messages.some(message => message.id === messageId)
-                    ? undefined
-                    : 'missing',
+                error: target ? undefined : 'missing',
             },
         })
     } catch (error) {
