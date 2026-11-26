@@ -1,5 +1,6 @@
 package me.palmdevs.isocord.share
 
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -42,12 +43,19 @@ object SharedContentInbox {
     val resolver = context.contentResolver
     val files =
       streamUris(intent).mapNotNull { uri ->
+        if (!isExternalContentUri(uri, context.packageName)) {
+          Log.w(TAG, "rejected shared uri: ${uri.scheme}://${uri.authority}")
+          return@mapNotNull null
+        }
         // A uri the sender gave no grant for is left out, not the whole share.
         try {
           context.grantUriPermission(context.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
           SharedFile(uri.toString(), displayName(resolver, uri), resolver.getType(uri))
         } catch (e: SecurityException) {
           Log.w(TAG, "shared file unreadable: ${e.javaClass.simpleName}")
+          null
+        } catch (e: IllegalArgumentException) {
+          Log.w(TAG, "shared file invalid: ${e.javaClass.simpleName}")
           null
         }
       }
@@ -58,6 +66,13 @@ object SharedContentInbox {
   private fun streamUris(intent: Intent): List<Uri> =
     IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
       ?: listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+
+  /** Rejects non-content URIs and the app's own FileProvider authorities. */
+  private fun isExternalContentUri(uri: Uri, packageName: String): Boolean {
+    if (uri.scheme != ContentResolver.SCHEME_CONTENT) return false
+    val authority = uri.authority ?: return false
+    return authority != packageName && !authority.startsWith("$packageName.")
+  }
 
   /** Activities started from recents replay their old intent. */
   fun isReplay(intent: Intent?): Boolean =
