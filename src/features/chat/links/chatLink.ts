@@ -1,3 +1,4 @@
+import { parseDiscordChannelUrl } from '../../../core/discord/channelUrl'
 import {
     burstPart,
     dmGuild,
@@ -275,7 +276,16 @@ function mediaOf(
  * undefined.
  */
 export function parseChatLink(url: string): ChatLink | undefined {
-    if (!url.startsWith(linkScheme)) return { kind: 'web', url }
+    if (!url.startsWith(linkScheme)) {
+        const channel = parseDiscordChannelUrl(url)
+        if (channel?.channelId)
+            return {
+                kind: 'channel',
+                channelId: channel.channelId,
+                messageId: channel.messageId,
+            }
+        return { kind: 'web', url }
+    }
     const [path = '', query] = url.slice(linkScheme.length).split('?', 2)
     const [kind = '', ...parts] = path.split('/')
     const [first, second, third] = parts

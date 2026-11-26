@@ -4,21 +4,26 @@ import {
     StackActions,
     useNavigation,
 } from '@react-navigation/native'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useStore } from 'zustand'
 import { endMainWait } from '../../app/startupTrace'
 import { accountsStore, currentAccount } from '../../core/accounts'
+import { parseDiscordChannelUrl } from '../../core/discord/channelUrl'
 import { logger } from '../../core/log'
 import { useSession, useSessionStore } from '../../core/react'
 import { StatusAvatar } from '../../design/components/avatars/StatusAvatar'
 import { Badge } from '../../design/components/Badge'
+import { showToast } from '../../design/components/overlays/toastStore'
 import { Text } from '../../design/components/Text'
 import { ThemedGradient } from '../../design/components/ThemedGradient'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
+import { dmGuild } from '../../native/NativeIsocordConstants'
 import { channelsStore, isPrivate } from '../../stores/channels/channels'
+import { holdLinkedChannel } from '../../stores/channels/linkedChannels'
+import { guildsStore } from '../../stores/guilds'
 import { presencesStore } from '../../stores/presences'
 import { readStatesStore } from '../../stores/readStates'
 import { parseChatLink } from '../chat/links/chatLink'
@@ -295,18 +300,52 @@ function ChannelOpener() {
     useSharedContent(content => openShareScreen({ kind: 'share', content }))
     // A tapped system notification opens the app on isocord://channel/<guildId|@me>/<channelId>/<messageId>
     // (MessageNotifier.kt), with the app already running or not. After the effect above, so the opener is set.
+    // Android App Links also deliver Discord channel/message URLs here.
+    const openerDeps = useRef({ session, navigate })
+    openerDeps.current = { session, navigate }
     useEffect(() => {
-        const open = (url: string | null | undefined) => {
+        const open = async (url: string | null | undefined) => {
+            if (!url) return
+            const { session: currentSession, navigate: go } =
+                openerDeps.current
             // The message is left out for a channel or a post (alerts in NotificationContent.kt).
-            const link = url ? parseChatLink(url) : undefined
-            if (url) diag.debug(`app link kind=${link?.kind}`)
-            if (link?.kind === 'channel')
+            const link = parseChatLink(url)
+            diag.debug(`app link kind=${link?.kind}`)
+            if (link?.kind === 'channel') {
+                if (!(await holdLinkedChannel(currentSession, link.channelId))) {
+                    showToast({
+                        content: t('chat.mention.noAccess'),
+                        key: 'no-access',
+                    })
+                    return
+                }
                 openChannel(link.channelId, link.messageId)
+                return
+            }
+            const discordLink = parseDiscordChannelUrl(url)
+            if (!discordLink) return
+            if (discordLink.guildId === dmGuild) {
+                go('main', { screen: 'messages' })
+            } else if (
+                currentSession.get(guildsStore).getState().guilds[
+                    discordLink.guildId
+                ]
+            ) {
+                currentSession.get(serversUiStore).setState({
+                    selectedGuildId: discordLink.guildId,
+                })
+                go('main', { screen: 'servers' })
+            } else {
+                showToast({
+                    content: t('chat.mention.noAccess'),
+                    key: 'no-access',
+                })
+            }
         }
         void Linking.getInitialURL().then(open)
-        const subscription = Linking.addEventListener('url', event =>
-            open(event.url),
-        )
+        const subscription = Linking.addEventListener('url', event => {
+            void open(event.url)
+        })
         return () => subscription.remove()
     }, [])
     return null
