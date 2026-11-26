@@ -77,13 +77,18 @@ function CategoryRow({
     )
     // The chevron flips on the frame of the tap; rebuilding the list (and saving) follows a frame later.
     const [shown, setShown] = useState(collapsed)
-    useEffect(() => setShown(collapsed), [collapsed])
+    const shownRef = useRef(collapsed)
+    useEffect(() => {
+        shownRef.current = collapsed
+        setShown(collapsed)
+    }, [collapsed])
     return (
         <RipplePressable
             accessibilityRole="button"
             accessibilityState={{ expanded: !shown }}
             onPress={() => {
-                const next = !shown
+                const next = !shownRef.current
+                shownRef.current = next
                 setShown(next)
                 requestAnimationFrame(() =>
                     setCategoryCollapsed(session, guildId, id, next),

@@ -82,6 +82,11 @@ export interface SettingsState extends UserSettings {
      * They stay applied over the updates that arrive meanwhile.
      */
     pendingChannelFlags?: Record<string, Record<string, number>>
+    /**
+     * Category collapse changes not saved yet, by guild then category.
+     * Kept over incoming updates until the save settles.
+     */
+    pendingCollapsedCategories?: Record<string, Record<string, boolean>>
 }
 
 /** Applies a base64 PreloadedUserSettings message, whole or partial, to the store. */
@@ -130,15 +135,27 @@ function sameFolders(a: GuildFolder[], b: GuildFolder[]): boolean {
     )
 }
 
-/** Lays opt-in changes not saved yet over freshly received settings. */
-function withPendingFlags(
+/** Lays unsaved opt-in and collapse changes over freshly received settings. */
+function withPendingSettings(
     settings: GuildSettings,
-    pending: Record<string, number> | undefined,
+    pendingFlags: Record<string, number> | undefined,
+    pendingCollapsed: Record<string, boolean> | undefined,
 ): GuildSettings {
-    if (!pending) return settings
+    if (!pendingFlags && !pendingCollapsed) return settings
+    let collapsedCategories = settings.collapsedCategories
+    if (pendingCollapsed) {
+        collapsedCategories = { ...collapsedCategories }
+        for (const [id, collapsed] of Object.entries(pendingCollapsed)) {
+            if (collapsed) collapsedCategories[id] = true
+            else delete collapsedCategories[id]
+        }
+    }
     return {
         ...settings,
-        channelFlags: { ...settings.channelFlags, ...pending },
+        ...(pendingFlags
+            ? { channelFlags: { ...settings.channelFlags, ...pendingFlags } }
+            : {}),
+        collapsedCategories,
     }
 }
 
@@ -209,9 +226,15 @@ export const settingsStore = defineStore(
             // A partial list holds only the entries changed since the version held: merge it onto those.
             const guildSettings: Record<string, GuildSettings> =
                 versioned?.partial ? { ...store.getState().guildSettings } : {}
+            const { pendingChannelFlags, pendingCollapsedCategories } =
+                store.getState()
             for (const entry of versioned?.entries ?? []) {
-                guildSettings[entry.guild_id ?? '@me'] =
-                    parseGuildSettings(entry)
+                const key = entry.guild_id ?? '@me'
+                guildSettings[key] = withPendingSettings(
+                    parseGuildSettings(entry),
+                    pendingChannelFlags?.[key],
+                    pendingCollapsedCategories?.[key],
+                )
             }
             if (versioned?.partial) {
                 // Entries of guilds the user has left are not worth keeping.
@@ -238,25 +261,29 @@ export const settingsStore = defineStore(
             store.setState(readAccountFlags(update.flags)),
         )
         dispatch.on('USER_GUILD_SETTINGS_UPDATE', entry =>
-            store.setState(state => ({
-                guildSettings: {
-                    ...state.guildSettings,
-                    [entry.guild_id ?? '@me']: withPendingFlags(
-                        parseGuildSettings(entry),
-                        state.pendingChannelFlags?.[entry.guild_id ?? '@me'],
-                    ),
-                },
-                // A version only moves on top of one held.
-                ...(state.guildSettingsVersion !== undefined &&
-                typeof entry.version === 'number'
-                    ? {
-                          guildSettingsVersion: Math.max(
-                              state.guildSettingsVersion,
-                              entry.version,
-                          ),
-                      }
-                    : {}),
-            })),
+            store.setState(state => {
+                const key = entry.guild_id ?? '@me'
+                return {
+                    guildSettings: {
+                        ...state.guildSettings,
+                        [key]: withPendingSettings(
+                            parseGuildSettings(entry),
+                            state.pendingChannelFlags?.[key],
+                            state.pendingCollapsedCategories?.[key],
+                        ),
+                    },
+                    // A version only moves on top of one held.
+                    ...(state.guildSettingsVersion !== undefined &&
+                    typeof entry.version === 'number'
+                        ? {
+                              guildSettingsVersion: Math.max(
+                                  state.guildSettingsVersion,
+                                  entry.version,
+                              ),
+                          }
+                        : {}),
+                }
+            }),
         )
         session.registerClientState(() => {
             const { guildSettingsVersion } = store.getState()

@@ -1,4 +1,5 @@
 import { Endpoint } from '../../core/api/paths'
+import { ApiError, HTTP_TOO_MANY_REQUESTS } from '../../core/api/rest'
 import {
     ChannelNotificationSettingsFlags,
     GuildNotificationSettingsFlags,
@@ -30,6 +31,121 @@ import type {
     SettingDescriptor,
 } from './settingsProto'
 
+/** Coalesces rapid category taps and in-flight updates (UserGuildSettingsManager). */
+const COLLAPSE_SAVE_DELAY_MS = 500
+const COLLAPSE_SAVE_RETRIES = 2
+const COLLAPSE_RETRY_BASE_MS = 1000
+const COLLAPSE_RETRY_MAX_MS = 15_000
+const COLLAPSE_MAX_ATTEMPTS = 5
+const MILLIS_PER_SECOND = 1000
+const HTTP_SERVER_ERROR = 500
+
+const collapseSaveTimers = new WeakMap<
+    Session,
+    Map<string, ReturnType<typeof setTimeout>>
+>()
+const collapseSaveInFlight = new WeakMap<Session, Set<string>>()
+
+function scheduleCollapseSave(
+    session: Session,
+    guildId: string,
+    delayMs: number,
+    attempt = 0,
+): void {
+    let timers = collapseSaveTimers.get(session)
+    if (!timers) collapseSaveTimers.set(session, (timers = new Map()))
+    clearTimeout(timers.get(guildId))
+    timers.set(
+        guildId,
+        setTimeout(() => {
+            timers?.delete(guildId)
+            saveCollapsedCategories(session, guildId, attempt)
+        }, delayMs),
+    )
+}
+
+function clearPendingCollapsed(
+    session: Session,
+    guildId: string,
+    sent: Record<string, boolean>,
+): void {
+    session.get(settingsStore).setState(state => {
+        const pending = { ...state.pendingCollapsedCategories?.[guildId] }
+        for (const [id, collapsed] of Object.entries(sent))
+            if (pending[id] === collapsed) delete pending[id]
+        return {
+            pendingCollapsedCategories: {
+                ...state.pendingCollapsedCategories,
+                [guildId]: pending,
+            },
+        }
+    })
+}
+
+function isRetryableCollapseError(error: unknown): boolean {
+    if (!(error instanceof ApiError)) return true
+    return (
+        error.status === HTTP_TOO_MANY_REQUESTS ||
+        error.status >= HTTP_SERVER_ERROR
+    )
+}
+
+function collapseRetryDelay(error: unknown, attempt: number): number {
+    if (error instanceof ApiError && error.retryAfter != null)
+        return Math.max(
+            error.retryAfter * MILLIS_PER_SECOND,
+            COLLAPSE_SAVE_DELAY_MS,
+        )
+    return Math.min(COLLAPSE_RETRY_BASE_MS * 2 ** attempt, COLLAPSE_RETRY_MAX_MS)
+}
+
+function saveCollapsedCategories(
+    session: Session,
+    guildId: string,
+    attempt = 0,
+): void {
+    let inFlight = collapseSaveInFlight.get(session)
+    if (inFlight?.has(guildId)) return
+    const sent = session.get(settingsStore).getState()
+        .pendingCollapsedCategories?.[guildId]
+    if (!sent || Object.keys(sent).length === 0) return
+    if (!inFlight) collapseSaveInFlight.set(session, (inFlight = new Set()))
+    inFlight.add(guildId)
+
+    const channel_overrides = Object.fromEntries(
+        Object.entries(sent).map(([id, collapsed]) => [id, { collapsed }]),
+    )
+    session.rest
+        .patch(Endpoint.myGuildSettings(guildId), {
+            body: { channel_overrides },
+            retries: COLLAPSE_SAVE_RETRIES,
+        })
+        .then(() => {
+            inFlight.delete(guildId)
+            clearPendingCollapsed(session, guildId, sent)
+            const remaining = session.get(settingsStore).getState()
+                .pendingCollapsedCategories?.[guildId]
+            if (remaining && Object.keys(remaining).length > 0)
+                scheduleCollapseSave(session, guildId, COLLAPSE_SAVE_DELAY_MS)
+        })
+        .catch(error => {
+            inFlight.delete(guildId)
+            if (
+                isRetryableCollapseError(error) &&
+                attempt < COLLAPSE_MAX_ATTEMPTS
+            ) {
+                scheduleCollapseSave(
+                    session,
+                    guildId,
+                    collapseRetryDelay(error, attempt),
+                    attempt + 1,
+                )
+                return
+            }
+            clearPendingCollapsed(session, guildId, sent)
+        })
+}
+
 /** Collapses or expands a category, optimistically, the way the reference client persists it. */
 export function setCategoryCollapsed(
     session: Session,
@@ -50,13 +166,16 @@ export function setCategoryCollapsed(
                 ...state.guildSettings,
                 [guildId]: { ...current, collapsedCategories },
             },
+            pendingCollapsedCategories: {
+                ...state.pendingCollapsedCategories,
+                [guildId]: {
+                    ...state.pendingCollapsedCategories?.[guildId],
+                    [categoryId]: collapsed,
+                },
+            },
         }
     })
-    session.rest
-        .patch(Endpoint.myGuildSettings(guildId), {
-            body: { channel_overrides: { [categoryId]: { collapsed } } },
-        })
-        .catch(() => {})
+    scheduleCollapseSave(session, guildId, COLLAPSE_SAVE_DELAY_MS)
 }
 
 /**
