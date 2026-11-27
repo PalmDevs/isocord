@@ -78,6 +78,8 @@ function rejectedFields(errors: unknown, path = ''): string[] {
 const RETRY_STATUSES = new Set([502, 504, 507, 598, 599, 522, 523, 524])
 /** Too Many Requests: a rate limit. */
 export const HTTP_TOO_MANY_REQUESTS = 429
+/** First status of the 5xx server errors. */
+export const HTTP_SERVER_ERROR = 500
 /** HTTPUtils `isRateLimitedStatus`. */
 const RATE_LIMIT_STATUSES = new Set([HTTP_TOO_MANY_REQUESTS, 503])
 
@@ -311,7 +313,7 @@ export class RestClient {
             ...rejectedFields(data?.errors),
         ].filter(Boolean)
         const line = detail.length ? `${status} (${detail.join(', ')})` : status
-        if (response.status >= 500) log.error(line)
+        if (response.status >= HTTP_SERVER_ERROR) log.error(line)
         else log.warn(line)
         throw new ApiError(
             response.status,

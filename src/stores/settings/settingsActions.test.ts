@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, mock } from 'bun:test'
+import { afterEach, describe, expect, it, jest, mock } from 'bun:test'
 import { stubNativeModules } from '../../features/chat/rows/nativeStubs'
 import type { Session } from '../../core/session'
 
@@ -47,12 +47,25 @@ function createTestSession(
     }
 }
 
+/** Past the save delay, and past the first retry backoff. */
+const SAVE_DELAY_MS = 600
+const RETRY_DELAY_MS = 1000
+
+/** Moves the fake clock, then lets the settled PATCH promise run its handlers. */
+async function advance(ms: number) {
+    jest.advanceTimersByTime(ms)
+    await Promise.resolve()
+    await Promise.resolve()
+}
+
 describe('setCategoryCollapsed', () => {
     afterEach(() => {
         mock.restore()
+        jest.useRealTimers()
     })
 
     it('applies optimistically and coalesces rapid toggles into one PATCH', async () => {
+        jest.useFakeTimers()
         const { session } = createTestSession(async () => ({}))
         const store = session.get(settingsStore)
 
@@ -69,7 +82,7 @@ describe('setCategoryCollapsed', () => {
         })
         expect(session.rest.patch).toHaveBeenCalledTimes(0)
 
-        await new Promise(resolve => setTimeout(resolve, 600))
+        await advance(SAVE_DELAY_MS)
 
         expect(session.rest.patch).toHaveBeenCalledTimes(1)
         expect(session.rest.patch).toHaveBeenCalledWith(
@@ -81,13 +94,13 @@ describe('setCategoryCollapsed', () => {
                         c2: { collapsed: true },
                     },
                 },
-                retries: 2,
             },
         )
         expect(store.getState().pendingCollapsedCategories?.g1).toEqual({})
     })
 
     it('keeps pending collapse state when stale USER_GUILD_SETTINGS_UPDATE arrives', async () => {
+        jest.useFakeTimers()
         const { session, emit } = createTestSession(async () => ({}))
         const store = session.get(settingsStore)
 
@@ -101,10 +114,11 @@ describe('setCategoryCollapsed', () => {
             c1: true,
         })
 
-        await new Promise(resolve => setTimeout(resolve, 600))
+        await advance(SAVE_DELAY_MS)
     })
 
     it('retries failed requests while keeping optimistic state', async () => {
+        jest.useFakeTimers()
         let calls = 0
         const { session } = createTestSession(async () => {
             calls++
@@ -115,7 +129,7 @@ describe('setCategoryCollapsed', () => {
         const store = session.get(settingsStore)
 
         setCategoryCollapsed(session, 'g1', 'c1', true)
-        await new Promise(resolve => setTimeout(resolve, 600))
+        await advance(SAVE_DELAY_MS)
 
         expect(calls).toBe(1)
         expect(store.getState().guildSettings.g1?.collapsedCategories).toEqual({
@@ -125,7 +139,7 @@ describe('setCategoryCollapsed', () => {
             c1: true,
         })
 
-        await new Promise(resolve => setTimeout(resolve, 600))
+        await advance(RETRY_DELAY_MS)
 
         expect(calls).toBe(2)
         expect(store.getState().pendingCollapsedCategories?.g1).toEqual({})

@@ -1,5 +1,9 @@
 import { Endpoint } from '../../core/api/paths'
-import { ApiError, HTTP_TOO_MANY_REQUESTS } from '../../core/api/rest'
+import {
+    ApiError,
+    HTTP_SERVER_ERROR,
+    HTTP_TOO_MANY_REQUESTS,
+} from '../../core/api/rest'
 import { GuildMemberFlags } from '../../core/discord/guild'
 import {
     ChannelNotificationSettingsFlags,
@@ -13,6 +17,7 @@ import {
     withoutField,
     writeBytesField,
 } from '../../core/protobuf'
+import { SECOND } from '../../core/time'
 import { emitPresenceUpdate } from '../selfPresence'
 import { isOptInEnabled, isOptInEnabledForGuild } from '../unreadPolicy'
 import { updateGuildSettings } from './notificationActions'
@@ -33,14 +38,14 @@ import type {
     SettingDescriptor,
 } from './settingsProto'
 
-/** Coalesces rapid category taps and in-flight updates (UserGuildSettingsManager). */
+/**
+ * Coalesces rapid category taps and in-flight updates (UserGuildSettingsManager). A failed save is
+ * retried here with backoff, so the REST call asks for no retries of its own.
+ */
 const COLLAPSE_SAVE_DELAY_MS = 500
-const COLLAPSE_SAVE_RETRIES = 2
 const COLLAPSE_RETRY_BASE_MS = 1000
 const COLLAPSE_RETRY_MAX_MS = 15_000
 const COLLAPSE_MAX_ATTEMPTS = 5
-const MILLIS_PER_SECOND = 1000
-const HTTP_SERVER_ERROR = 500
 
 const collapseSaveTimers = new WeakMap<
     Session,
@@ -94,11 +99,11 @@ function isRetryableCollapseError(error: unknown): boolean {
 
 function collapseRetryDelay(error: unknown, attempt: number): number {
     if (error instanceof ApiError && error.retryAfter != null)
-        return Math.max(
-            error.retryAfter * MILLIS_PER_SECOND,
-            COLLAPSE_SAVE_DELAY_MS,
-        )
-    return Math.min(COLLAPSE_RETRY_BASE_MS * 2 ** attempt, COLLAPSE_RETRY_MAX_MS)
+        return Math.max(error.retryAfter * SECOND, COLLAPSE_SAVE_DELAY_MS)
+    return Math.min(
+        COLLAPSE_RETRY_BASE_MS * 2 ** attempt,
+        COLLAPSE_RETRY_MAX_MS,
+    )
 }
 
 function saveCollapsedCategories(
@@ -120,7 +125,6 @@ function saveCollapsedCategories(
     session.rest
         .patch(Endpoint.myGuildSettings(guildId), {
             body: { channel_overrides },
-            retries: COLLAPSE_SAVE_RETRIES,
         })
         .then(() => {
             inFlight.delete(guildId)
