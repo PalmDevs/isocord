@@ -1,4 +1,4 @@
-import native from '../native/NativeIsocordTrace'
+import native from '../native/IsocordTrace'
 import { deviceStorage } from './storage'
 
 /** A timed section: start and duration in ms on `performance.now()`'s clock. */

@@ -1,5 +1,5 @@
 import { createStore } from 'zustand/vanilla'
-import native from '../../native/NativeIsocordFontScale'
+import native from '../../native/IsocordFontScale'
 
 /** UserSettingsConstants' FontScales: the zoom levels the slider steps through. */
 export const FONT_SCALES = [0.75, 0.875, 0.9375, 1, 1.125, 1.25, 1.5, 1.75, 2]

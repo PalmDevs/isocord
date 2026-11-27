@@ -1,0 +1,74 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["isocord"],
+  "ios": {
+    "iosModuleName": "NitroIsocord"
+  },
+  "android": {
+    "androidNamespace": ["isocord"],
+    "androidCxxLibName": "NitroIsocord"
+  },
+  "autolinking": {
+    "IsocordBack": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordBack"
+      }
+    },
+    "IsocordConstants": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordConstants"
+      }
+    },
+    "IsocordCookies": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordCookies"
+      }
+    },
+    "IsocordExpressionFlight": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordExpressionFlight"
+      }
+    },
+    "IsocordFontScale": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordFontScale"
+      }
+    },
+    "IsocordGateway": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordGateway"
+      }
+    },
+    "IsocordNotifications": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordNotifications"
+      }
+    },
+    "IsocordShare": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordShare"
+      }
+    },
+    "IsocordTrace": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordTrace"
+      }
+    },
+    "IsocordUploader": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordUploader"
+      }
+    }
+  },
+  "ignorePaths": ["**/node_modules", "android", "scripts", "patches"]
+}

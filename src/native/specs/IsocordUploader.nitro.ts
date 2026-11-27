@@ -1,5 +1,4 @@
-import { TurboModuleRegistry } from 'react-native'
-import type { CodegenTypes, TurboModule } from 'react-native'
+import type { HybridObject } from 'react-native-nitro-modules'
 
 export interface ProgressEvent {
     id: string
@@ -32,7 +31,7 @@ export interface PreparedFile {
     compressed: boolean
 }
 
-export interface Spec extends TurboModule {
+export interface IsocordUploader extends HybridObject<{ android: 'kotlin' }> {
     /**
      * Reads the file's name, size and type, and re-encodes it when needed: HEIC to JPEG, and images
      * or videos larger than `maxBytes` scaled down.
@@ -44,7 +43,7 @@ export interface Spec extends TurboModule {
     ): Promise<PreparedFile>
     /**
      * Streams the file to a signed Google Cloud Storage `uploadUrl` in resumable chunks, checking the
-     * committed offset and retrying after network errors. Progress arrives on `onProgress`.
+     * committed offset and retrying after network errors. Progress arrives via `onProgress`.
      */
     upload(
         id: string,
@@ -57,7 +56,5 @@ export interface Spec extends TurboModule {
     cancel(id: string): void
     /** Removes a compressed copy made by `prepare`. Other uris are left alone. */
     deleteFile(uri: string): void
-    readonly onProgress: CodegenTypes.EventEmitter<ProgressEvent>
+    onProgress(listener: (event: ProgressEvent) => void): () => void
 }
-
-export default TurboModuleRegistry.getEnforcing<Spec>('IsocordUploader')

@@ -3,7 +3,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { Button } from '../../design/components/buttons/Button'
 import { Text } from '../../design/components/Text'
 import { t } from '../../i18n'
-import { splashContentNativeId } from '../../native/NativeIsocordConstants'
+import { splashContentNativeId } from '../../native/IsocordConstants'
 import type { AuthScreenProps } from './navigation'
 
 const backgrounds = {

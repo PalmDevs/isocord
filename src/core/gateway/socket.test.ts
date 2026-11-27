@@ -9,9 +9,9 @@ await stubNativeModules()
 /** IDENTIFY payloads handed to native code, and whether it takes them. */
 const prepared: Array<{ socketId: number; payload: string }> = []
 let nativeTakes = true
-mock.module('../../native/NativeIsocordCompression', () => ({
+mock.module('../../native/IsocordGateway', () => ({
     default: {
-        getConstants: () => ({ supportsZstd: true }),
+        supportsZstd: true,
         enableZstdStreamSupport: () => {},
         disableZstdStreamSupport: () => {},
         prepareIdentify: (socketId: number, payload: string) => {

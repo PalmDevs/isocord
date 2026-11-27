@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { View } from 'react-native'
 import { useSession } from '../../../core/react'
-import { reactionChipHeight } from '../../../native/NativeIsocordConstants'
+import { reactionChipHeight } from '../../../native/IsocordConstants'
 import ReactionsView from '../../../native/ReactionsViewNativeComponent'
 import { parseChatLink } from '../links/chatLink'
 import { handleChatLink } from '../links/links'

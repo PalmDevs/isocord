@@ -7,7 +7,7 @@ import { RipplePressable } from '../../../design/components/buttons/RipplePressa
 import { Emoji } from '../../../design/components/Emoji'
 import { Text } from '../../../design/components/Text'
 import { t } from '../../../i18n'
-import { expressionGrid } from '../../../native/NativeIsocordConstants'
+import { expressionGrid } from '../../../native/IsocordConstants'
 import { channelsStore } from '../../../stores/channels/channels'
 import { expressionsStore } from '../../../stores/expressions'
 import { guildsStore } from '../../../stores/guilds'

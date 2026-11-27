@@ -18,18 +18,16 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.internal.featureflags.ReactNativeFeatureFlags
 import com.facebook.react.internal.featureflags.ReactNativeFeatureFlagsOverrides_RNOSS_Stable_Android
 import com.facebook.react.internal.featureflags.ReactNativeFeatureFlagsProvider
+import com.margelo.nitro.JNIOnLoad
+import com.margelo.nitro.isocord.NitroIsocordOnLoad
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import me.palmdevs.isocord.chat.ChatPackage
-import me.palmdevs.isocord.core.ConstantsPackage
-import me.palmdevs.isocord.core.CorePackage
 import me.palmdevs.isocord.core.FontScale
 import me.palmdevs.isocord.core.TwemojiFonts
 import me.palmdevs.isocord.input.ChatInputPackage
 import me.palmdevs.isocord.network.IsocordNetwork
-import me.palmdevs.isocord.notifications.NotificationsPackage
-import me.palmdevs.isocord.upload.UploaderPackage
 
 private const val TAG = "IsocordStartup"
 
@@ -44,10 +42,6 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           add(ChatPackage())
           add(ChatInputPackage())
-          add(UploaderPackage())
-          add(NotificationsPackage())
-          add(ConstantsPackage())
-          add(CorePackage())
         },
       // Expo defaults to its own virtual entry, which only Expo CLI serves. This app uses plain Metro.
       jsMainModulePath = "index",
@@ -66,6 +60,8 @@ class MainApplication : Application(), ReactApplication {
     IsocordNetwork.install(this)
     TwemojiFonts.registerReactFonts(assets)
     loadReactNative(this)
+    JNIOnLoad.initializeNativeNitro()
+    NitroIsocordOnLoad.initializeNative()
     if (BuildConfig.DISCORD_MOUNTING_FLAGS) {
       // Flags read before this keep their stable value, so they are logged.
       ReactNativeFeatureFlags.dangerouslyForceOverride(DiscordMountingFlags)?.let {

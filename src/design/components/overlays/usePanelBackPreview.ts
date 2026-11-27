@@ -2,13 +2,13 @@ import { useEffect, useRef } from 'react'
 import { DeviceEventEmitter } from 'react-native'
 import { useSharedValue, withTiming } from 'react-native-reanimated'
 import { scheduleOnUI } from 'react-native-worklets'
-import NativeIsocordBack from '../../../native/NativeIsocordBack'
+import IsocordBack from '../../../native/IsocordBack'
 import {
     ANDROID_PREDICTIVE_BACK_INPUT_TIMING,
     SWIPE_RELEASE_TIMING,
 } from '../../tokens/motion'
 import type { SharedValue } from 'react-native-reanimated'
-import type { BackPreviewFrame, Spec } from '../../../native/NativeIsocordBack'
+import type { BackPreviewFrame } from '../../../native/IsocordBack'
 
 const DIRECT_PANEL_BACK_TRAVEL = 0
 const MAX_PANEL_BACK_TRAVEL = 0.25
@@ -17,7 +17,7 @@ const HARDWARE_BACK_EVENT = 'hardwareBackPress'
 const previewListeners = new Map<string, (frame: BackPreviewFrame) => void>()
 let nextOwner = 0
 let dispatchUsers = 0
-let subscription: ReturnType<Spec['onBackPreview']> | undefined
+let unsubscribe: (() => void) | undefined
 
 function easeOutCubic(t: number) {
     return 1 - (1 - t) ** 3
@@ -31,7 +31,7 @@ export function watchBackPreview(
     overlay: boolean,
     listener: (frame: BackPreviewFrame) => void,
 ) {
-    const back = NativeIsocordBack
+    const back = IsocordBack
     if (!back) return
     const owner = String(++nextOwner)
     previewListeners.set(owner, listener)
@@ -45,9 +45,9 @@ export function watchBackPreview(
 /** Routes commits that arrive after the preview owner unmounts. */
 export function usePanelBackEvents() {
     useEffect(() => {
-        if (!NativeIsocordBack) return
+        if (!IsocordBack) return
         if (dispatchUsers++ === 0) {
-            subscription = NativeIsocordBack.onBackPreview(frame => {
+            unsubscribe = IsocordBack.onBackPreview(frame => {
                 const listener = previewListeners.get(frame.owner)
                 if (listener) listener(frame)
                 else if (frame.committed) dispatchBackPress()
@@ -55,8 +55,8 @@ export function usePanelBackEvents() {
         }
         return () => {
             if (--dispatchUsers === 0) {
-                subscription?.remove()
-                subscription = undefined
+                unsubscribe?.()
+                unsubscribe = undefined
             }
         }
     }, [])

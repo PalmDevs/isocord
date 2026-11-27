@@ -1,4 +1,4 @@
-import type { SharedContent } from '../../native/NativeIsocordShare'
+import type { SharedContent } from '../../native/IsocordShare'
 import type { Message } from '../../stores/readStates'
 
 /** What the share screen sends: a message to forward (ForwardModal), or what another app shared (ShareScreen). */

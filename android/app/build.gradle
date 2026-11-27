@@ -83,6 +83,17 @@ composeCompiler {
 android {
     buildFeatures {
         compose true
+        prefab true
+    }
+    sourceSets {
+        main {
+            java.srcDirs += ["${rootDir}/../nitrogen/generated/android/kotlin"]
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path "../CMakeLists.txt"
+        }
     }
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -109,6 +120,11 @@ android {
         versionName "1.0"
         // Discord's mounting-mode flags (MainApplication.kt), for A/B traces. `-PdiscordMountingFlags=true` turns them on.
         buildConfigField "boolean", "DISCORD_MOUNTING_FLAGS", project.property("discordMountingFlags")
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+            }
+        }
     }
     signingConfigs {
         debug {
@@ -139,11 +155,11 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0"
     // Restarts the app after a font scale change, as the reference does.
     implementation "com.jakewharton:process-phoenix:3.0.0"
-    // Gateway zstd-stream decompression on the WebSocket's reader thread (CompressionModule).
+    // Gateway zstd-stream decompression on the WebSocket's reader thread (HybridIsocordGateway).
     implementation("com.squareup.zstd:zstd-kmp:0.4.0")
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    // Predictive Back progress callbacks used by BackModule.
+    // Predictive Back progress callbacks used by HybridIsocordBack.
     implementation("androidx.activity:activity:1.12.4")
     // Launch splash, held until the first React frame (MainActivity).
     implementation("androidx.core:core-splashscreen:1.2.0")

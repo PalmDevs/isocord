@@ -3,9 +3,6 @@ package me.palmdevs.isocord.core
 import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
-import com.facebook.react.bridge.ReactApplicationContext
-import com.jakewharton.processphoenix.ProcessPhoenix
-import me.palmdevs.isocord.specs.NativeIsocordFontScaleSpec
 
 /**
  * The app's own font scale, applied on top of the system one (pf.a in the reference). Everything sizes text in sp,
@@ -35,22 +32,5 @@ object FontScale {
 
   internal fun save(context: Context, scale: Float) {
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putFloat(KEY, scale).commit()
-  }
-}
-
-/** The reference's FontModule: JS reads the saved scale and saves a new one, which restarts the app. */
-class FontScaleModule(context: ReactApplicationContext) : NativeIsocordFontScaleSpec(context) {
-  override fun getName() = NAME
-
-  override fun getCustomFontScale(): Double = FontScale.custom(reactApplicationContext).toDouble()
-
-  // FontModule.setCustomFontScale: persist, then restart so every cached metric picks up the new scale.
-  override fun setCustomFontScale(scale: Double) {
-    FontScale.save(reactApplicationContext, scale.toFloat())
-    ProcessPhoenix.triggerRebirth(reactApplicationContext)
-  }
-
-  companion object {
-    const val NAME = "IsocordFontScale"
   }
 }

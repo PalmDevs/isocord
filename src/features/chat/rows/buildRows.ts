@@ -16,7 +16,7 @@ import {
     cdnSize,
 } from '../../../design/components/avatars/avatarUrl'
 import { t } from '../../../i18n'
-import { avatarSize } from '../../../native/NativeIsocordConstants'
+import { avatarSize } from '../../../native/IsocordConstants'
 import { computeChannelName } from '../../../stores/channels/channelName'
 import { isForumPost, isThread } from '../../../stores/channels/channels'
 import { isThreadJoined } from '../../../stores/channels/threadMemberActions'

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { logger } from '../../core/log'
-import NativeShare from '../../native/NativeIsocordShare'
-import type { SharedContent } from '../../native/NativeIsocordShare'
+import IsocordShare from '../../native/IsocordShare'
+import type { SharedContent } from '../../native/IsocordShare'
 
 const log = logger('Share')
 
@@ -13,13 +13,12 @@ export function useSharedContent(open: (content: SharedContent) => void) {
     // biome-ignore lint/correctness/useExhaustiveDependencies: `open` is read when a share arrives
     useEffect(() => {
         const take = () =>
-            void NativeShare.takeShared()
+            void IsocordShare.takeShared()
                 .then(json => {
                     if (json) open(JSON.parse(json) as SharedContent)
                 })
                 .catch(error => log.warn(`Reading a share failed: ${error}`))
         take()
-        const subscription = NativeShare.onShared(take)
-        return () => subscription.remove()
+        return IsocordShare.onShared(take)
     }, [])
 }

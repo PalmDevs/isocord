@@ -30,7 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets'
 import { t } from '../../../i18n'
-import NativeIsocordBack from '../../../native/NativeIsocordBack'
+import IsocordBack from '../../../native/IsocordBack'
 import { Icon } from '../../icons/Icon'
 import { useSurfaceColor } from '../../surfaceTint'
 import {
@@ -410,7 +410,7 @@ export function BottomSheet({
     const canExtendScroll = scrollable && footer == null
     const setScrollOverflow = (visible: boolean) => {
         const tag = scrollRef.current?.getScrollableNode()
-        if (tag != null) NativeIsocordBack?.setSheetScrollOverflow(tag, visible)
+        if (tag != null) IsocordBack?.setSheetScrollOverflow(tag, visible)
     }
     useAnimatedReaction(
         () => canExtendScroll && backScale.get() < 1,

@@ -1,32 +1,42 @@
-package me.palmdevs.isocord.core
+package com.margelo.nitro.isocord
 
 import android.content.ContentValues
 import android.os.Build
 import android.os.Environment
 import android.os.Trace
 import android.provider.MediaStore
+import androidx.annotation.Keep
+import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.bridge.LifecycleEventListener
-import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.UiThreadUtil
+import com.margelo.nitro.NitroModules
+import com.margelo.nitro.core.Promise
 import java.io.File
-import me.palmdevs.isocord.specs.NativeIsocordTraceSpec
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import me.palmdevs.isocord.core.Perf
 
 /**
  * Lets JS mark sections in system traces (Perfetto), so startup work on the JS thread shows by name.
  * Synchronous, so a section covers exactly the work between calls. A call costs microseconds, and nothing records without a trace.
  * Also the bridge to the perf monitor ([Perf]).
  */
-class TraceModule(context: ReactApplicationContext) :
-  NativeIsocordTraceSpec(context), LifecycleEventListener {
+@DoNotStrip
+@Keep
+class HybridIsocordTrace : HybridIsocordTraceSpec(), LifecycleEventListener {
+  private val context: ReactApplicationContext =
+    NitroModules.applicationContext ?: error("NitroModules.applicationContext is null")
+  private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
   init {
     context.addLifecycleEventListener(this)
   }
 
-  override fun getName() = NAME
-
   override fun onHostResume() {
-    reactApplicationContext.currentActivity?.let(Perf::attach)
+    context.currentActivity?.let(Perf::attach)
   }
 
   override fun onHostPause() = Unit
@@ -46,21 +56,21 @@ class TraceModule(context: ReactApplicationContext) :
 
   /** Starts or stops [Perf]; returns the native clock in ms, so JS can put native spans on its own timeline. */
   override fun setRecording(enabled: Boolean): Double {
-    UiThreadUtil.runOnUiThread { Perf.setRecording(enabled, reactApplicationContext.currentActivity) }
+    UiThreadUtil.runOnUiThread { Perf.setRecording(enabled, context.currentActivity) }
     return System.nanoTime() / 1e6
   }
 
   override fun snapshot(): String = Perf.snapshot()
 
   /** Saves an exported trace to Downloads (the app's external files folder before Android 10); resolves where. */
-  override fun saveTrace(name: String, json: String, promise: Promise) {
-    try {
+  override fun saveTrace(name: String, json: String): Promise<String> =
+    Promise.async(ioScope) {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         val values = ContentValues().apply {
           put(MediaStore.Downloads.DISPLAY_NAME, name)
           put(MediaStore.Downloads.MIME_TYPE, "application/json")
         }
-        val resolver = reactApplicationContext.contentResolver
+        val resolver = context.contentResolver
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("Cannot create $name")
         try {
           resolver.openOutputStream(uri)!!.use { it.write(json.toByteArray()) }
@@ -68,18 +78,17 @@ class TraceModule(context: ReactApplicationContext) :
           resolver.delete(uri, null, null)
           throw e
         }
-        promise.resolve("${Environment.DIRECTORY_DOWNLOADS}/$name")
+        "${Environment.DIRECTORY_DOWNLOADS}/$name"
       } else {
-        val file = File(reactApplicationContext.getExternalFilesDir(null), name)
+        val file = File(context.getExternalFilesDir(null), name)
         file.writeText(json)
-        promise.resolve(file.absolutePath)
+        file.absolutePath
       }
-    } catch (e: Exception) {
-      promise.reject("save_failed", e)
     }
-  }
 
-  companion object {
-    const val NAME = "IsocordTrace"
+  override fun dispose() {
+    context.removeLifecycleEventListener(this)
+    ioScope.cancel()
+    super.dispose()
   }
 }

@@ -5,8 +5,8 @@ import { SPOILER_FILENAME_PREFIX } from '../../core/discord/messages'
 import { logger } from '../../core/log'
 import { useSessionStore } from '../../core/react'
 import { defineStore } from '../../core/session'
-import { uploader as wire } from '../../native/NativeIsocordConstants'
-import Uploader from '../../native/NativeIsocordUploader'
+import { uploader as wire } from '../../native/IsocordConstants'
+import Uploader from '../../native/IsocordUploader'
 import { MAX_TOTAL_ATTACHMENT_SIZE, MAX_UPLOAD_COUNT } from './limits'
 import type { Feature } from '../../core/feature'
 import type { Session } from '../../core/session'
@@ -176,7 +176,7 @@ function find(session: Session, channelId: string, id: string) {
 
 /** Follows the native upload progress of the session's files until it ends. Ids of other sessions' files are not found. */
 function listenForProgress(session: Session): () => void {
-    const subscription = Uploader.onProgress(event => {
+    return Uploader.onProgress(event => {
         const channelId = event.id.split(wire.idSeparator)[0]
         if (!channelId) return
         const item = find(session, channelId, event.id)
@@ -193,7 +193,6 @@ function listenForProgress(session: Session): () => void {
             progress: event.total > 0 ? event.done / event.total : 0,
         })
     })
-    return () => subscription.remove()
 }
 
 /** Progress listening for each session. */
@@ -250,8 +249,8 @@ async function requestUploadUrl(
 function errorKind(error: unknown): AttachmentError {
     if (error instanceof ApiError)
         return error.status === 413 ? 'too_large' : 'rejected'
-    const code = (error as { code?: string } | null)?.code
-    if (code?.startsWith(wire.errorHttpPrefix)) return 'rejected'
+    const code = errorCode(error)
+    if (code.startsWith(wire.errorHttpPrefix)) return 'rejected'
     if (code === wire.errorFailed) return 'network'
     return error instanceof TypeError ? 'network' : 'unknown'
 }
@@ -259,7 +258,14 @@ function errorKind(error: unknown): AttachmentError {
 /** An error's code (a status, or the native module's code), never its message. */
 function errorCode(error: unknown): string {
     if (error instanceof ApiError) return `HTTP ${error.status}`
-    return (error as { code?: string } | null)?.code ?? 'no code'
+    if (!(error instanceof Error)) return 'no code'
+    const msg = error.message
+    if (msg.includes(wire.errorCancelled)) return wire.errorCancelled
+    const httpIdx = msg.indexOf(wire.errorHttpPrefix)
+    if (httpIdx !== -1)
+        return msg.slice(httpIdx).split(/\s/)[0] ?? wire.errorFailed
+    if (msg.includes(wire.errorFailed)) return wire.errorFailed
+    return 'no code'
 }
 
 function fail(session: Session, channelId: string, id: string, error: unknown) {
@@ -290,8 +296,7 @@ async function run(
                 filename: item.filename,
             })
         } catch (error) {
-            if ((error as { code?: string }).code === wire.errorCancelled)
-                return
+            if (errorCode(error) === wire.errorCancelled) return
             log.warn(`Preparing an attachment failed (${errorCode(error)})`)
             patch(session, channelId, id, {
                 state: 'error',
@@ -324,7 +329,7 @@ async function run(
         })
     } catch (error) {
         if (task.removed) return
-        if ((error as { code?: string }).code === wire.errorCancelled) return
+        if (errorCode(error) === wire.errorCancelled) return
         fail(session, channelId, id, error)
         return
     }
@@ -365,7 +370,7 @@ async function upload(
         patch(session, channelId, id, { state: 'uploaded', progress: 1 })
     } catch (error) {
         if (task.removed) return
-        if ((error as { code?: string }).code === wire.errorCancelled) return
+        if (errorCode(error) === wire.errorCancelled) return
         fail(session, channelId, id, error)
     }
 }

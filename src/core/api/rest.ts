@@ -1,4 +1,4 @@
-import { cookieScopeHeader } from '../../native/NativeIsocordConstants'
+import { cookieScopeHeader } from '../../native/IsocordConstants'
 import { API_BASE } from '../constants'
 import { logger } from '../log'
 import { encodeProperties, timezone } from './identity'

@@ -14,7 +14,7 @@ import org.json.JSONObject
 
 /**
  * The in-app perf monitor's native half (Settings, Performance).
- * While recording, counts frames from the window's FrameMetrics and keeps native [span]s. JS drains both each second through [TraceModule.snapshot].
+ * While recording, counts frames from the window's FrameMetrics and keeps native [span]s. JS drains both each second through [HybridIsocordTrace.snapshot].
  * Otherwise a span is only a system trace section and frames are not observed.
  */
 object Perf {

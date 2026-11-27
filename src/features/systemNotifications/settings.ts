@@ -1,7 +1,7 @@
 // biome-ignore lint/correctness/useReactNativePlatformComponents: Isocord only runs on Android.
 import { Linking, PermissionsAndroid, Platform } from 'react-native'
 import { accountsStore } from '../../core/accounts'
-import native from '../../native/NativeIsocordNotifications'
+import native from '../../native/IsocordNotifications'
 import { systemNotificationsStore } from './prefs'
 
 /**

@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla'
-import { notificationKind } from '../../native/NativeIsocordConstants'
-import native from '../../native/NativeIsocordNotifications'
+import { notificationKind } from '../../native/IsocordConstants'
+import native from '../../native/IsocordNotifications'
 
 /** One of `notificationKind`, the kinds under "Notify me about". */
 export type NotificationKind = string

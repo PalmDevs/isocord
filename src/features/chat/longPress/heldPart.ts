@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard'
 import { channelPermalink } from '../../../core/discord/permalink'
 import { t } from '../../../i18n'
-import { embedTextPart } from '../../../native/NativeIsocordConstants'
+import { embedTextPart } from '../../../native/IsocordConstants'
 import { channelsStore } from '../../../stores/channels/channels'
 import { chatGesturesStore } from '../../../stores/settings/chatGestures'
 import { settingsStore } from '../../../stores/settings/settingsStore'

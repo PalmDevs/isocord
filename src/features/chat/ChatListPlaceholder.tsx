@@ -2,7 +2,7 @@ import { View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { Skeleton } from '../../design/components/Skeleton'
 import { ThemedGradient } from '../../design/components/ThemedGradient'
-import { avatarSize } from '../../native/NativeIsocordConstants'
+import { avatarSize } from '../../native/IsocordConstants'
 
 const MESSAGE_WIDTHS = [
     '75%',

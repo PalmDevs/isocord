@@ -13,7 +13,7 @@ import {
     setTheme,
 } from '../../design/tokens'
 import { t } from '../../i18n'
-import { notificationKind } from '../../native/NativeIsocordConstants'
+import { notificationKind } from '../../native/IsocordConstants'
 import { setChatGesture } from '../../stores/settings/chatGestures'
 import {
     setAnimateEmoji,

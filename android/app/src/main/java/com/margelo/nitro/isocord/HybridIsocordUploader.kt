@@ -1,21 +1,24 @@
-package me.palmdevs.isocord.upload
+package com.margelo.nitro.isocord
 
 import android.net.Uri
-import com.facebook.react.bridge.Arguments
-import com.facebook.react.bridge.Promise
-import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.bridge.ReadableMap
-import com.facebook.react.module.annotations.ReactModule
+import androidx.annotation.Keep
+import com.facebook.proguard.annotations.DoNotStrip
+import com.margelo.nitro.NitroModules
+import com.margelo.nitro.core.Promise
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import me.palmdevs.isocord.specs.NativeIsocordUploaderSpec
+import me.palmdevs.isocord.upload.MediaPrep
+import me.palmdevs.isocord.upload.UploadEngine
+import me.palmdevs.isocord.upload.UploadFailedException
 
 /** What JS reads from the uploader's ids, rejections and progress events. */
 object UploaderWire {
@@ -36,54 +39,53 @@ object UploaderWire {
  * Plain in-process work, not WorkManager or a foreground service: survives a short background stay, not a process kill.
  * The chunked resume in [UploadEngine] makes a restart cheap, but JS must start it again.
  */
-@ReactModule(name = UploaderModule.NAME)
-class UploaderModule(context: ReactApplicationContext) : NativeIsocordUploaderSpec(context) {
+@DoNotStrip
+@Keep
+class HybridIsocordUploader : HybridIsocordUploaderSpec() {
+  private val appContext =
+    (NitroModules.applicationContext ?: error("NitroModules.applicationContext is null")).applicationContext
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val jobs = ConcurrentHashMap<String, Job>()
-  private val engine = UploadEngine(context.applicationContext)
-  private val prep = MediaPrep(context.applicationContext)
+  private val engine = UploadEngine(appContext)
+  private val prep = MediaPrep(appContext)
+  private val listeners = CopyOnWriteArrayList<(ProgressEvent) -> Unit>()
   /** At most this many files are sent at once; the rest wait, so a big batch does not starve each file. */
   private val uploadSlots = Semaphore(MAX_PARALLEL_UPLOADS)
   private val compressSlots = Semaphore(1)
 
-  override fun getName() = NAME
-
-  override fun prepare(id: String, uri: String, options: ReadableMap, promise: Promise) {
-    val maxBytes = if (options.hasKey("maxBytes")) options.getDouble("maxBytes").toLong() else 0L
-    val filename = if (options.hasKey("filename")) options.getString("filename") else null
+  override fun prepare(id: String, uri: String, options: PrepareOptions): Promise<PreparedFile> {
+    val maxBytes = options.maxBytes.toLong()
+    val filename = options.filename
     val throttle = Throttle()
-    launchTracked(id, promise) {
+    return launchTracked(id) {
       compressSlots.withPermit {
         val result =
           prep.prepare(Uri.parse(uri), filename, maxBytes) { percent ->
             throttle.run { emit(id, UploaderWire.PHASE_COMPRESS, percent.toDouble(), 100.0) }
           }
-        promise.resolve(
-          Arguments.createMap().apply {
-            putString("uri", result.uri)
-            putString("filename", result.filename)
-            putString("mimeType", result.mimeType)
-            putDouble("size", result.size.toDouble())
-            putInt("width", result.width)
-            putInt("height", result.height)
-            putDouble("durationSecs", result.durationSecs)
-            putBoolean("compressed", result.compressed)
-          }
+        PreparedFile(
+          uri = result.uri,
+          filename = result.filename,
+          mimeType = result.mimeType,
+          size = result.size.toDouble(),
+          width = result.width.toDouble(),
+          height = result.height.toDouble(),
+          durationSecs = result.durationSecs,
+          compressed = result.compressed,
         )
       }
     }
   }
 
-  override fun upload(id: String, uri: String, uploadUrl: String, mimeType: String, size: Double, promise: Promise) {
+  override fun upload(id: String, uri: String, uploadUrl: String, mimeType: String, size: Double): Promise<Unit> {
     val total = size.toLong()
     val throttle = Throttle()
-    launchTracked(id, promise) {
+    return launchTracked(id) {
       uploadSlots.withPermit {
         engine.upload(id, Uri.parse(uri), uploadUrl, mimeType, total) { done ->
           throttle.run { emit(id, UploaderWire.PHASE_UPLOAD, done.toDouble(), total.toDouble()) }
         }
         emit(id, UploaderWire.PHASE_UPLOAD, total.toDouble(), total.toDouble())
-        promise.resolve(null)
       }
     }
   }
@@ -95,41 +97,42 @@ class UploaderModule(context: ReactApplicationContext) : NativeIsocordUploaderSp
 
   override fun deleteFile(uri: String) = prep.delete(uri)
 
-  override fun invalidate() {
-    scope.coroutineContext[Job]?.cancel()
-    super.invalidate()
+  override fun onProgress(listener: (event: ProgressEvent) -> Unit): () -> Unit {
+    listeners.add(listener)
+    return { listeners.remove(listener) }
   }
 
-  /** Runs [block] on the background dispatcher and settles the promise; a cancel rejects with ECANCELLED. */
-  private fun launchTracked(id: String, promise: Promise, block: suspend () -> Unit) {
+  override fun dispose() {
+    listeners.clear()
+    scope.cancel()
+    super.dispose()
+  }
+
+  /** Runs [block] on the background dispatcher and settles the promise; errors map to [UploaderWire] codes. */
+  private fun <T> launchTracked(id: String, block: suspend () -> T): Promise<T> {
+    val promise = Promise<T>()
     jobs.remove(id)?.cancel()
     val job =
       scope.launch {
         try {
-          block()
-        } catch (e: CancellationException) {
-          promise.reject(UploaderWire.ERROR_CANCELLED, "Cancelled")
+          promise.resolve(block())
+        } catch (_: CancellationException) {
+          promise.reject(Error(UploaderWire.ERROR_CANCELLED))
         } catch (e: UploadFailedException) {
-          promise.reject("${UploaderWire.ERROR_HTTP_PREFIX}${e.status}", "Upload failed with HTTP ${e.status}")
-        } catch (e: Exception) {
-          // The message is the exception's own text: never file contents or the upload url, but it can name a local
-          // content URI or path, so JS logs only the code.
-          promise.reject(UploaderWire.ERROR_FAILED, e.message ?: "Failed")
+          promise.reject(Error("${UploaderWire.ERROR_HTTP_PREFIX}${e.status}"))
+        } catch (_: Exception) {
+          // Never expose local content URIs or paths in the error text.
+          promise.reject(Error(UploaderWire.ERROR_FAILED))
         }
       }
     jobs[id] = job
     job.invokeOnCompletion { jobs.remove(id, job) }
+    return promise
   }
 
   private fun emit(id: String, phase: String, done: Double, total: Double) {
-    emitOnProgress(
-      Arguments.createMap().apply {
-        putString("id", id)
-        putString("phase", phase)
-        putDouble("done", done)
-        putDouble("total", total)
-      }
-    )
+    val event = ProgressEvent(id, phase, done, total)
+    for (listener in listeners) listener(event)
   }
 
   /** Lets an action through at most every [PROGRESS_INTERVAL_MS]. */
@@ -145,7 +148,6 @@ class UploaderModule(context: ReactApplicationContext) : NativeIsocordUploaderSp
   }
 
   companion object {
-    const val NAME = "IsocordUploader"
     private const val MAX_PARALLEL_UPLOADS = 3
     private const val PROGRESS_INTERVAL_MS = 100L
   }

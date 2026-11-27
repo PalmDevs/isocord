@@ -1,5 +1,5 @@
 import { openActionSheet } from '../../../design/components/sheets/sheetStore'
-import { swipeAction, swipeMode } from '../../../native/NativeIsocordConstants'
+import { swipeAction, swipeMode } from '../../../native/IsocordConstants'
 import { channelsStore } from '../../../stores/channels/channels'
 import { findMessage, messagesStore } from '../../../stores/messages/messages'
 import { heldMedia } from '../../mediaViewer/store'

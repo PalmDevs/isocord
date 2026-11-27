@@ -1,7 +1,7 @@
 import { encodeProperties } from '../../core/api/identity'
 import { GATEWAY_CAPABILITIES } from '../../core/constants'
 import { t } from '../../i18n'
-import native from '../../native/NativeIsocordNotifications'
+import native from '../../native/IsocordNotifications'
 import type { Session } from '../../core/session'
 
 /** The account as GatewayService needs it (AccountConfig in NotificationPrefs.kt). */

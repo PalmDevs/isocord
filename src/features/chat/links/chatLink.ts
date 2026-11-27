@@ -9,7 +9,7 @@ import {
     originParam,
     thumbnailPart,
     viewerAction,
-} from '../../../native/NativeIsocordConstants'
+} from '../../../native/IsocordConstants'
 import { headerPartOf } from '../headerParts'
 import type { MediaOrigin, MediaSelection } from '../../mediaViewer/store'
 import type { HeaderPart } from '../headerParts'

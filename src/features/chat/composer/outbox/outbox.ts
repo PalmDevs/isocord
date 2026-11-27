@@ -11,7 +11,7 @@ import { snowflakeFromTimestamp } from '../../../../core/discord/snowflake'
 import { useSessionStore } from '../../../../core/react'
 import { defineStore } from '../../../../core/session'
 import { t } from '../../../../i18n'
-import NativeIsocordExpressionFlight from '../../../../native/NativeIsocordExpressionFlight'
+import IsocordExpressionFlight from '../../../../native/IsocordExpressionFlight'
 import { channelsStore } from '../../../../stores/channels/channels'
 import {
     addPendingMessage,
@@ -194,7 +194,7 @@ export async function send(
         ),
     )
     if (outgoing.flightId)
-        NativeIsocordExpressionFlight?.bind(outgoing.flightId, nonce)
+        IsocordExpressionFlight?.bind(outgoing.flightId, nonce)
     // Sent from a jumped-to window: back to the present, where the message belongs (the pending one is kept).
     void jumpToPresent(session, channelId)
     void post(session, channelId, nonce)
@@ -376,7 +376,7 @@ export async function sendSticker(
         session,
         pendingMessage(session, channelId, body, [], undefined, [sticker]),
     )
-    if (flightId) NativeIsocordExpressionFlight?.bind(flightId, nonce)
+    if (flightId) IsocordExpressionFlight?.bind(flightId, nonce)
     void jumpToPresent(session, channelId)
     try {
         const message = await session.rest.post<Message>(

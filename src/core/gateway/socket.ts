@@ -1,6 +1,6 @@
 import { AppState } from 'react-native'
-import compression from '../../native/NativeIsocordCompression'
-import { gateway } from '../../native/NativeIsocordConstants'
+import { gateway } from '../../native/IsocordConstants'
+import nativeGateway from '../../native/IsocordGateway'
 import {
     API_VERSION,
     DEFAULT_GATEWAY_URL,
@@ -225,7 +225,7 @@ export class GatewaySocket {
     private open(): void {
         this.disableCompression()
         const base = (this.sessionId && this.resumeUrl) || DEFAULT_GATEWAY_URL
-        const supportsZstd = compression.getConstants().supportsZstd
+        const supportsZstd = nativeGateway.supportsZstd
         // React Native's WebSocket takes an options argument its typings don't declare.
         const NativeWebSocket = WebSocket as unknown as new (
             url: string,
@@ -249,7 +249,7 @@ export class GatewaySocket {
         // The frames are decompressed on the socket's reader thread and reach JS as text, so JS only parses them.
         if (supportsZstd) {
             this.socketId = (ws as WebSocket & { _socketId: number })._socketId
-            compression.enableZstdStreamSupport(this.socketId)
+            nativeGateway.enableZstdStreamSupport(this.socketId)
         }
         this.setState('connecting')
         this.queue = []
@@ -344,7 +344,7 @@ export class GatewaySocket {
     /** Stops native decompression for the current socket and frees its zstd stream. */
     private disableCompression(): void {
         if (this.socketId === null) return
-        compression.disableZstdStreamSupport(this.socketId)
+        nativeGateway.disableZstdStreamSupport(this.socketId)
         this.socketId = null
     }
 
@@ -407,7 +407,7 @@ export class GatewaySocket {
             this.state !== 'connecting'
         )
             return
-        this.preIdentified = compression.prepareIdentify(
+        this.preIdentified = nativeGateway.prepareIdentify(
             this.socketId,
             JSON.stringify({
                 op: Opcode.IDENTIFY,

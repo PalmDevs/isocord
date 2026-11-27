@@ -1,4 +1,4 @@
-import native from '../../native/NativeIsocordNotifications'
+import native from '../../native/IsocordNotifications'
 import { forwardAlerts } from './alerts'
 import { configure } from './configure'
 import { forward } from './forward'

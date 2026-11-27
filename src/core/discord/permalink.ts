@@ -1,4 +1,4 @@
-import { dmGuild } from '../../native/NativeIsocordConstants'
+import { dmGuild } from '../../native/IsocordConstants'
 import { WEB_URL } from '../constants'
 
 /** ChannelUtils.getChannelPermalink: the web link of a channel, or of a message in it. */

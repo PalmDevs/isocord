@@ -1,6 +1,6 @@
 import { emojiUrl } from '../../../../core/discord/cdn'
 import { ChannelType } from '../../../../core/discord/channelType'
-import { nodeType } from '../../../../native/NativeIsocordConstants'
+import { nodeType } from '../../../../native/IsocordConstants'
 import { isPrivate } from '../../../../stores/channels/channels'
 import { displayName } from '../../../../stores/users'
 import { argb, rgbInt } from '../../color'

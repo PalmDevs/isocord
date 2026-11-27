@@ -40,7 +40,7 @@ private class ReadyRelationships(val relationships: List<RawRelationship> = empt
 
 /**
  * The app's own gateway session while in front. JS forwards its dispatches, and the background session's rules decide
- * them ([SessionNotifier]). Used from the native modules thread only, where [NotificationsModule.dispatch] runs.
+ * them ([SessionNotifier]). Used from the single-threaded dispatch scope where [HybridIsocordNotifications.dispatch] runs.
  */
 class AppSession(context: Context, @Volatile var account: AccountConfig) {
   private val state = NotificationState(account.userId)

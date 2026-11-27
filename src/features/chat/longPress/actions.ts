@@ -9,7 +9,7 @@ import {
 } from '../../../core/discord/messages'
 import { Permission } from '../../../core/discord/permissions'
 import { t } from '../../../i18n'
-import { swipeMode } from '../../../native/NativeIsocordConstants'
+import { swipeMode } from '../../../native/IsocordConstants'
 import { channelsStore, isPrivate } from '../../../stores/channels/channels'
 import { guildsStore } from '../../../stores/guilds'
 import { can as hasPermission } from '../../../stores/permissions'

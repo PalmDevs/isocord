@@ -2,7 +2,7 @@ import {
     clientVersionCode,
     clientVersionName,
     discord,
-} from '../native/NativeIsocordConstants'
+} from '../native/IsocordConstants'
 
 /** The official client build Isocord identifies as. Kotlin's `ClientBuild` owns the version. */
 export const CLIENT = {

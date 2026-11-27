@@ -1,12 +1,15 @@
-package me.palmdevs.isocord.compression
+package com.margelo.nitro.isocord
 
 import android.util.Log
+import androidx.annotation.Keep
+import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.websocket.WebSocketModule
+import com.margelo.nitro.NitroModules
 import java.util.concurrent.ConcurrentHashMap
+import me.palmdevs.isocord.compression.ZstdStream
 import me.palmdevs.isocord.core.Perf
-import me.palmdevs.isocord.specs.NativeIsocordCompressionSpec
 import okio.ByteString
 
 private const val TAG = "IsocordFastConnect"
@@ -16,13 +19,18 @@ private const val TAG = "IsocordFastConnect"
  * the payloads. Also sends a prepared IDENTIFY from the socket's reader thread.
  * References: CompressionModule, ZstdContentHandler and FastConnectModule in the official client.
  */
-class CompressionModule(context: ReactApplicationContext) : NativeIsocordCompressionSpec(context) {
-  override fun getName() = NAME
+@DoNotStrip
+@Keep
+class HybridIsocordGateway : HybridIsocordGatewaySpec() {
+  private val context: ReactApplicationContext =
+    NitroModules.applicationContext ?: error("NitroModules.applicationContext is null")
 
   /** One handler per socket: the gateway's frames continue each other. */
   private val handlers = ConcurrentHashMap<Int, ContentHandler>()
 
-  private fun webSocketModule() = reactApplicationContext.getNativeModule(WebSocketModule::class.java)
+  override val supportsZstd: Boolean = true
+
+  private fun webSocketModule() = context.getNativeModule(WebSocketModule::class.java)
 
   override fun enableZstdStreamSupport(socketId: Double) {
     val id = socketId.toInt()
@@ -39,7 +47,11 @@ class CompressionModule(context: ReactApplicationContext) : NativeIsocordCompres
   override fun prepareIdentify(socketId: Double, payload: String): Boolean =
     handlers[socketId.toInt()]?.prepareIdentify(payload) ?: false
 
-  override fun getTypedExportedConstants(): Map<String, Any> = mapOf("supportsZstd" to true)
+  override fun dispose() {
+    handlers.values.forEach { it.close() }
+    handlers.clear()
+    super.dispose()
+  }
 
   /** Turns a binary zstd frame into the text the JS WebSocket delivers. */
   private inner class ContentHandler(private val id: Int) : WebSocketModule.ContentHandler, AutoCloseable {
@@ -93,9 +105,5 @@ class CompressionModule(context: ReactApplicationContext) : NativeIsocordCompres
     }
 
     override fun close() = stream.close()
-  }
-
-  companion object {
-    const val NAME = "IsocordCompression"
   }
 }

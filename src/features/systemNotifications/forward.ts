@@ -1,6 +1,6 @@
 import { traced } from '../../core/trace'
-import { dmGuild } from '../../native/NativeIsocordConstants'
-import native from '../../native/NativeIsocordNotifications'
+import { dmGuild } from '../../native/IsocordConstants'
+import native from '../../native/IsocordNotifications'
 import { channelsStore } from '../../stores/channels/channels'
 import { guildsStore } from '../../stores/guilds'
 import { presencesStore } from '../../stores/presences'

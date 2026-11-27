@@ -1,12 +1,9 @@
-import { TurboModuleRegistry } from 'react-native'
-import type { TurboModule } from 'react-native'
+import type { HybridObject } from 'react-native-nitro-modules'
 
-/** Native zstd decompression for the gateway socket (CompressionModule.kt). */
-export interface Spec extends TurboModule {
-    getConstants(): {
-        /** Whether the native WebSocket can decompress a zstd-stream socket. */
-        supportsZstd: boolean
-    }
+/** Native WebSocket zstd decompression and fast-connect IDENTIFY for the gateway (HybridIsocordGateway.kt). */
+export interface IsocordGateway extends HybridObject<{ android: 'kotlin' }> {
+    /** Whether the native WebSocket can decompress a zstd-stream socket. */
+    readonly supportsZstd: boolean
     /**
      * Decompresses the binary messages of a WebSocket in native code, through
      * WebSocketModule.ContentHandler, so the JS thread only parses the payloads.
@@ -20,5 +17,3 @@ export interface Spec extends TurboModule {
      */
     prepareIdentify(socketId: number, payload: string): boolean
 }
-
-export default TurboModuleRegistry.getEnforcing<Spec>('IsocordCompression')

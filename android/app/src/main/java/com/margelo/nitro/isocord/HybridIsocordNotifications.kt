@@ -1,4 +1,4 @@
-package me.palmdevs.isocord.notifications
+package com.margelo.nitro.isocord
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -6,30 +6,38 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
-import com.facebook.react.BaseReactPackage
-import com.facebook.react.bridge.NativeModule
-import com.facebook.react.bridge.Promise
+import androidx.annotation.Keep
+import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.module.annotations.ReactModule
-import com.facebook.react.module.model.ReactModuleInfo
-import com.facebook.react.module.model.ReactModuleInfoProvider
+import com.margelo.nitro.NitroModules
+import com.margelo.nitro.core.Promise
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import me.palmdevs.isocord.core.AppJson
 import me.palmdevs.isocord.notifications.gateway.GatewayService
 import me.palmdevs.isocord.notifications.notify.AccountConfig
 import me.palmdevs.isocord.notifications.notify.AppSession
+import me.palmdevs.isocord.notifications.notify.DispatchContext
 import me.palmdevs.isocord.notifications.notify.MessageNotifier
 import me.palmdevs.isocord.notifications.notify.NotificationPrefs
-import me.palmdevs.isocord.notifications.notify.DispatchContext
-import me.palmdevs.isocord.specs.NativeIsocordNotificationsSpec
 
 private const val TAG = "IsocordNotifications"
 
-/** JS side of the background notifications (src/native/NativeIsocordNotifications.ts). */
-@ReactModule(name = NotificationsModule.NAME)
-class NotificationsModule(private val context: ReactApplicationContext) : NativeIsocordNotificationsSpec(context) {
-  override fun getName() = NAME
+/** JS side of the background notifications (src/native/specs/IsocordNotifications.nitro.ts). */
+@DoNotStrip
+@Keep
+class HybridIsocordNotifications : HybridIsocordNotificationsSpec() {
+  private val context: ReactApplicationContext =
+    NitroModules.applicationContext ?: error("NitroModules.applicationContext is null")
+
+  /** Serializes AppSession dispatches off the JS thread, matching TurboModule's single native modules thread. */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private val dispatchScope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
 
   /** The app's own session, for the account [configure] last set. */
   @Volatile private var app: AppSession? = null
@@ -52,17 +60,15 @@ class NotificationsModule(private val context: ReactApplicationContext) : Native
     GatewayService.sync(context)
   }
 
-  override fun dispatch(type: String, event: String, dispatchContext: String, promise: Promise) {
-    val app = app
-    if (app == null) {
-      promise.resolve(false)
-      return
-    }
-    try {
-      promise.resolve(app.dispatch(type, event, AppJson.decodeFromString<DispatchContext>(dispatchContext)))
-    } catch (e: SerializationException) {
-      Log.w(TAG, "forwarded $type failed: ${e.javaClass.simpleName}")
-      promise.resolve(false)
+  override fun dispatch(type: String, event: String, dispatchContext: String): Promise<Boolean> {
+    val currentApp = app ?: return Promise.resolved(false)
+    return Promise.async(dispatchScope) {
+      try {
+        currentApp.dispatch(type, event, AppJson.decodeFromString<DispatchContext>(dispatchContext))
+      } catch (e: SerializationException) {
+        Log.w(TAG, "forwarded $type failed: ${e.javaClass.simpleName}")
+        false
+      }
     }
   }
 
@@ -94,26 +100,8 @@ class NotificationsModule(private val context: ReactApplicationContext) : Native
     (context.currentActivity ?: context).startActivity(intent)
   }
 
-  companion object {
-    const val NAME = "IsocordNotifications"
-  }
-}
-
-class NotificationsPackage : BaseReactPackage() {
-  override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? =
-    if (name == NotificationsModule.NAME) NotificationsModule(reactContext) else null
-
-  override fun getReactModuleInfoProvider() = ReactModuleInfoProvider {
-    mapOf(
-      NotificationsModule.NAME to
-        ReactModuleInfo(
-          NotificationsModule.NAME,
-          NotificationsModule::class.java.name,
-          false, // canOverrideExistingModule
-          false, // needsEagerInit
-          false, // isCxxModule
-          true, // isTurboModule
-        )
-    )
+  override fun dispose() {
+    dispatchScope.cancel()
+    super.dispose()
   }
 }

@@ -1,8 +1,7 @@
-import { TurboModuleRegistry } from 'react-native'
-import type { TurboModule } from 'react-native'
+import type { HybridObject } from 'react-native-nitro-modules'
 
-/** System trace sections and the perf monitor (TraceModule.kt). */
-export interface Spec extends TurboModule {
+/** System trace sections and the perf monitor (HybridIsocordTrace.kt). */
+export interface IsocordTrace extends HybridObject<{ android: 'kotlin' }> {
     beginSection(name: string): boolean
     endSection(): boolean
     /** Starts or stops the perf monitor and returns the native clock in ms. */
@@ -12,5 +11,3 @@ export interface Spec extends TurboModule {
     /** Saves an exported trace to Downloads and resolves where. */
     saveTrace(name: string, json: string): Promise<string>
 }
-
-export default TurboModuleRegistry.getEnforcing<Spec>('IsocordTrace')

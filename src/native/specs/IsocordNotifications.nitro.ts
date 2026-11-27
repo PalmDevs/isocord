@@ -1,11 +1,11 @@
-import { TurboModuleRegistry } from 'react-native'
-import type { TurboModule } from 'react-native'
+import type { HybridObject } from 'react-native-nitro-modules'
 
 /**
  * System notifications from a background gateway session (notifications/GatewayService.kt). Discord's push
  * notifications only reach the official app, so a foreground service keeps a gateway connection of its own.
  */
-export interface Spec extends TurboModule {
+export interface IsocordNotifications
+    extends HybridObject<{ android: 'kotlin' }> {
     /**
      * The current account, as JSON of `AccountConfig` (NotificationPrefs.kt): token, IDENTIFY properties, account headers
      * and the notifications' translated text. Saved, so the service can start without JS after a reboot.
@@ -40,5 +40,3 @@ export interface Spec extends TurboModule {
     /** Asks the system to let the app run unrestricted in the background (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS). */
     requestIgnoreBatteryOptimizations(): void
 }
-
-export default TurboModuleRegistry.getEnforcing<Spec>('IsocordNotifications')

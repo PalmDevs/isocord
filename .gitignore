@@ -76,3 +76,6 @@ yarn-error.log
 
 # Twemoji assets, fetched by scripts/fetch-twemoji.sh on `bun install`
 android/app/src/main/assets/twemoji/
+
+# React Native Nitro Modules
+nitrogen/generated
