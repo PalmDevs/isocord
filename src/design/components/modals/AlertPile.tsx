@@ -164,6 +164,7 @@ function AlertCard({
         <Animated.View
             entering={reducedMotion ? undefined : ENTERING}
             exiting={reducedMotion ? undefined : EXITING}
+            needsOffscreenAlphaCompositing
             pointerEvents={index === 0 ? 'box-none' : 'none'}
             importantForAccessibility={
                 index === 0 ? 'auto' : 'no-hide-descendants'

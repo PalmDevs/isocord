@@ -111,12 +111,19 @@ export function openGuildTagSheet(session: Session, user: User): void {
     const tagGuildId = tagGuild?.identity_guild_id
     if (!tagGuild?.tag || !tagGuildId) return
     const known = session.get(guildsStore).getState().guilds[tagGuildId]
+    if (known) {
+        void import('../servers/guildActions').then(
+            ({ openGuildActionSheet }) => {
+                openGuildActionSheet(known)
+            },
+        )
+        return
+    }
     openActionSheet(
         'guild-tag',
         <TempGuildInfoSheet
             guildId={tagGuildId}
-            name={known?.name}
-            icon={known?.icon ?? null}
+            icon={null}
             tag={tagGuild.tag}
         />,
     )

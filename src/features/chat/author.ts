@@ -1,4 +1,5 @@
 import { CDN_BASE } from '../../core/constants'
+import { guildTagBadgeUrl } from '../../core/discord/cdn'
 import { avatarUrl } from '../../design/components/avatars/avatarUrl'
 import { rgbInt } from './color'
 import { twemojiUrl } from './emoji'
@@ -105,7 +106,7 @@ export function clanTag(user: User): ClanTag | undefined {
     return {
         tag: guild.tag,
         badgeUrl: guild.badge
-            ? `${CDN_BASE}/clan-badges/${guild.identity_guild_id}/${guild.badge}.png?size=32`
+            ? guildTagBadgeUrl(guild.identity_guild_id, guild.badge)
             : undefined,
     }
 }

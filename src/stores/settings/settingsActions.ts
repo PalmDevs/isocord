@@ -1,5 +1,6 @@
 import { Endpoint } from '../../core/api/paths'
 import { ApiError, HTTP_TOO_MANY_REQUESTS } from '../../core/api/rest'
+import { GuildMemberFlags } from '../../core/discord/guild'
 import {
     ChannelNotificationSettingsFlags,
     GuildNotificationSettingsFlags,
@@ -13,7 +14,8 @@ import {
     writeBytesField,
 } from '../../core/protobuf'
 import { emitPresenceUpdate } from '../selfPresence'
-import { isOptInEnabled } from '../unreadPolicy'
+import { isOptInEnabled, isOptInEnabledForGuild } from '../unreadPolicy'
+import { updateGuildSettings } from './notificationActions'
 import {
     CUSTOM_STATUS,
     encodeFolders,
@@ -486,3 +488,70 @@ export function optIntoChannels(
     applyChannelFlags(session, guildId, changes, guildFlags)
     saveChannelFlags(session, guildId, guildFlags)
 }
+
+/**
+ * OptInOnboardingUtils.toggleShowAllChannels: flips opt-in mode for a community guild, opting existing
+ * members into all viewable channels the first time opt-in turns on.
+ */
+export function toggleShowAllChannels(
+    session: Session,
+    guild: { id: string; myMemberFlags?: number; features?: readonly string[] },
+    viewableChannelIds: readonly string[],
+): void {
+    const state = session.get(settingsStore).getState()
+    const optIn = isOptInEnabledForGuild(state, guild)
+    const settings = state.guildSettings[guild.id]
+    const hasOptedInChannels = Object.values(settings?.channelFlags ?? {}).some(
+        flag => (flag & ChannelNotificationSettingsFlags.OPT_IN_ENABLED) !== 0,
+    )
+    const notSetUp =
+        !optIn &&
+        ((guild.myMemberFlags ?? 0) & GuildMemberFlags.COMPLETED_ONBOARDING) ===
+            0 &&
+        !hasOptedInChannels
+    if (notSetUp) {
+        optIntoChannels(session, guild.id, viewableChannelIds)
+        return
+    }
+    updateGuildSettings(session, guild.id, {
+        flags: setFlag(
+            settings?.flags ?? 0,
+            GuildNotificationSettingsFlags.OPT_IN_CHANNELS_ON,
+            !optIn,
+        ),
+    })
+}
+
+/** Updates a per-guild privacy list (`restrictedGuildIds` or `messageRequestRestrictedGuildIds`). */
+function setRestrictedGuild(
+    session: Session,
+    key: 'restrictedGuildIds' | 'messageRequestRestrictedGuildIds',
+    guildId: string,
+    allow: boolean,
+): void {
+    const list = session.get(settingsStore).getState()[key] ?? []
+    const set = new Set(list)
+    if (allow) set.delete(guildId)
+    else set.add(guildId)
+    saveSetting(session, USER_SETTINGS[key], [...set])
+}
+
+/** RestrictedGuildIds: allows or blocks DMs from members of `guildId`. */
+export const setGuildRestricted = (
+    session: Session,
+    guildId: string,
+    allow: boolean,
+) => setRestrictedGuild(session, 'restrictedGuildIds', guildId, allow)
+
+/** MessageRequestRestrictedGuildIds: allows or blocks message requests from members of `guildId`. */
+export const setGuildMessageRequestRestricted = (
+    session: Session,
+    guildId: string,
+    allow: boolean,
+) =>
+    setRestrictedGuild(
+        session,
+        'messageRequestRestrictedGuildIds',
+        guildId,
+        allow,
+    )

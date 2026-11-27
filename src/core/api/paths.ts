@@ -7,6 +7,11 @@ export const Endpoint = {
     mfaSmsSend: '/auth/mfa/sms/send',
     me: '/users/@me',
     myChannels: '/users/@me/channels',
+    /** USER_SET_GUILD_IDENTITY: adopts or clears a server tag. */
+    myClan: '/users/@me/clan',
+    myGuild: (guildId: string) => `/users/@me/guilds/${guildId}`,
+    /** SET_GUILD_MEMBER: updates the current user's server profile (e.g. nickname). */
+    myGuildMember: (guildId: string) => `/guilds/${guildId}/members/@me`,
     notificationCenterItems: '/users/@me/notification-center/items',
     notificationCenterItem: (itemId: string) =>
         `/users/@me/notification-center/items/${itemId}`,
@@ -45,6 +50,8 @@ export const Endpoint = {
         `/channels/${threadId}/thread-members/@me/settings`,
     /** GUILD_CHANNELS: creates (POST) a guild channel, used to duplicate one. */
     guildChannels: (guildId: string) => `/guilds/${guildId}/channels`,
+    guildPreview: (guildId: string) => `/guilds/${guildId}/preview`,
+    channelInvites: (channelId: string) => `/channels/${channelId}/invites`,
     channelMessages: (channelId: string) => `/channels/${channelId}/messages`,
     channelMessage: (channelId: string, messageId: string) =>
         `/channels/${channelId}/messages/${messageId}`,
@@ -61,6 +68,7 @@ export const Endpoint = {
         `/channels/${channelId}/messages/${messageId}/threads`,
     messageAck: (channelId: string, messageId: string) =>
         `/channels/${channelId}/messages/${messageId}/ack`,
+    bulkAck: '/read-states/ack-bulk',
     messageCrosspost: (channelId: string, messageId: string) =>
         `/channels/${channelId}/messages/${messageId}/crosspost`,
     messageReactions: (channelId: string, messageId: string) =>

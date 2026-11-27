@@ -25,6 +25,8 @@ type ProtoValue = ProtoField[1]
 interface Codec<T> {
     /** Decodes a present field. Undefined keeps the current value. */
     read: (raw: ProtoValue) => T | undefined
+    /** Decodes all occurrences of a repeated field when present. */
+    readAll?: (entries: ProtoValue[]) => T | undefined
     /** Encodes the field, or nothing for the default. */
     write: (field: number, value: T) => Uint8Array
 }
@@ -91,6 +93,17 @@ const stringValueCodec: Codec<string> = {
         ),
 }
 
+/** Repeated fixed64 (packed or unpacked) as decimal strings. */
+const fixed64ListCodec: Codec<string[]> = {
+    read: raw => (raw instanceof Uint8Array ? readFixed64s(raw) : []),
+    readAll: entries =>
+        entries.flatMap(entry =>
+            entry instanceof Uint8Array ? readFixed64s(entry) : [],
+        ),
+    write: (field, value) =>
+        value.length > 0 ? writeBytesField(field, writeFixed64s(value)) : EMPTY,
+}
+
 /** The chat related user settings (PreloadedUserSettings.text_and_images) the expression picker depends on. */
 export interface TextAndImagesSettings {
     /** Default skin tone: a modifier character, empty for none. */
@@ -116,6 +129,10 @@ export interface UserSettings {
     status?: string
     /** SafetySettings: an ignored user's profile opens without the "Show Profile?" sheet. */
     ignoreProfileSpeedbumpDisabled?: boolean
+    /** PrivacySettings.restricted_guild_ids: guilds where DMs from members are blocked. */
+    restrictedGuildIds?: string[]
+    /** PrivacySettings.message_request_restricted_guild_ids: guilds where message requests are blocked. */
+    messageRequestRestrictedGuildIds?: string[]
 }
 
 /** UserSettings definitions in the reference's user_settings module. */
@@ -137,6 +154,17 @@ export const USER_SETTINGS: Descriptors<UserSettings> = {
         path: [21, 2],
         codec: boolCodec,
         default: false,
+    },
+    // `privacy` (8) `restricted_guild_ids` (3) and `message_request_restricted_guild_ids` (16).
+    restrictedGuildIds: {
+        path: [8, 3],
+        codec: fixed64ListCodec,
+        default: [],
+    },
+    messageRequestRestrictedGuildIds: {
+        path: [8, 16],
+        codec: fixed64ListCodec,
+        default: [],
     },
 }
 
@@ -263,8 +291,15 @@ export function readSettings<State>(
         const { path, codec, default: fallback } = descriptors[key]
         const category = categories.get(path[0])
         if (!category) continue
-        const raw = fieldOf(category, path[1])
-        const value = raw === undefined ? fallback : codec.read(raw)
+        const entries = readFields(category)
+            .filter(([n]) => n === path[1])
+            .map(([, v]) => v)
+        const value =
+            entries.length === 0
+                ? fallback
+                : codec.readAll
+                  ? codec.readAll(entries)
+                  : codec.read(entries[0]!)
         if (value !== undefined) result[key] = value as State[keyof State]
     }
     return result

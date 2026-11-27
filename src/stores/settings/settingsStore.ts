@@ -332,6 +332,8 @@ export const settingsStore = defineStore(
             'locale',
             'newNotifications',
             'mentionOnAllMessages',
+            'restrictedGuildIds',
+            'messageRequestRestrictedGuildIds',
         ],
     },
 )

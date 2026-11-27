@@ -52,6 +52,15 @@ export interface Guild {
     rulesChannelId?: string | null
     /** The community updates channel, which cannot become an announcement channel. */
     publicUpdatesChannelId?: string | null
+    /** Server description from READY/GUILD_UPDATE. */
+    description?: string | null
+    /** Server boost tier (0-3) and count. */
+    premiumTier?: number
+    premiumSubscriberCount?: number
+    /** Vanity invite code when the server has one. */
+    vanityUrlCode?: string | null
+    /** Server tag profile, when the server has GUILD_TAGS. */
+    profile?: { tag?: string | null; badge?: string | null } | null
     /**
      * Newest version of the guild and its roles held here, 0 when the server gave none. Kept with the
      * data it describes so the next IDENTIFY can ask for what changed since. The channels' version is
@@ -90,11 +99,16 @@ interface RawGuildProperties {
     name: string
     icon: string | null
     banner?: string | null
+    description?: string | null
     features?: string[]
     owner_id: string
     rules_channel_id?: string | null
     public_updates_channel_id?: string | null
     default_message_notifications?: number
+    premium_tier?: number
+    premium_subscription_count?: number
+    vanity_url_code?: string | null
+    profile?: { tag?: string | null; badge?: string | null } | null
 }
 
 /** Guilds arrive with their fields under `properties` in READY and GUILD_CREATE, and flat in GUILD_UPDATE. */
@@ -259,6 +273,19 @@ export const guildsStore = defineStore(
                 publicUpdatesChannelId: properties
                     ? (properties.public_updates_channel_id ?? null)
                     : previous?.publicUpdatesChannelId,
+                description: properties
+                    ? (properties.description ?? null)
+                    : previous?.description,
+                premiumTier: properties?.premium_tier ?? previous?.premiumTier,
+                premiumSubscriberCount:
+                    properties?.premium_subscription_count ??
+                    previous?.premiumSubscriberCount,
+                vanityUrlCode: properties
+                    ? (properties.vanity_url_code ?? null)
+                    : previous?.vanityUrlCode,
+                profile: properties
+                    ? (properties.profile ?? null)
+                    : previous?.profile,
                 version,
                 pendingDeleteSync:
                     sync && mode === 'full'

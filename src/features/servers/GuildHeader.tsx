@@ -1,4 +1,4 @@
-import { useIsFocused } from '@react-navigation/native'
+import { useIsFocused, useNavigation } from '@react-navigation/native'
 import { Image } from 'expo-image'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { PixelRatio, Pressable, View } from 'react-native'
@@ -10,7 +10,8 @@ import Animated, {
     withSpring,
 } from 'react-native-reanimated'
 import { StyleSheet } from 'react-native-unistyles'
-import { CDN_BASE } from '../../core/constants'
+import { guildBannerUrl } from '../../core/discord/cdn'
+import { GuildFeature } from '../../core/discord/guild'
 import { computePermissions, Permission } from '../../core/discord/permissions'
 import { useSession, useSessionStore } from '../../core/react'
 import { Button } from '../../design/components/buttons/Button'
@@ -30,13 +31,14 @@ import { SPRING_STANDARD } from '../../design/tokens/motion'
 import { t } from '../../i18n'
 import { channelsStore } from '../../stores/channels/channels'
 import { can } from '../../stores/permissions'
+import { openGuildActionSheet, openInviteSheet } from './guildActions'
 import { useServersPanels } from './useServersPanels'
 import type { ReactNode } from 'react'
 import type { HostInstance } from 'react-native'
 import type { SharedValue } from 'react-native-reanimated'
 import type { Guild } from '../../stores/guilds'
 
-// Placeholder for the sheets the header opens (guild action sheet, invite, events).
+// Placeholder for sheets not yet built (events).
 function openPlaceholderSheet(key: string, title: string) {
     openActionSheet(
         key,
@@ -44,15 +46,10 @@ function openPlaceholderSheet(key: string, title: string) {
     )
 }
 
-/** openGuildActionSheet. Placeholder until the guild action sheet exists. */
-const openGuildActionSheet = (guild: Guild) =>
-    openPlaceholderSheet('guild-actions', guild.name)
-
 /** getGuildBannerURL: webp at the media proxy size for a 360pt wide banner, animated only when asked. */
 function bannerUrl(guild: Guild, animate: boolean): string {
     const size = 2 ** Math.ceil(Math.log2(360 * PixelRatio.get()))
-    const animated = animate && guild.banner?.startsWith('a_')
-    return `${CDN_BASE}/banners/${guild.id}/${guild.banner}.webp?size=${size}${animated ? '&animated=true' : ''}`
+    return guildBannerUrl(guild.id, guild.banner!, size, animate)
 }
 
 /**
@@ -74,14 +71,15 @@ export function GuildBanner({
     // The chat, a forward's stacked chat or the details cover the list: decoding frames nobody sees redrew the whole
     // window every frame. Paused rather than swapped for the still image, so it plays on at once when a swipe
     // uncovers the list.
-    const { listCovered } = useServersPanels()
+    const navigation = useNavigation()
+    const { listCovered, openGuildSearch } = useServersPanels()
     const image = useRef<Image>(null)
     const pressed = useSharedValue(0)
     const animate =
         !reducedMotion &&
         !sheetOpen &&
         focused &&
-        (guild.features?.includes('ANIMATED_BANNER') ?? false)
+        (guild.features?.includes(GuildFeature.ANIMATED_BANNER) ?? false)
     // Only an animated banner has playback to drive. A still image has nothing to pause, and its native view may not
     // be registered yet (frozen or just mounted), which rejects the call.
     useEffect(() => {
@@ -110,7 +108,9 @@ export function GuildBanner({
         <Animated.View style={bannerStyle}>
             <Pressable
                 accessibilityIgnoresInvertColors
-                onPress={() => openGuildActionSheet(guild)}
+                onPress={() =>
+                    openGuildActionSheet(guild, navigation, openGuildSearch)
+                }
                 onPressIn={() => pressed.set(withSpring(1, SPRING_STANDARD))}
                 onPressOut={() => pressed.set(withSpring(0, SPRING_STANDARD))}
                 style={styles.banner(height)}
@@ -182,12 +182,7 @@ function GuildSearchAndInvite({ guild }: { guild: Guild }) {
                     size="sm"
                     icon="GroupPlusIcon"
                     accessibilityLabel={t('servers.header.invite')}
-                    onPress={() =>
-                        openPlaceholderSheet(
-                            'guild-invite',
-                            t('servers.header.invite'),
-                        )
-                    }
+                    onPress={() => openInviteSheet(guild)}
                 />
             )}
             {canCreateEvents(guild, session.userId) && (
@@ -232,6 +227,8 @@ export function GuildHeader({
      */
     backdrop: ReactNode
 }) {
+    const navigation = useNavigation()
+    const { openGuildSearch } = useServersPanels()
     // Measured before the frame is drawn, so the list's room follows a server switch in the same frame. onLayout
     // arrived a few frames later, and until then the first rows sat under the header. onLayout still covers
     // changes that don't come from rendering this header, like a new width.
@@ -246,7 +243,7 @@ export function GuildHeader({
         transform: [{ translateY: Math.max(0, bannerHeight - scrollY.get()) }],
     }))
     // useStickyServerHeaderSubtitle: only community servers show their member count.
-    const memberCount = guild.features?.includes('COMMUNITY')
+    const memberCount = guild.features?.includes(GuildFeature.COMMUNITY)
         ? guild.memberCount
         : 0
 
@@ -260,7 +257,9 @@ export function GuildHeader({
             <RipplePressable
                 accessibilityRole="button"
                 accessibilityHint={t('servers.header.optionsHint')}
-                onPress={() => openGuildActionSheet(guild)}
+                onPress={() =>
+                    openGuildActionSheet(guild, navigation, openGuildSearch)
+                }
             >
                 <View style={styles.header}>
                     <Text

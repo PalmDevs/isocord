@@ -4,12 +4,19 @@ import type { NavigationProp, ParamListBase } from '@react-navigation/native'
 export const CHANNEL_SETTINGS_ROUTES = {
     editChannel: 'editChannel',
     duplicateChannel: 'duplicateChannel',
+    createChannel: 'createChannel',
     customizeGroup: 'customizeGroup',
 } as const
 
 /** The params of every route here. */
 export interface ChannelRouteParams {
     channelId: string
+}
+
+export interface CreateChannelRouteParams {
+    guildId: string
+    initialType?: number
+    parentId?: string
 }
 
 type Navigation = Pick<NavigationProp<ParamListBase>, 'navigate'>
@@ -25,6 +32,19 @@ export const openDuplicateChannel = (
 ) =>
     navigation.navigate(CHANNEL_SETTINGS_ROUTES.duplicateChannel, {
         channelId,
+    })
+
+/** GuildActionSheet's Create Channel / Create Category rows: CreateChannelModal. */
+export const openCreateChannel = (
+    navigation: Navigation,
+    guildId: string,
+    initialType?: number,
+    parentId?: string,
+) =>
+    navigation.navigate(CHANNEL_SETTINGS_ROUTES.createChannel, {
+        guildId,
+        initialType,
+        parentId,
     })
 
 /** ChannelLongPressActionSheet's Customize Group row: showChatGDMCustomizeActionSheet. */

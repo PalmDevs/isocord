@@ -1,8 +1,14 @@
 import { ChannelType } from './channelType'
 
+/** Permission overwrite types (docs.discord.food, Channel Permission Overwrite). */
+export const OverwriteType = {
+    ROLE: 0,
+    MEMBER: 1,
+} as const
+
 export interface PermissionOverwrite {
     id: string
-    /** 0 for a role, 1 for a member. */
+    /** An `OverwriteType`. */
     type: number
     allow: string
     deny: string
@@ -30,9 +36,10 @@ export const Permission = {
     BAN_MEMBERS: 1n << 2n,
     ADMINISTRATOR: 1n << 3n,
     MANAGE_CHANNELS: 1n << 4n,
-    MANAGE_ROLES: 1n << 28n,
-    VIEW_CHANNEL: 1n << 10n,
+    MANAGE_GUILD: 1n << 5n,
     ADD_REACTIONS: 1n << 6n,
+    VIEW_AUDIT_LOG: 1n << 7n,
+    VIEW_CHANNEL: 1n << 10n,
     SEND_MESSAGES: 1n << 11n,
     MANAGE_MESSAGES: 1n << 13n,
     EMBED_LINKS: 1n << 14n,
@@ -40,6 +47,12 @@ export const Permission = {
     READ_MESSAGE_HISTORY: 1n << 16n,
     MENTION_EVERYONE: 1n << 17n,
     USE_EXTERNAL_EMOJIS: 1n << 18n,
+    VIEW_GUILD_ANALYTICS: 1n << 19n,
+    CHANGE_NICKNAME: 1n << 26n,
+    MANAGE_NICKNAMES: 1n << 27n,
+    MANAGE_ROLES: 1n << 28n,
+    MANAGE_WEBHOOKS: 1n << 29n,
+    MANAGE_GUILD_EXPRESSIONS: 1n << 30n,
     MODERATE_MEMBERS: 1n << 40n,
     MANAGE_EVENTS: 1n << 33n,
     MANAGE_THREADS: 1n << 34n,
@@ -47,11 +60,25 @@ export const Permission = {
     CREATE_PRIVATE_THREADS: 1n << 36n,
     USE_EXTERNAL_STICKERS: 1n << 37n,
     SEND_MESSAGES_IN_THREADS: 1n << 38n,
+    CREATE_GUILD_EXPRESSIONS: 1n << 43n,
     CREATE_EVENTS: 1n << 44n,
     SEND_VOICE_MESSAGES: 1n << 46n,
     PIN_MESSAGES: 1n << 51n,
     BYPASS_SLOWMODE: 1n << 52n,
 } as const
+
+/** PermissionUtils.VIEW_GUILD_SETTINGS: any permission that exposes Server Settings. */
+export const VIEW_GUILD_SETTINGS =
+    Permission.MANAGE_GUILD |
+    Permission.MANAGE_ROLES |
+    Permission.ADMINISTRATOR |
+    Permission.BAN_MEMBERS |
+    Permission.MANAGE_NICKNAMES |
+    Permission.CREATE_GUILD_EXPRESSIONS |
+    Permission.MANAGE_GUILD_EXPRESSIONS |
+    Permission.MANAGE_WEBHOOKS |
+    Permission.VIEW_AUDIT_LOG |
+    Permission.VIEW_GUILD_ANALYTICS
 
 const ALL = ~0n
 

@@ -24,7 +24,7 @@ function textOf(node: ReactNode): string {
 
 type ControlRowProps = Pick<
     TableRowProps,
-    'label' | 'subLabel' | 'disabled' | 'accessibilityHint'
+    'label' | 'subLabel' | 'disabled' | 'accessibilityHint' | 'icon'
 >
 
 function describe({ label, subLabel }: ControlRowProps) {
@@ -47,6 +47,7 @@ export function TableSwitchRow({
     onValueChange,
     label,
     subLabel,
+    icon,
     trailing,
     disabled = false,
     accessibilityHint,
@@ -82,6 +83,7 @@ export function TableSwitchRow({
         <TableRow
             label={labelWithTrailing}
             subLabel={subLabel}
+            icon={icon}
             variant={variant}
             disabled={disabled}
             start={start}

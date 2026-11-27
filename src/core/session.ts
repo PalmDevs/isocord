@@ -75,7 +75,7 @@ export function defineStore<T>(
 const log = logger('Session')
 
 /** Bump to drop the cache of every store. One store bumps its own `cacheVersion`. */
-const CACHE_VERSION = 8
+const CACHE_VERSION = 9
 /**
  * Set while a launch starts up from the cache.
  * Cleared once the restored state survives the first render or the app backgrounds, not on READY.

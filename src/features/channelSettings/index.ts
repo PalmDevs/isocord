@@ -1,3 +1,4 @@
+import { CreateChannelScreen } from './CreateChannelScreen'
 import { CustomizeGroupScreen } from './CustomizeGroupScreen'
 import { DuplicateChannelScreen } from './DuplicateChannelScreen'
 import { EditChannelScreen } from './EditChannelScreen'
@@ -6,7 +7,12 @@ import type { Feature } from '../../core/feature'
 
 export { closeDm, confirmLeaveGroup } from './leave'
 export { canDuplicateChannel, canEditChannel } from './permissions'
-export { openDuplicateChannel, openEditChannel, openEditGroup } from './routes'
+export {
+    openCreateChannel,
+    openDuplicateChannel,
+    openEditChannel,
+    openEditGroup,
+} from './routes'
 export {
     canArchiveThread,
     canDeleteThread,
@@ -31,6 +37,7 @@ export const channelSettingsFeature: Feature = {
     screens: {
         [CHANNEL_SETTINGS_ROUTES.editChannel]: EditChannelScreen,
         [CHANNEL_SETTINGS_ROUTES.duplicateChannel]: DuplicateChannelScreen,
+        [CHANNEL_SETTINGS_ROUTES.createChannel]: CreateChannelScreen,
         [CHANNEL_SETTINGS_ROUTES.customizeGroup]: CustomizeGroupScreen,
     },
 }

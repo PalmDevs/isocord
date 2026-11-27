@@ -6,6 +6,7 @@ import {
     UserNotificationSettings,
 } from '../core/discord/notificationSettings'
 import { Permission } from '../core/discord/permissions'
+import { BULK_ACK_BATCH_SIZE, ReadStateType } from '../core/discord/readStates'
 import {
     compareSnowflakes,
     snowflakeFromTimestamp,
@@ -62,6 +63,10 @@ declare module '../core/gateway/events' {
     }
     interface GatewayEvents {
         MESSAGE_CREATE: Message
+        BULK_ACK_LOCAL: {
+            guildId: string
+            entries: Array<{ channelId: string; messageId: string }>
+        }
         MESSAGE_ACK: {
             channel_id: string
             message_id: string
@@ -390,6 +395,19 @@ export const readStatesStore = defineStore(
             })
         })
 
+        dispatch.on('BULK_ACK_LOCAL', ({ guildId, entries }) => {
+            const state = store.getState()
+            const acks = { ...state.acks }
+            const mentions = { ...state.mentions }
+            const lowMentions = { ...state.lowMentions }
+            for (const { channelId, messageId } of entries) {
+                acks[channelId] = messageId
+                mentions[channelId] = 0
+                delete lowMentions[channelId]
+            }
+            change([guildId], { acks, mentions, lowMentions })
+        })
+
         const passive = (
             guildId: string,
             updated: Array<{ id: string; last_message_id: string }> | undefined,
@@ -576,6 +594,57 @@ export function markMessageUnread(
                     message.mentions?.some(user => user.id === session.userId)),
         ).length
     ackManually(session, channelId, previous, mentions)
+}
+
+/** Returns readable, viewable channels in `guildId` that have unreads or mentions (ignoring mutes). */
+function unreadGuildEntries(
+    session: Session,
+    guildId: string,
+): Array<{ channelId: string; messageId: string }> {
+    const guild = session.get(guildsStore).getState().guilds[guildId]
+    if (!guild) return []
+    const { byGuild, channels } = session.get(channelsStore).getState()
+    const readStates = session.get(readStatesStore).getState()
+    const joined = snowflakeFromTimestamp(new Date(guild.joinedAt).getTime())
+    const entries: Array<{ channelId: string; messageId: string }> = []
+    for (const id of byGuild[guildId] ?? []) {
+        const channel = channels[id]
+        if (!channel || !READABLE.has(channel.type)) continue
+        if (!can(session, id, Permission.VIEW_CHANNEL)) continue
+        const last = readStates.lastMessageIds[id]
+        const hasUnread =
+            last !== undefined &&
+            compareSnowflakes(last, readStates.acks[id] ?? joined) > 0
+        const hasMention = (readStates.mentions[id] ?? 0) > 0
+        if (!hasUnread && !hasMention) continue
+        const messageId = last ?? readStates.acks[id] ?? joined
+        entries.push({ channelId: id, messageId })
+    }
+    return entries
+}
+
+/** GuildReadStateStore.getGuildHasUnreadIgnoreMuted: true when any viewable channel has unreads or mentions. */
+export function guildHasUnread(session: Session, guildId: string): boolean {
+    return unreadGuildEntries(session, guildId).length > 0
+}
+
+/** markGuildsAsRead: marks every readable, viewable channel in a guild as read locally and on the server. */
+export function ackGuild(session: Session, guildId: string): void {
+    const entries = unreadGuildEntries(session, guildId)
+    if (entries.length === 0) return
+    session.gateway.dispatch.emit('BULK_ACK_LOCAL', { guildId, entries })
+    for (let i = 0; i < entries.length; i += BULK_ACK_BATCH_SIZE) {
+        const read_states = entries
+            .slice(i, i + BULK_ACK_BATCH_SIZE)
+            .map(e => ({
+                channel_id: e.channelId,
+                message_id: e.messageId,
+                read_state_type: ReadStateType.CHANNEL,
+            }))
+        session.rest
+            .post(Endpoint.bulkAck, { body: { read_states } })
+            .catch(() => {})
+    }
 }
 
 /** The manual ack of a "mark unread", applied locally first, then sent. */

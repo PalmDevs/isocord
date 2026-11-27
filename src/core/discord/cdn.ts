@@ -11,6 +11,19 @@ export const emojiUrl = (
 export const guildIconUrl = (guildId: string, hash: string, size: number) =>
     `${CDN_BASE}/icons/${guildId}/${hash}.webp?size=${size}`
 
+/** Returns a guild banner image (getGuildBannerURL). */
+export const guildBannerUrl = (
+    guildId: string,
+    hash: string,
+    size: number,
+    animated?: boolean,
+) =>
+    `${CDN_BASE}/banners/${guildId}/${hash}.webp?size=${size}${animated && hash.startsWith('a_') ? '&animated=true' : ''}`
+
+/** Returns a server tag badge icon (getGuildTagBadgeUrl). */
+export const guildTagBadgeUrl = (guildId: string, badge: string, size = 32) =>
+    `${CDN_BASE}/clan-badges/${guildId}/${badge}.png?size=${size}`
+
 /** Returns a sticker image from the media proxy. */
 export const stickerImageUrl = (id: string, extension: string, size: number) =>
     `${MEDIA_BASE}/stickers/${id}.${extension}?size=${size}`
