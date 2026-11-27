@@ -346,25 +346,20 @@ export const messagesStore = defineStore(
         const passReveal = (channelId: string, ids: Set<string>) =>
             store.setState(state => {
                 const channel = state.channels[channelId]
-                const nextChannelReveal =
-                    channel?.revealedId && ids.has(channel.revealedId)
-                        ? nextRevealAfterDelete(
-                              channel.messages,
-                              channel.revealedId,
-                              ids,
-                          )
-                        : channel?.revealedId
-                const shown = state.preview
-                const nextPreviewReveal =
-                    shown?.channelId === channelId &&
-                    shown.revealedId &&
-                    ids.has(shown.revealedId)
-                        ? nextRevealAfterDelete(
-                              shown.messages,
-                              shown.revealedId,
-                              ids,
-                          )
-                        : shown?.revealedId
+                const nextChannelReveal = nextRevealAfterDelete(
+                    channel?.messages ?? [],
+                    channel?.revealedId,
+                    ids,
+                )
+                const shown =
+                    state.preview?.channelId === channelId
+                        ? state.preview
+                        : undefined
+                const nextPreviewReveal = nextRevealAfterDelete(
+                    shown?.messages ?? [],
+                    shown?.revealedId,
+                    ids,
+                )
                 const channelChanged =
                     channel && nextChannelReveal !== channel.revealedId
                 const previewChanged =
