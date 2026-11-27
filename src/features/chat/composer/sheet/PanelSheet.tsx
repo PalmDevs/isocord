@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { SheetDragContext } from '../../../design/components/sheets/sheetDragContext'
+import { scheduleOnRN } from 'react-native-worklets'
+import { SheetDragContext } from '../../../../design/components/sheets/sheetDragContext'
 import { animateTo, PanelSheetContext } from './usePanelSheet'
 import type { ReactNode } from 'react'
 import type { PanelSheet } from './usePanelSheet'
@@ -40,7 +41,12 @@ export function PanelSheetProvider({
             release: (velocityY: number) => {
                 'worklet'
                 const target = pickSnap(height.get(), velocityY, min, max)
-                animateTo(height, target, target === 0 ? close : undefined)
+                if (target === 0) {
+                    scheduleOnRN(close)
+                    return
+                }
+                // The spring carries the finger's speed (positive is down, the sheet grows up).
+                animateTo(height, target, -velocityY)
             },
         }),
         [height, min, max, close],

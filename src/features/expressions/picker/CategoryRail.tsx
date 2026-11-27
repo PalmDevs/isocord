@@ -57,7 +57,7 @@ export function CategoryRail({
         // The keyboard sits over the system bar, so the rail on top of it (a sheet the keyboard lifts) needs no inset.
         const inset = bottom * (1 - keyboard.progress.get())
         const size = { height: RAIL_HEIGHT + inset, paddingBottom: inset }
-        if (max === 0) return size
+        if (max === 0 || (sheet?.closingFrom.get() ?? 0) > 0) return size
         const current = height.get()
         // The content is `max` tall once the sheet leaves its resting height (see KeyboardArea's SheetFrame).
         const content = current > min + 1 ? max : min

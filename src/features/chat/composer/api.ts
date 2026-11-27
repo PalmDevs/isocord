@@ -70,16 +70,22 @@ function textApi(store: LocalStore, input: ComposerInput, drafts: DraftSync) {
 function panelApi(store: LocalStore, input: ComposerInput) {
     return {
         openCustomKeyboard: (panel: string) => {
-            store.setState({ panel })
+            store.setState({ panel, awaitingKeyboard: false })
             input.focus('openCustomKeyboard')
         },
         closeCustomKeyboard: () =>
-            store.setState({ panel: null, panelTyping: false }),
+            store.setState({
+                panel: null,
+                panelTyping: false,
+                awaitingKeyboard: false,
+            }),
         openSystemKeyboard: () => {
-            // A keyboard that is already up (for the panel's own field) holds the space: no event will come for
-            // it, so the panel closes now.
-            if (store.getState().keyboardOpen)
-                store.setState({ panel: null, panelTyping: false })
+            // Close the panel now so it slides away at once; hold its space until the IME arrives when closed.
+            store.setState(state => ({
+                panel: null,
+                panelTyping: false,
+                awaitingKeyboard: state.panel !== null && !state.keyboardOpen,
+            }))
             input.focus('openSystemKeyboard')
         },
         setPanelTyping: (typing: boolean) =>

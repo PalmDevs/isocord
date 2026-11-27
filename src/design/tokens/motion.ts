@@ -86,14 +86,15 @@ export const ACTION_SHEET_SPRING = {
 /** ACTION_SHEET_SPRING_CONFIG_REDUCED_MOTION. */
 export const ACTION_SHEET_REDUCED_MOTION_TIMING = { duration: 250 }
 /**
- * The keyboard-area sheets (PortalKeyboardBottomSheet): @gorhom/bottom-sheet's Android default, the keyboard's own
- * duration (KEYBOARD_ANIMATION_DURATION) with an exponential ease-out, so a panel moves like the keyboard it stands
- * in for.
+ * The keyboard-area sheets and the room under the input, in and out, dragged or not.
+ * A critically damped spring: a soft start and a long, frictional settle, carrying a drag's velocity.
+ * Departs from the reference's 250 ms exponential ease-out (PortalKeyboardBottomSheet), which looks jarring.
  */
-export const KEYBOARD_SHEET_TIMING = {
-    duration: 250,
-    easing: Easing.out(Easing.exp),
-}
+export const KEYBOARD_SHEET_SPRING = {
+    duration: 400,
+    dampingRatio: 1,
+    overshootClamping: true,
+} as const
 
 /** EmojiSuggestionBarUtils.ITEM_ENTRANCE_SPRING_CONFIG: each suggested emoji pops in, 20 ms after the one before. */
 export const SUGGESTION_ENTRANCE_SPRING = {

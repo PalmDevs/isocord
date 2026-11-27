@@ -7,9 +7,8 @@ import type { LocalStore } from '../state/ComposerContext'
 import type { ComposerInput } from './nativeInput'
 
 const KEYBOARD_HEIGHT_KEY = 'keyboardHeight'
-/** The reference's KeyboardUIStore: 253 until a keyboard has been seen, and never less than 200 afterwards. */
+/** The reference's KeyboardUIStore: 253 until a keyboard has been seen. The panel's floor is in useKeyboardAreaMotion. */
 const DEFAULT_KEYBOARD_HEIGHT = 253
-const MIN_KEYBOARD_HEIGHT = 200
 
 /**
  * Resets of every mounted composer, so code outside the chat (the panels' swipe-away) can put them back to rest.
@@ -27,9 +26,8 @@ export function dismissComposers(): void {
 
 /** The keyboard's last known height (dp), kept across launches so a panel can open before any keyboard has. */
 export function lastKeyboardHeight(): number {
-    return Math.max(
-        deviceStorage.getNumber(KEYBOARD_HEIGHT_KEY) ?? DEFAULT_KEYBOARD_HEIGHT,
-        MIN_KEYBOARD_HEIGHT,
+    return (
+        deviceStorage.getNumber(KEYBOARD_HEIGHT_KEY) ?? DEFAULT_KEYBOARD_HEIGHT
     )
 }
 
@@ -40,18 +38,22 @@ export function lastKeyboardHeight(): number {
 export function useKeyboardTracking(store: LocalStore): void {
     useEffect(() => {
         const subscriptions = [
-            KeyboardEvents.addListener('keyboardWillShow', () =>
-                store.setState({ keyboardOpen: true }),
+            KeyboardEvents.addListener('keyboardWillShow', event =>
+                store.setState(state => ({
+                    keyboardOpen: true,
+                    keyboardHeight:
+                        event.height > 0 ? event.height : state.keyboardHeight,
+                })),
             ),
             KeyboardEvents.addListener('keyboardDidShow', event => {
-                if (event.height > 0)
-                    deviceStorage.set(
-                        KEYBOARD_HEIGHT_KEY,
-                        Math.max(event.height, MIN_KEYBOARD_HEIGHT),
-                    )
+                const nextHeight = event.height > 0 ? event.height : undefined
+                if (nextHeight !== undefined)
+                    deviceStorage.set(KEYBOARD_HEIGHT_KEY, nextHeight)
                 // The keyboard replaces a panel, unless it came up for a field inside the panel.
                 store.setState(state => ({
                     keyboardOpen: true,
+                    awaitingKeyboard: false,
+                    keyboardHeight: nextHeight ?? state.keyboardHeight,
                     panel: state.panelTyping ? state.panel : null,
                 }))
             }),
@@ -72,6 +74,7 @@ export function useDismissal(store: LocalStore, input: ComposerInput): void {
             store.setState({
                 panel: null,
                 panelTyping: false,
+                awaitingKeyboard: false,
                 mediaRowOpen: false,
             })
             input.blur()
@@ -95,7 +98,11 @@ export function useBackClosesPanel(store: LocalStore, open: boolean): void {
         const subscription = BackHandler.addEventListener(
             'hardwareBackPress',
             () => {
-                store.setState({ panel: null, panelTyping: false })
+                store.setState({
+                    panel: null,
+                    panelTyping: false,
+                    awaitingKeyboard: false,
+                })
                 return true
             },
         )

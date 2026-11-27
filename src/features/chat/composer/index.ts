@@ -3,11 +3,11 @@ export { actionButtonStyles } from './actionButtonStyles'
 export { Composer } from './Composer'
 export { Reveal } from './floating'
 export { dismissComposers } from './input/keyboard'
-export { SHEET_HANDLE_HEIGHT } from './keyboardAreaMetrics'
 export { registerComposerSlots } from './parsing/slots'
+export { SHEET_HANDLE_HEIGHT } from './sheet/keyboardAreaMetrics'
+export { usePanelSheet } from './sheet/usePanelSheet'
 export { ComposerProvider } from './state/ComposerContext'
 export { useComposer, useComposerState } from './state/useComposer'
-export { usePanelSheet } from './usePanelSheet'
 export type {
     ComposerActionButton,
     ComposerAttachment,

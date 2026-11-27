@@ -12,6 +12,7 @@ import { useSession } from '../../../../core/react'
 import { createComposerApi } from '../api'
 import { createDraftSync, useDraftSync } from '../input/draftSync'
 import {
+    lastKeyboardHeight,
     useBackClosesPanel,
     useDismissal,
     useKeyboardTracking,
@@ -37,12 +38,16 @@ export interface ComposerState {
     selection: { start: number; end: number }
     focused: boolean
     keyboardOpen: boolean
+    /** Height of the IME (dp), current or last known, updated as it starts opening. */
+    keyboardHeight: number
     /** An input command needs the native field before the opening animation settles. */
     inputRequested: boolean
     /** Name of the panel shown in the custom-keyboard area, or null. */
     panel: string | null
     /** A field inside the panel (its search) has the keyboard, so a keyboard coming up must not close the panel. */
     panelTyping: boolean
+    /** The system keyboard was asked to replace a panel. Its room is held until the IME has opened. */
+    awaitingKeyboard: boolean
     mediaRowOpen: boolean
     /** Height of the typing indicator while it is up (0 otherwise); the chat list makes room for it. */
     typingInset: number
@@ -167,9 +172,11 @@ const createLocalStore = (
         selection: { start: 0, end: 0 },
         focused: false,
         keyboardOpen: false,
+        keyboardHeight: lastKeyboardHeight(),
         inputRequested: false,
         panel: null,
         panelTyping: false,
+        awaitingKeyboard: false,
         mediaRowOpen: false,
         typingInset: 0,
         canSend,

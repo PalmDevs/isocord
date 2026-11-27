@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AppState } from 'react-native'
+import { useAppState } from 'react-native'
 import { compareSnowflakes } from '../../../core/discord/snowflake'
 import { useSession, useSessionStore } from '../../../core/react'
 import { longestScrollMs } from '../../../native/IsocordConstants'
@@ -66,7 +66,7 @@ export function useReadSession({
         messagesStore,
         state => state.channels[channelId],
     )
-    const active = useAppActive()
+    const active = useAppState() === 'active'
     // Unknown (false) until the list reports it, so a chat restored to a spot in its history is not read on opening.
     const [bottom, setBottom] = useState<{
         channelId: string
@@ -118,17 +118,6 @@ export function useReadSession({
         onAtBottomChange: (scrollKey, atBottom) =>
             setBottom({ channelId: scrollKey, atBottom }),
     }
-}
-
-function useAppActive(): boolean {
-    const [active, setActive] = useState(AppState.currentState === 'active')
-    useEffect(() => {
-        const subscription = AppState.addEventListener('change', state =>
-            setActive(state === 'active'),
-        )
-        return () => subscription.remove()
-    }, [])
-    return active
 }
 
 /**

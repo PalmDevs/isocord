@@ -1,44 +1,59 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-    BackHandler,
-    Keyboard,
-    Pressable,
-    useWindowDimensions,
-    View,
-} from 'react-native'
-import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
+import { useCallback, useEffect, useReducer, useState } from 'react'
+import { BackHandler, Keyboard, Pressable, View } from 'react-native'
 import Animated, {
     Extrapolation,
     interpolate,
     useAnimatedReaction,
     useAnimatedStyle,
-    useSharedValue,
-    withTiming,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { scheduleOnRN } from 'react-native-worklets'
-import { Backdrop } from '../../../design/components/overlays/Backdrop'
-import { SheetDrag } from '../../../design/components/sheets/SheetDrag'
-import { KEYBOARD_SHEET_TIMING } from '../../../design/tokens/motion'
-import { t } from '../../../i18n'
-import { lastKeyboardHeight } from './input/keyboard'
-import { SHEET_HANDLE_HEIGHT } from './keyboardAreaMetrics'
-import { PanelSheetProvider } from './PanelSheet'
-import { useComposerSlots } from './parsing/slots'
+import { Backdrop } from '../../../../design/components/overlays/Backdrop'
+import { SheetDrag } from '../../../../design/components/sheets/SheetDrag'
+import { t } from '../../../../i18n'
+import { useComposerSlots } from '../parsing/slots'
 import {
     useComposer,
     useComposerInternals,
     useComposerState,
-} from './state/useComposer'
+} from '../state/useComposer'
+import { SHEET_HANDLE_HEIGHT } from './keyboardAreaMetrics'
+import { PanelSheetProvider } from './PanelSheet'
+import { useKeyboardAreaMotion, useSheetBounds } from './useKeyboardAreaMotion'
 import { useSheetController } from './usePanelSheet'
 import type { ReactNode } from 'react'
 import type { PanelSheet } from './usePanelSheet'
 
-const CLOSE_MS = KEYBOARD_SHEET_TIMING.duration
-const KEYBOARD_GAP = 8
-/** NAV_BAR_HEIGHT_MULTILINE: an expanded sheet stops this far below the status bar. */
-const TOP_GAP = 56
+/** Panels built so far, the one drawn, and each panel's build generation. */
+interface PanelLifecycle {
+    opened: string[]
+    shown: string | null
+    generations: Record<string, number>
+}
+
+/**
+ * Returns the lifecycle once `next` is drawn (null: the closed sheet has slid away).
+ * The panel drawn before forgets its state (tab, search, scroll): it is built afresh, still hidden, so its next
+ * opening starts clean and costs no build.
+ */
+function showPanel(state: PanelLifecycle, next: string | null): PanelLifecycle {
+    if (next === state.shown) return state
+    const { shown, generations } = state
+    return {
+        opened:
+            next === null || state.opened.includes(next)
+                ? state.opened
+                : [...state.opened, next],
+        shown: next,
+        generations:
+            shown === null
+                ? generations
+                : { ...generations, [shown]: (generations[shown] ?? 0) + 1 },
+    }
+}
+
+const NO_PANELS: PanelLifecycle = { opened: [], shown: null, generations: {} }
 
 /**
  * The space under the input: the keyboard's, or a custom panel's.
@@ -48,7 +63,6 @@ const TOP_GAP = 56
  * The panel is a sheet (reference: `PortalKeyboardBottomSheet`, snap points `[minimum, maximum]`).
  * At rest it has the keyboard's height. Dragging its handle, header or a list at its top expands it over the chat.
  * Dragging down brings it back, or closes it from the keyboard's height.
- * The space this area takes does not change, so the chat does not move.
  *
  * A panel is built on first open and kept, invisible while closed.
  * Opening it again costs no build, and its lists stay laid out.
@@ -62,44 +76,15 @@ export function KeyboardArea({ channelId }: { channelId: string }) {
         insets.bottom,
         theme.modules.mobile.CHAT_INPUT_FLOATING_OFFSET_MINIMUM,
     )
-    const { height: windowHeight } = useWindowDimensions()
-    const keyboard = useReanimatedKeyboardAnimation()
     const composer = useComposer()
+    const { store } = useComposerInternals()
     const panel = useComposerState(state => state.panel)
+    const imeHeight = useComposerState(state => state.keyboardHeight)
     const panels = useComposerSlots(state => state.panels)
-    const panelHeight = useSharedValue(0)
+    const { min, max } = useSheetBounds(imeHeight)
 
-    // useKeyboardActionSheetHeight: the sheet rests at the keyboard's height (a tall keyboard leaves a
-    // navigation bar's height to expand into) and expands to the window less the status and navigation bars.
-    const max = Math.max(0, windowHeight - insets.top - TOP_GAP)
-    const keyboardHeight = lastKeyboardHeight()
-    const min =
-        keyboardHeight >= max ? Math.max(0, max - TOP_GAP) : keyboardHeight
-
-    const [opened, setOpened] = useState<string[]>([])
-    useEffect(() => {
-        if (panel !== null && !opened.includes(panel))
-            setOpened(names => [...names, panel])
-    }, [panel, opened])
-
-    // A closed panel forgets its state (tab, search, scroll): once it has slid away it is built afresh, still
-    // hidden, so the next opening starts clean and costs no build.
-    const [generations, setGenerations] = useState<Record<string, number>>({})
-    const lastPanel = useRef(panel)
-    useEffect(() => {
-        const closed = lastPanel.current
-        lastPanel.current = panel
-        if (closed === null || closed === panel) return
-        const timer = setTimeout(
-            () =>
-                setGenerations(current => ({
-                    ...current,
-                    [closed]: (current[closed] ?? 0) + 1,
-                })),
-            CLOSE_MS,
-        )
-        return () => clearTimeout(timer)
-    }, [panel])
+    const [lifecycle, show] = useReducer(showPanel, NO_PANELS)
+    if (panel !== null && panel !== lifecycle.shown) show(panel)
 
     const { closeCustomKeyboard } = composer
     // Keeps its identity: the sheet controller's memo depends on it.
@@ -109,86 +94,24 @@ export function KeyboardArea({ channelId }: { channelId: string }) {
         Keyboard.dismiss()
     }, [closeCustomKeyboard])
     const sheet = useSheetController({ min, max, close })
-    const { height: sheetHeight } = sheet
+    const expanded = useExpanded(sheet, panel !== null)
 
-    // Open above its resting height, which the Back button undoes first.
-    const [expanded, setExpanded] = useState(false)
-    useAnimatedReaction(
-        () => sheetHeight.get() > min + 1,
-        (now, was) => {
-            if (now !== was) scheduleOnRN(setExpanded, now)
+    const room = useKeyboardAreaMotion({
+        store,
+        sheet,
+        bottomOffset,
+        expanded,
+        // A reopened panel cancels the slide, so this only runs once the sheet is gone.
+        onClosed: () => {
+            if (store.getState().panel === null) show(null)
         },
-        [min],
-    )
-    useEffect(() => {
-        if (!expanded || panel === null) return
-        const subscription = BackHandler.addEventListener(
-            'hardwareBackPress',
-            () => {
-                sheet.collapse()
-                return true
-            },
-        )
-        return () => subscription.remove()
-    }, [expanded, panel, sheet])
-
-    // A closed sheet rests at the keyboard's height, ready for the next opening; one that is open follows it
-    // unless it is expanded.
-    const expandedNow = useRef(false)
-    expandedNow.current = expanded
-    useEffect(() => {
-        if (panel === null || !expandedNow.current) sheetHeight.set(min)
-    }, [panel, min, sheetHeight])
-
-    // A panel that replaces the system keyboard takes the keyboard's room at once (reference: the
-    // keyboard-height placeholder stays while the IME hides). Growing it with a timing instead lets the IME
-    // shrink faster than the panel grows, so the input bobbed down and up. This runs inside the setState that
-    // asks for the panel, before the native input hides the IME, not a commit later like the effect below.
-    const { store } = useComposerInternals()
-    useEffect(
-        () =>
-            store.subscribe((state, previous) => {
-                if (
-                    state.panel !== null &&
-                    previous.panel === null &&
-                    previous.keyboardOpen
-                )
-                    panelHeight.set(min + KEYBOARD_GAP)
-            }),
-        [store, min, panelHeight],
-    )
-
-    useEffect(() => {
-        if (panel !== null) {
-            panelHeight.set(
-                withTiming(min + KEYBOARD_GAP, KEYBOARD_SHEET_TIMING),
-            )
-            // We want to animate closing the panel.
-            // } else if (keyboard.height.get() < -1) {
-            //     // The keyboard is already there to hold the space.
-            //     panelHeight.set(0)
-        } else {
-            panelHeight.set(withTiming(0, KEYBOARD_SHEET_TIMING))
-        }
-    }, [panel, min, panelHeight /*, keyboard.height */])
-
-    const style = useAnimatedStyle(() => {
-        // The card sits KEYBOARD_GAP above the keyboard; the gap grows in with it.
-        const open = Math.max(0, -keyboard.height.get())
-        return {
-            height: Math.max(
-                open + Math.min(KEYBOARD_GAP, open),
-                panelHeight.get(),
-                bottomOffset,
-            ),
-        }
     })
 
     // The spacer holds the room under the input; the sheets are drawn in a layer filling the composer's
     // full-window wrapper, so an expanded sheet stays inside its parent's bounds and gets its touches.
     return (
         <>
-            <Animated.View style={style} />
+            <Animated.View style={room} />
             <View pointerEvents="box-none" style={styles.layer}>
                 <SheetBackdrop
                     sheet={sheet}
@@ -197,14 +120,15 @@ export function KeyboardArea({ channelId }: { channelId: string }) {
                 {Object.entries(panels).map(
                     ([name, { placement, Component }]) =>
                         placement === 'keyboard' &&
-                        (opened.includes(name) || name === panel) ? (
+                        lifecycle.opened.includes(name) ? (
                             <PanelSheetProvider key={name} value={sheet}>
                                 <SheetFrame
                                     sheet={sheet}
                                     active={name === panel}
+                                    shown={name === lifecycle.shown}
                                 >
                                     <Component
-                                        key={generations[name] ?? 0}
+                                        key={lifecycle.generations[name] ?? 0}
                                         channelId={channelId}
                                     />
                                 </SheetFrame>
@@ -216,6 +140,30 @@ export function KeyboardArea({ channelId }: { channelId: string }) {
     )
 }
 
+/** Returns whether the sheet is open above its resting height. Back collapses it first. */
+function useExpanded(sheet: PanelSheet, open: boolean) {
+    const { height, min } = sheet
+    const [expanded, setExpanded] = useState(false)
+    useAnimatedReaction(
+        () => height.get() > min + 1,
+        (now, was) => {
+            if (now !== was) scheduleOnRN(setExpanded, now)
+        },
+        [min],
+    )
+    useEffect(() => {
+        if (!expanded || !open) return
+        const subscription = BackHandler.addEventListener(
+            'hardwareBackPress',
+            () => {
+                sheet.collapse()
+                return true
+            },
+        )
+        return () => subscription.remove()
+    }, [expanded, open, sheet])
+    return expanded
+}
 /** Dims the chat behind an expanded sheet; tapping it collapses the sheet. */
 function SheetBackdrop({
     sheet,
@@ -247,30 +195,44 @@ function SheetBackdrop({
 function SheetFrame({
     sheet,
     active,
+    shown,
     children,
 }: {
     sheet: PanelSheet
     active: boolean
+    shown: boolean
     children: ReactNode
 }) {
-    const { height, min, max } = sheet
+    const { height, closingFrom, min, max } = sheet
     const frame = useAnimatedStyle(() => {
         const current = height.get()
+        const from = closingFrom.get()
+        if (from > 0) {
+            return {
+                opacity: shown && current > 0 ? 1 : 0,
+                height: from,
+                transform: [{ translateY: Math.max(0, from - current) }],
+            }
+        }
         return {
+            // Kept at its real size while closed so its lists stay laid out, but not drawn.
+            opacity: shown && current > 0 ? 1 : 0,
             height: Math.min(max, Math.max(min, current)),
             // Dragged below its resting height it slides down rather than shrinking.
             transform: [{ translateY: Math.max(0, min - current) }],
         }
     })
     // Like the reference: the content is `maximum` tall once the sheet leaves its resting height, `minimum` otherwise.
-    const content = useAnimatedStyle(() => ({
-        height: height.get() > min + 1 ? max : min,
-    }))
+    const content = useAnimatedStyle(() => {
+        const from = closingFrom.get()
+        const ref = from > 0 ? from : height.get()
+        return { height: ref > min + 1 ? max : min }
+    })
     return (
         <Animated.View
             pointerEvents={active ? 'box-none' : 'none'}
             importantForAccessibility={active ? 'auto' : 'no-hide-descendants'}
-            style={[styles.sheet, !active && styles.closed, frame]}
+            style={[styles.sheet, frame]}
         >
             <Animated.View style={[styles.content, content]}>
                 {children}
@@ -309,8 +271,6 @@ const styles = StyleSheet.create(theme => ({
             theme.modules.mobile.MOBILE_KEYBOARD_TOP_BORDER_RADIUS,
         backgroundColor: theme.colors.MOBILE_KEYBOARD_PANEL_BACKGROUND,
     },
-    // Kept at its real size so its lists stay laid out, but not drawn.
-    closed: { opacity: 0 },
     content: { width: '100%' },
     handleArea: {
         position: 'absolute',
