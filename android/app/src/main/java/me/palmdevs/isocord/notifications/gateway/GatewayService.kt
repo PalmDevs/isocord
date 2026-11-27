@@ -184,7 +184,10 @@ class GatewayService : Service(), GatewayListener {
     }
   }
 
-  /** Subscribes to `threads` for guilds with forum or media channels so THREAD_CREATE arrives. */
+  /**
+   * Subscribes to `threads` for guilds with forum or media channels so THREAD_CREATE arrives.
+   * Stands in for the reference's FORUM_THREAD_CREATED push (NotificationData).
+   */
   private fun subscribeForums() {
     val guildIds =
       state.channels.values.mapNotNullTo(HashSet()) { channel ->

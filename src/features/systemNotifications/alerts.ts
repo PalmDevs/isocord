@@ -1,6 +1,3 @@
-import { THREADS_ONLY_CHANNEL_TYPES } from '../../core/discord/channelType'
-import { channelsStore } from '../../stores/channels/channels'
-import { subscribeToGuildThreads } from '../../stores/memberList'
 import { forward } from './forward'
 import type { Session } from '../../core/session'
 
@@ -41,55 +38,19 @@ const EVENT_USER_EVENTS = [
     'GUILD_SCHEDULED_EVENT_USER_REMOVE',
 ] as const
 
-function subscribeForumGuilds(session: Session): void {
-    const channels = session.get(channelsStore).getState().channels
-    for (const channel of Object.values(channels)) {
-        if (channel.guild_id && THREADS_ONLY_CHANNEL_TYPES.has(channel.type)) {
-            subscribeToGuildThreads(session, channel.guild_id)
-        }
-    }
-}
-
 /** Forwards a session's alert dispatches. Returns the cleanup. */
 export function forwardAlerts(session: Session): () => void {
     const { dispatch } = session.gateway
-    subscribeForumGuilds(session)
     const offs = [
         // Only the relationships, to tell an accepted request (ReadyRelationships in AppSession.kt).
-        dispatch.on('READY', ready => {
-            for (const guild of ready.guilds ?? []) {
-                if (
-                    guild.channels?.some(channel =>
-                        THREADS_ONLY_CHANNEL_TYPES.has(channel.type),
-                    )
-                ) {
-                    subscribeToGuildThreads(session, guild.id)
-                }
-            }
-            return forward(
+        dispatch.on('READY', ready =>
+            forward(
                 session,
                 'READY',
                 { relationships: ready.relationships ?? [] },
                 {},
-            )
-        }),
-        dispatch.on('GUILD_CREATE', guild => {
-            if (
-                guild.channels?.some(channel =>
-                    THREADS_ONLY_CHANNEL_TYPES.has(channel.type),
-                )
-            ) {
-                subscribeToGuildThreads(session, guild.id)
-            }
-        }),
-        dispatch.on('CHANNEL_CREATE', channel => {
-            if (
-                channel.guild_id &&
-                THREADS_ONLY_CHANNEL_TYPES.has(channel.type)
-            ) {
-                subscribeToGuildThreads(session, channel.guild_id)
-            }
-        }),
+            ),
+        ),
         ...CALL_EVENTS.map(type =>
             dispatch.on(type, call =>
                 forward(session, type, call, {
@@ -111,7 +72,7 @@ export function forwardAlerts(session: Session): () => void {
                 userIds: [reaction.user_id],
             }),
         ),
-        // The forum is the place: the thread is new to the stores' lookups.
+        // The forum is the place: the thread is new to the stores' lookups. Only the open server sends it (subscribeToGuild).
         dispatch.on('THREAD_CREATE', thread =>
             forward(session, 'THREAD_CREATE', thread, {
                 channelId: thread.parent_id,

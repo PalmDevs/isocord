@@ -483,6 +483,9 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [x] Placeholder invite screen (`features/invite`) for discord.gg and discord.com invite links (`core/discord/inviteUrl.ts`).
 - [x] Notification taps (`isocord://channel`) open the chat without the hold check, which now covers only https Discord links. An unknown channel opens as a DM (`MainTabs` `ChannelOpener`).
   - [ ] Verify on device: a first DM's notification, and a cold start before READY.
+- [x] Forum thread subscriptions: the JS gateway now subscribes to `threads` only for the open server (`GuildSubscriptions.subscribeToGuild`).
+  - [x] The background gateway (`GatewayService.kt`) keeps subscribing for every server with a forum. It stands in for push, and the official APK gets forum alerts as the `FORUM_THREAD_CREATED` push type (`NotificationData`).
+  - [x] Removed the unused `subscribeToGuildThreads` and `threadGuilds` from `stores/memberList.ts`.
 - [x] Guild invite sheet (InstantInviteActionSheet): one invite on open, a new one only on Save after changing Expire After or Max Uses. Default expiry 7 days, never for hubs.
   - [ ] No Link Settings screen (InviteSettingsModal). No roles, temporary membership or application-bypass options.
   - The channel can't be changed, as in the reference.
