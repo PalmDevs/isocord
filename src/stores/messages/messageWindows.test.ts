@@ -157,3 +157,30 @@ test('a window jumped to ignores new messages', () => {
     receive(11)
     expect(channel()).toBe(detached)
 })
+
+test('a refresh drops the newest message when the server no longer has it', async () => {
+    let respond = (_page: Message[]) => {}
+    const { session, channel, loaded, receive } = chat(
+        () =>
+            new Promise(resolve => {
+                respond = resolve
+            }),
+    )
+    // Message 11 was deleted while its MESSAGE_DELETE could not arrive.
+    loaded(range(1, 11))
+    session.get(messagesStore).setState(state => ({
+        channels: {
+            [CHANNEL]: { ...state.channels[CHANNEL]!, stale: true },
+        },
+    }))
+    const loading = loadMessages(session, CHANNEL)
+    // Arrived over the gateway while the page was on its way.
+    receive(12)
+    respond(range(1, 10))
+    await loading
+    expect(
+        channel()
+            ?.messages.map(message => message.id)
+            .slice(0, 2),
+    ).toEqual(['12', '10'])
+})

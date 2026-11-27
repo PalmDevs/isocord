@@ -318,6 +318,13 @@ export function moderationActions({
                     () =>
                         session.rest
                             .delete(Endpoint.channelMessage(channelId, id))
+                            // MessageActionCreators.deleteMessage: removed locally, not only by the gateway echo.
+                            .then(() =>
+                                session.gateway.dispatch.emit(
+                                    'MESSAGE_DELETE',
+                                    { id, channel_id: channelId },
+                                ),
+                            )
                             .catch(() => toast(t('chat.actions.failed'))),
                     alertMessagePreview(session, message),
                 ),

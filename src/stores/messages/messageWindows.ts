@@ -70,16 +70,19 @@ const recentlyFailed = (session: Session, key: string) =>
  * Older messages are dropped because nothing says they join up with the page.
  * Kept, as the reference merges them back: gateway messages newer than the page,
  * and messages still sending or failed.
+ * A newer message that was loaded before the request is dropped: the server no longer has it.
  */
 function mergeNewest(
     known: Message[],
     page: Message[],
+    loadedBefore: Set<string>,
 ): Pick<ChannelMessages, 'messages' | 'hasMore'> {
     const newest = page[0]
     const kept = known.filter(
         message =>
             message.state !== undefined ||
             (newest !== undefined &&
+                !loadedBefore.has(message.id) &&
                 compareSnowflakes(message.id, newest.id) > 0),
     )
     return {
@@ -143,6 +146,8 @@ export async function loadMessages(
     }
 
     const before = older ? current?.messages.at(-1)?.id : undefined
+    // Messages that arrive after this are the gateway's, and may be newer than the page.
+    const loadedBefore = new Set(current?.messages.map(message => message.id))
     const set = (patch: Partial<ChannelMessages>) =>
         store.setState(state => ({
             channels: {
@@ -179,7 +184,7 @@ export async function loadMessages(
         const known = store.getState().channels[channelId]?.messages ?? []
         if (!older) {
             // A detached window (`jumpToPresent`) is replaced the same way; it never holds newer messages.
-            const merged = mergeNewest(known, page)
+            const merged = mergeNewest(known, page, loadedBefore)
             // MessagesRenderer fetchMoreBefore: the next page waits for the list to near its top.
             set({ ...merged, hasMoreAfter: false, stale: false })
             return
