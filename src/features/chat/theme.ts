@@ -92,8 +92,15 @@ export function chatTheme({
         jumpIcon: argb(colors.CHAT_INPUT_ICON_DEFAULT_TINT),
         // The swipe to reply gutter: the reference's native chatSwipeToReplyBackground (not a JS token; a surface
         // close to it), the circle that turns brand coloured at the threshold, and the circle that replaces it
-        // for an edit (SwipeHelper.drawContextArea).
-        swipeBackground: argb(colors.BACKGROUND_BASE_LOW),
+        // for an edit (SwipeHelper.drawContextArea). Light's BACKGROUND_BASE_LOW equals the chat background, and
+        // gradient themes' BACKGROUND_BASE_LOW equals their scrim, so each takes a distinct surface instead.
+        swipeBackground: argb(
+            gradient
+                ? colors.BACKGROUND_MOD_SUBTLE
+                : isDark
+                  ? colors.BACKGROUND_BASE_LOW
+                  : colors.BACKGROUND_BASE_LOWEST,
+        ),
         swipeCircle: argb(colors.BACKGROUND_SURFACE_HIGHEST),
         swipeCircleActive: argb(colors.BACKGROUND_BRAND),
         swipeEditCircle: argb(colors.INTERACTIVE_BACKGROUND_SELECTED),

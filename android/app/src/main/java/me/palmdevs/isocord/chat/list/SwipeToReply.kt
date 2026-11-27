@@ -10,8 +10,10 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,10 +22,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
@@ -71,6 +78,7 @@ private val ELASTIC = 48.dp
 
 private val MAX_CIRCLE = 40.dp
 private val CIRCLE_MARGIN = 6.dp
+private val MAX_CORNER_RADIUS = 16.dp
 
 /** AccelerateDecelerateInterpolator, which every animation of SwipeHelper and its recover animation uses. */
 private val AccelerateDecelerate = Easing { fraction -> (cos((fraction + 1.0) * PI) / 2.0 + 0.5).toFloat() }
@@ -113,6 +121,7 @@ private class SwipeState {
   var armed = true
   var returning: Job? = null
   var editing: Job? = null
+  val rowPath = Path()
 }
 
 /**
@@ -125,7 +134,8 @@ private class SwipeState {
  */
 @Composable
 fun SwipeToReply(canEdit: Boolean?, onSwipe: (SwipeAction) -> Unit, content: @Composable () -> Unit) {
-  if (canEdit == null) return content()
+  val slot = remember { movableContentOf<@Composable () -> Unit> { it() } }
+  if (canEdit == null) return slot(content)
   val theme = LocalChatTheme.current
   val view = LocalView.current
   val scope = rememberCoroutineScope()
@@ -139,6 +149,7 @@ fun SwipeToReply(canEdit: Boolean?, onSwipe: (SwipeAction) -> Unit, content: @Co
   val elastic = with(density) { ELASTIC.toPx() }
   val circleMargin = with(density) { CIRCLE_MARGIN.toPx() }
   val maxCircle = with(density) { MAX_CIRCLE.toPx() }
+  val maxCornerRadius = with(density) { MAX_CORNER_RADIUS.toPx() }
 
   val controller = remember(density) {
     SwipeController(state, scope, view, stop, reset, edit, circleMargin, maxCircle, { currentCanEdit }, { currentOnSwipe(it) })
@@ -147,7 +158,7 @@ fun SwipeToReply(canEdit: Boolean?, onSwipe: (SwipeAction) -> Unit, content: @Co
   Box(
     Modifier
       .fillMaxWidth()
-      .drawBehind { drawGutter(state, theme, stop, circleMargin, maxCircle) }
+      .drawBehind { drawGutter(state, theme, stop, circleMargin, maxCircle, maxCornerRadius) }
       .pointerInput(Unit) {
         awaitEachGesture {
           val down = awaitFirstDown(requireUnconsumed = false)
@@ -176,7 +187,23 @@ fun SwipeToReply(canEdit: Boolean?, onSwipe: (SwipeAction) -> Unit, content: @Co
         }
       },
   ) {
-    Box(Modifier.fillMaxWidth().graphicsLayer { translationX = -state.pull }) { content() }
+    Box(
+      Modifier
+        .fillMaxWidth()
+        .graphicsLayer {
+          translationX = -state.pull
+          val radius = (state.pull / stop).coerceIn(0f, 1f) * maxCornerRadius
+          if (radius > 0f) {
+            shape = RoundedCornerShape(topEnd = radius, bottomEnd = radius)
+            clip = true
+          } else {
+            clip = false
+          }
+        }
+        .drawBehind {
+          if (state.pull > 0f && theme.background != Color.Transparent) drawRect(theme.background)
+        },
+    ) { slot(content) }
   }
 }
 
@@ -209,10 +236,18 @@ private suspend fun AwaitPointerEventScope.holdGesture(pointer: PointerId, onMov
 private fun lerpFloat(from: Float, to: Float, fraction: Float) = from + (to - from) * fraction
 
 /** The area the row uncovers on its right: a band with the reply circle centred in it (SwipeHelper.drawContextArea). */
-private fun DrawScope.drawGutter(state: SwipeState, theme: ChatTheme, stop: Float, margin: Float, maxCircle: Float) {
+private fun DrawScope.drawGutter(
+  state: SwipeState,
+  theme: ChatTheme,
+  stop: Float,
+  margin: Float,
+  maxCircle: Float,
+  maxCornerRadius: Float,
+) {
   val pull = state.pull
   if (pull < 1f) return
   val progress = (pull / stop).coerceIn(0f, 1f)
+  val radiusPx = progress * maxCornerRadius
   val shown = if (state.completed) 1f else progress
   // Colours hold their start value until 80% of the way, then reach the end value at the threshold.
   val mix = ((shown - 0.8f) / 0.2f).coerceIn(0f, 1f)
@@ -225,31 +260,45 @@ private fun DrawScope.drawGutter(state: SwipeState, theme: ChatTheme, stop: Floa
   // The arrow turns into place as the swipe nears the threshold.
   val degrees = (1f - progress) * 90f
 
-  clipRect(left = size.width - pull, right = size.width) {
-    drawRect(theme.swipeBackground)
-    drawCircle(lerp(theme.swipeCircle, theme.swipeCircleActive, mix).copy(alpha = alpha), radius, center)
-    val editScale = state.editScale
-    if (editScale > 0f) {
-      withTransform({ scale(editScale, editScale, center) }) {
-        drawCircle(lerp(theme.swipeCircle, theme.swipeEditCircle, mix).copy(alpha = 1f), radius, center)
+  state.rowPath.reset()
+  state.rowPath.addRoundRect(
+    RoundRect(
+      left = -pull,
+      top = 0f,
+      right = size.width - pull,
+      bottom = size.height,
+      topRightCornerRadius = CornerRadius(radiusPx, radiusPx),
+      bottomRightCornerRadius = CornerRadius(radiusPx, radiusPx),
+    ),
+  )
+
+  clipRect(left = (size.width - pull - radiusPx).coerceAtLeast(0f), right = size.width) {
+    clipPath(state.rowPath, ClipOp.Difference) {
+      drawRect(theme.swipeBackground)
+      drawCircle(lerp(theme.swipeCircle, theme.swipeCircleActive, mix).copy(alpha = alpha), radius, center)
+      val editScale = state.editScale
+      if (editScale > 0f) {
+        withTransform({ scale(editScale, editScale, center) }) {
+          drawCircle(lerp(theme.swipeCircle, theme.swipeEditCircle, mix).copy(alpha = 1f), radius, center)
+        }
       }
-    }
-    val replyScale = (1f - editScale).coerceIn(0f, 1f)
-    withTransform({
-      translate(center.x - 1f, center.y - 1f)
-      rotate(degrees, Offset.Zero)
-      scale(replyScale, replyScale, Offset.Zero)
-      translate(-iconSize / 2, -iconSize / 2)
-      scale(iconSize / REPLY_VIEWPORT, iconSize / REPLY_VIEWPORT, Offset.Zero)
-    }) { drawPath(REPLY_PATH, iconColor.copy(alpha = alpha)) }
-    if (editScale > 0f) {
+      val replyScale = (1f - editScale).coerceIn(0f, 1f)
       withTransform({
         translate(center.x - 1f, center.y - 1f)
         rotate(degrees, Offset.Zero)
-        scale(editScale, editScale, Offset.Zero)
+        scale(replyScale, replyScale, Offset.Zero)
         translate(-iconSize / 2, -iconSize / 2)
-        scale(iconSize / EDIT_VIEWPORT, iconSize / EDIT_VIEWPORT, Offset.Zero)
-      }) { drawPath(EDIT_PATH, iconColor) }
+        scale(iconSize / REPLY_VIEWPORT, iconSize / REPLY_VIEWPORT, Offset.Zero)
+      }) { drawPath(REPLY_PATH, iconColor.copy(alpha = alpha)) }
+      if (editScale > 0f) {
+        withTransform({
+          translate(center.x - 1f, center.y - 1f)
+          rotate(degrees, Offset.Zero)
+          scale(editScale, editScale, Offset.Zero)
+          translate(-iconSize / 2, -iconSize / 2)
+          scale(iconSize / EDIT_VIEWPORT, iconSize / EDIT_VIEWPORT, Offset.Zero)
+        }) { drawPath(EDIT_PATH, iconColor) }
+      }
     }
   }
 }
