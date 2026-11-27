@@ -8,6 +8,7 @@ import { debugLogsFeature } from '../features/debugLogs'
 import { expressionsFeature } from '../features/expressions'
 import { filePreviewFeature } from '../features/filePreview'
 import { inAppNotificationsFeature } from '../features/inAppNotifications'
+import { inviteFeature } from '../features/invite'
 import { mediaViewerFeature } from '../features/mediaViewer'
 import { perfFeature } from '../features/perf'
 import { globalSearchFeature } from '../features/search/global'
@@ -39,6 +40,7 @@ registerFeature(channelBrowserFeature)
 registerFeature(channelSettingsFeature)
 registerFeature(debugLogsFeature)
 registerFeature(filePreviewFeature)
+registerFeature(inviteFeature)
 registerFeature(shareFeature)
 // Before alerts, sheets and toasts, which open over the viewer (reactions, the reaction picker).
 registerFeature(mediaViewerFeature)

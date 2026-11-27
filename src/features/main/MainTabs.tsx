@@ -27,7 +27,7 @@ import { guildsStore } from '../../stores/guilds'
 import { presencesStore } from '../../stores/presences'
 import { readStatesStore } from '../../stores/readStates'
 import { parseChatLink } from '../chat/links/chatLink'
-import { openChannel, setOpener } from '../chat/links/openChannel'
+import { openChannel, openInvite, setOpener } from '../chat/links/openChannel'
 import { MessagesPanels } from '../messages/MessagesPanels'
 import { MessagesTab } from '../messages/MessagesTab'
 import { useMessagesPanels } from '../messages/useMessagesPanels'
@@ -292,6 +292,9 @@ function ChannelOpener() {
             navigate('plaintextFilePreview', { url, fileName }),
         ),
     )
+    useEffect(() =>
+        setOpener('invite', (code, url) => navigate('invite', { code, url })),
+    )
     // A fresh screen for each share, above the currently focused screen.
     const openShareScreen = (params: ShareParams) =>
         navigation.dispatch(StackActions.push('share', params))
@@ -311,6 +314,10 @@ function ChannelOpener() {
             // The message is left out for a channel or a post (alerts in NotificationContent.kt).
             const link = parseChatLink(url)
             diag.debug(`app link kind=${link?.kind}`)
+            if (link?.kind === 'invite') {
+                openInvite(link.code, link.url)
+                return
+            }
             if (link?.kind === 'channel') {
                 if (!(await holdLinkedChannel(currentSession, link.channelId))) {
                     showToast({

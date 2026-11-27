@@ -32,7 +32,7 @@ import { showReactionsSheet } from '../sheets/reactionsSheet'
 import { openRoleMembers } from '../sheets/roleMembersSheet'
 import { PostLinkAction, parseChatLink } from './chatLink'
 import { openMaskedLink } from './maskedLink'
-import { openChannelBrowser, openStackedChat } from './openChannel'
+import { openChannelBrowser, openInvite, openStackedChat } from './openChannel'
 import { openMessageSticker } from './openSticker'
 import type { Session } from '../../../core/session'
 import type { Message } from '../../../stores/readStates'
@@ -85,6 +85,10 @@ export function handleChatLink(url: string, context: LinkContext): void {
     log.debug(`Chat link: ${link.kind}`)
     if (link.kind === 'web') {
         openLink(link.url)
+        return
+    }
+    if (link.kind === 'invite') {
+        openInvite(link.code, link.url)
         return
     }
     const { session, channelId, composer } = context

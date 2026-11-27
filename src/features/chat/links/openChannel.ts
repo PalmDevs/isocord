@@ -18,6 +18,8 @@ interface Openers {
     channelBrowser: (guildId: string, tab: 'customize' | 'browse') => void
     /** Set by the main tabs: a text file's plain-text preview (openPlaintextFilePreview). */
     plaintextFilePreview: (url: string, fileName: string) => void
+    /** Set by the main tabs: the placeholder screen for a Discord invite link. */
+    invite: (code: string, url: string) => void
     /** Set by the main tabs: the screen that forwards a message or sends what another app shared. */
     share: (params: ShareParams) => void
 }
@@ -55,6 +57,11 @@ export function openChannelBrowser(
 /** openPlaintextFilePreview: a text file's contents on a screen of their own. */
 export function openPlaintextFilePreview(url: string, fileName: string): void {
     openers.plaintextFilePreview?.(url, fileName)
+}
+
+/** Opens the placeholder invite screen for a Discord invite link. */
+export function openInvite(code: string, url: string): void {
+    openers.invite?.(code, url)
 }
 
 /** openForwardModal, or the share screen for what another app shared. */

@@ -1,4 +1,5 @@
 import { parseDiscordChannelUrl } from '../../../core/discord/channelUrl'
+import { parseDiscordInviteUrl } from '../../../core/discord/inviteUrl'
 import {
     burstPart,
     dmGuild,
@@ -80,6 +81,7 @@ const viewerActions = [
 /** A link tapped in a chat, a search list or the media viewer, decoded. */
 export type ChatLink =
     | { kind: 'web'; url: string }
+    | { kind: 'invite'; code: string; url: string }
     /** A tap on a reaction chip (`react`) or a hold on it (`reactions`). `burst`: the super reaction chip. */
     | {
           kind: 'react' | 'reactions'
@@ -284,6 +286,8 @@ export function parseChatLink(url: string): ChatLink | undefined {
                 channelId: channel.channelId,
                 messageId: channel.messageId,
             }
+        const invite = parseDiscordInviteUrl(url)
+        if (invite) return { kind: 'invite', ...invite }
         return { kind: 'web', url }
     }
     const [path = '', query] = url.slice(linkScheme.length).split('?', 2)
