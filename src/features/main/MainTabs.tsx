@@ -4,7 +4,7 @@ import {
     StackActions,
     useNavigation,
 } from '@react-navigation/native'
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useStore } from 'zustand'
@@ -20,7 +20,7 @@ import { Text } from '../../design/components/Text'
 import { ThemedGradient } from '../../design/components/ThemedGradient'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
-import { dmGuild } from '../../native/NativeIsocordConstants'
+import { dmGuild, linkScheme } from '../../native/NativeIsocordConstants'
 import { channelsStore, isPrivate } from '../../stores/channels/channels'
 import { holdLinkedChannel } from '../../stores/channels/linkedChannels'
 import { guildsStore } from '../../stores/guilds'
@@ -264,8 +264,8 @@ function ChannelOpener() {
             diag.debug(
                 `open channel ${channelId} known=${channel !== undefined}`,
             )
-            if (!channel) return
-            if (isPrivate(channel)) {
+            // Not held yet: a first DM from a notification, before its CHANNEL_CREATE or READY.
+            if (!channel || isPrivate(channel)) {
                 navigate('main', { screen: 'messages' })
                 messages.openChat(channelId, messageId)
             } else if (channel.guild_id) {
@@ -304,51 +304,49 @@ function ChannelOpener() {
     // A tapped system notification opens the app on isocord://channel/<guildId|@me>/<channelId>/<messageId>
     // (MessageNotifier.kt), with the app already running or not. After the effect above, so the opener is set.
     // Android App Links also deliver Discord channel/message URLs here.
-    const openerDeps = useRef({ session, navigate })
-    openerDeps.current = { session, navigate }
-    useEffect(() => {
-        const open = async (url: string | null | undefined) => {
-            if (!url) return
-            const { session: currentSession, navigate: go } =
-                openerDeps.current
-            // The message is left out for a channel or a post (alerts in NotificationContent.kt).
-            const link = parseChatLink(url)
-            diag.debug(`app link kind=${link?.kind}`)
-            if (link?.kind === 'invite') {
-                openInvite(link.code, link.url)
-                return
-            }
-            if (link?.kind === 'channel') {
-                if (!(await holdLinkedChannel(currentSession, link.channelId))) {
-                    showToast({
-                        content: t('chat.mention.noAccess'),
-                        key: 'no-access',
-                    })
-                    return
-                }
-                openChannel(link.channelId, link.messageId)
-                return
-            }
-            const discordLink = parseDiscordChannelUrl(url)
-            if (!discordLink) return
-            if (discordLink.guildId === dmGuild) {
-                go('main', { screen: 'messages' })
-            } else if (
-                currentSession.get(guildsStore).getState().guilds[
-                    discordLink.guildId
-                ]
+    const open = useEffectEvent(async (url: string | null | undefined) => {
+        if (!url) return
+        // The message is left out for a channel or a post (alerts in NotificationContent.kt).
+        const link = parseChatLink(url)
+        diag.debug(`app link kind=${link?.kind}`)
+        if (link?.kind === 'invite') {
+            openInvite(link.code, link.url)
+            return
+        }
+        if (link?.kind === 'channel') {
+            // Our own notification links open channels not held yet (a first DM, before READY).
+            if (
+                !url.startsWith(linkScheme) &&
+                !(await holdLinkedChannel(session, link.channelId))
             ) {
-                currentSession.get(serversUiStore).setState({
-                    selectedGuildId: discordLink.guildId,
-                })
-                go('main', { screen: 'servers' })
-            } else {
                 showToast({
                     content: t('chat.mention.noAccess'),
                     key: 'no-access',
                 })
+                return
             }
+            openChannel(link.channelId, link.messageId)
+            return
         }
+        const discordLink = parseDiscordChannelUrl(url)
+        if (!discordLink) return
+        if (discordLink.guildId === dmGuild) {
+            navigate('main', { screen: 'messages' })
+        } else if (
+            session.get(guildsStore).getState().guilds[discordLink.guildId]
+        ) {
+            session.get(serversUiStore).setState({
+                selectedGuildId: discordLink.guildId,
+            })
+            navigate('main', { screen: 'servers' })
+        } else {
+            showToast({
+                content: t('chat.mention.noAccess'),
+                key: 'no-access',
+            })
+        }
+    })
+    useEffect(() => {
         void Linking.getInitialURL().then(open)
         const subscription = Linking.addEventListener('url', event => {
             void open(event.url)

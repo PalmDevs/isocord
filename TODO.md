@@ -481,6 +481,8 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [x] After sending a sticker or GIF, the system keyboard opens, as in `ExpressionPickerKeyboard` (`onPressSticker`, `onPressGIF`).
 - [x] Klipy's pending GIF preview uses the size Klipy returns. Checked with curl: every `media_format` and the klipy.com unfurl tags give the same size as the file (220x229).
 - [x] Placeholder invite screen (`features/invite`) for discord.gg and discord.com invite links (`core/discord/inviteUrl.ts`).
+- [x] Notification taps (`isocord://channel`) open the chat without the hold check, which now covers only https Discord links. An unknown channel opens as a DM (`MainTabs` `ChannelOpener`).
+  - [ ] Verify on device: a first DM's notification, and a cold start before READY.
 - [x] Guild invite sheet (InstantInviteActionSheet): one invite on open, a new one only on Save after changing Expire After or Max Uses. Default expiry 7 days, never for hubs.
   - [ ] No Link Settings screen (InviteSettingsModal). No roles, temporary membership or application-bypass options.
   - The channel can't be changed, as in the reference.
