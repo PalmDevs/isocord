@@ -17,7 +17,10 @@ export interface NativeProps extends ViewProps {
     /** dp below the last row. */
     bottomPadding?: CodegenTypes.Float
     /** An item was tapped. */
-    onPressItem?: CodegenTypes.DirectEventHandler<{ key: string }>
+    onPressItem?: CodegenTypes.DirectEventHandler<{
+        key: string
+        flightId: string
+    }>
     /** An item was held. */
     onLongPressItem?: CodegenTypes.DirectEventHandler<{ key: string }>
     /** The section at the top of the grid changed (the category rail follows it). */

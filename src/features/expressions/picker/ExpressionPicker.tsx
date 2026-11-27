@@ -89,14 +89,17 @@ export const ExpressionPicker = memo(function ExpressionPicker({
             emoji.type === 'unicode' ? (emoji.parent ?? emoji) : emoji,
         )
     }
-    const pickSticker = async (sticker: Sticker) => {
+    // ExpressionPickerKeyboard onPressSticker and onPressGIF: send, then the system keyboard replaces the picker.
+    const pickSticker = async (sticker: Sticker, flightId: string) => {
         recordStickerUsage(session, sticker)
-        if (!(await sendSticker(sticker.id)))
+        openSystemKeyboard()
+        if (!(await sendSticker(sticker, flightId)))
             toast(t('expressions.stickerFailed'))
     }
-    const pickGif = async (gif: Gif) => {
+    const pickGif = async (gif: Gif, flightId: string) => {
         trackGifSelect(session, gif, queries.gifs)
-        if (!(await sendGif(gif.url))) toast(t('expressions.gifFailed'))
+        openSystemKeyboard()
+        if (!(await sendGif(gif, flightId))) toast(t('expressions.gifFailed'))
     }
     // The link goes in the message being written, and the keyboard comes back to finish it.
     const insertGif = (gif: Gif) => {

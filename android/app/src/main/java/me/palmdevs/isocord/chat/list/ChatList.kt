@@ -73,6 +73,8 @@ import me.palmdevs.isocord.chat.rows.PostActionsBar
 import me.palmdevs.isocord.chat.rows.PostActionsRow
 import me.palmdevs.isocord.chat.rows.SystemRow
 import me.palmdevs.isocord.chat.rows.WelcomeRow
+import me.palmdevs.isocord.expressions.ExpressionFlightRegistry
+import me.palmdevs.isocord.expressions.LocalChatFlightKey
 
 val LocalChatTheme = staticCompositionLocalOf { ChatTheme() }
 
@@ -286,12 +288,21 @@ private fun LazyItemScope.AnimatedRow(row: ChatRow, changes: ChatRowChanges, arr
   // jumps and rows that scroll back into view are put in place at once. Rows deleted on screen animate out.
   // The motion is a modifier of a box every row has, so the row's content never moves in the tree.
   val enter = remember { arrivals.consume(row.key) }
+  val flightKey = changes.lazyKey(row.key)
+  // Read once when the row enters, so the registry's map doesn't recompose every visible row.
+  val hasFlight = remember(flightKey) {
+    Snapshot.withoutReadObservation { ExpressionFlightRegistry.activeFor(flightKey) != null }
+  }
   val motion = when {
-    changes.isLeaving(row.key) -> RowMotion(changes.lazyKey(row.key), leaving = true, onLeft = { changes.finish(row.key) })
-    enter -> RowMotion(changes.lazyKey(row.key), leaving = false, onLeft = NOOP_LEFT)
+    changes.isLeaving(row.key) -> RowMotion(flightKey, leaving = true, onLeft = { changes.finish(row.key) })
+    enter -> RowMotion(flightKey, leaving = false, onLeft = NOOP_LEFT, fade = !hasFlight)
     else -> Modifier
   }
-  Box(motion) { RowContent(row) }
+  Box(motion) {
+    CompositionLocalProvider(LocalChatFlightKey provides flightKey) {
+      RowContent(row)
+    }
+  }
 }
 
 @Composable

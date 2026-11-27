@@ -182,7 +182,7 @@ fun ExpressionGrid(
   animate: Boolean,
   bottomPadding: Dp,
   scrollRequest: ScrollRequest?,
-  onPress: (String) -> Unit,
+  onPress: (String, String) -> Unit,
   onLongPress: (String) -> Unit,
   onActiveSection: (Int) -> Unit,
   onAtTop: (Boolean) -> Unit,

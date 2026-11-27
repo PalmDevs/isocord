@@ -193,7 +193,7 @@ export interface GifPickerProps {
     /** A category was tapped: its name is searched. */
     onSearch: (query: string) => void
     onView: (view: GifView) => void
-    onSelect: (gif: Gif) => void
+    onSelect: (gif: Gif, flightId: string) => void
     /** A GIF was held. */
     onHold: (gif: Gif) => void
 }
@@ -275,13 +275,13 @@ export function GifPicker({
                     </View>
                 ) : undefined
             }
-            onPressItem={key => {
+            onPressItem={(key, flightId) => {
                 if (key === TRENDING_KEY) return onView('trending')
                 if (key === FAVORITES_KEY) return onView('favorites')
                 if (key.startsWith(CATEGORY_PREFIX))
                     return onSearch(key.slice(CATEGORY_PREFIX.length))
                 const gif = byKey.get(key)
-                if (gif) onSelect(gif)
+                if (gif) onSelect(gif, flightId)
             }}
             onLongPressItem={key => {
                 const gif = byKey.get(key)

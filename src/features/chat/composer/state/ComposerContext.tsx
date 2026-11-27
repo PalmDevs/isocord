@@ -24,6 +24,7 @@ import { useCanSend, useCanStartThread, useSlowmode } from './status'
 import { ApiContext, InternalContext } from './useComposer'
 import type { ReactNode } from 'react'
 import type { StoreApi } from 'zustand'
+import type { StickerItem } from '../../../../stores/messages/messageTypes'
 import type { Message } from '../../../../stores/readStates'
 import type { ComposerAttachment } from '../parsing/slots'
 import type { Internals } from './useComposer'
@@ -84,6 +85,16 @@ export interface AttachedMessage {
     send: (content: string, silent: boolean) => Promise<boolean>
 }
 
+/** A GIF picked from the picker: `url` is sent, while `src`/`width`/`height` populate the pending preview. */
+export interface PendingGif {
+    url: string
+    src: string
+    width: number
+    height: number
+    embedWidth?: number
+    embedHeight?: number
+}
+
 export interface ComposerApi {
     channelId: string
     /**
@@ -139,9 +150,9 @@ export interface ComposerApi {
     addAttachments: (attachments: ComposerAttachment[]) => void
     send: () => void
     /** Sends a sticker on its own; resolves false when refused. */
-    sendSticker: (stickerId: string) => Promise<boolean>
+    sendSticker: (sticker: StickerItem, flightId?: string) => Promise<boolean>
     /** Sends a GIF's link as its own message, replying if a reply is set; resolves false when refused. */
-    sendGif: (url: string) => Promise<boolean>
+    sendGif: (gif: PendingGif, flightId?: string) => Promise<boolean>
 }
 
 const createLocalStore = (

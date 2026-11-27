@@ -156,6 +156,7 @@ export const PREVIEW_MESSAGE_TYPES: ReadonlySet<number> = new Set([
 /** MessageFlags. */
 export const MessageFlag = {
     CROSSPOSTED: 1 << 1,
+    SUPPRESS_EMBEDS: 1 << 2,
     HAS_THREAD: 1 << 5,
     EPHEMERAL: 1 << 6,
     SUPPRESS_NOTIFICATIONS: 1 << 12,

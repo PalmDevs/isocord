@@ -281,7 +281,7 @@ export function Suggestions({
     const pickSticker = (sticker: Sticker) => {
         if (!range) return
         composer.replaceRange(range, '')
-        void composer.sendSticker(sticker.id).then(ok => {
+        void composer.sendSticker(sticker).then(ok => {
             if (ok) recordStickerUsage(session, sticker)
             else toast('Could not send the sticker')
         })

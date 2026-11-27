@@ -30,7 +30,7 @@ export interface GifGridProps {
     /** Shown instead of the grid (no results). */
     empty?: ReactNode
     bottomPadding?: number
-    onPressItem: (key: string) => void
+    onPressItem: (key: string, flightId: string) => void
     onLongPressItem: (key: string) => void
 }
 
@@ -61,7 +61,9 @@ export function GifGrid({
                     tiles={tiles}
                     theme={themeJson}
                     bottomPadding={bottomPadding}
-                    onPressItem={e => onPressItem(e.nativeEvent.key)}
+                    onPressItem={e =>
+                        onPressItem(e.nativeEvent.key, e.nativeEvent.flightId)
+                    }
                     onLongPressItem={e => onLongPressItem(e.nativeEvent.key)}
                     onAtTop={e => atTop.set(e.nativeEvent.atTop)}
                 />

@@ -6,14 +6,24 @@ import { loadDraft, saveDraft } from './drafts'
 import { fitsLength, saveEdit, send, sendSticker } from './outbox'
 import type { RefObject } from 'react'
 import type { Session } from '../../../../core/session'
+import type { StickerItem } from '../../../../stores/messages/messageTypes'
 import type { Message } from '../../../../stores/readStates'
 import type { DraftSync } from '../input/draftSync'
 import type { ComposerInput } from '../input/nativeInput'
 import type {
     AttachedMessage,
     LocalStore,
+    PendingGif,
     ThreadCreation,
 } from '../state/ComposerContext'
+
+/** The pending preview's size: the provider's full rendition, or the picker's own (Klipy gives only that one). */
+function previewSize(gif: PendingGif): { width: number; height: number } {
+    return {
+        width: gif.embedWidth ?? gif.width,
+        height: gif.embedHeight ?? gif.height,
+    }
+}
 
 interface Sender {
     session: Session
@@ -158,27 +168,27 @@ export function createSender(sender: Sender) {
         },
 
         // A sticker picked while creating a thread is its first message (ThreadCreationHooks' sendMessage).
-        sendSticker: async (stickerId: string) => {
+        sendSticker: async (sticker: StickerItem, flightId?: string) => {
             // A forward's or a share's composer has no channel of its own to send in (ForwardMessageFooter has no stickers).
             if (sender.attached.current) return false
             if (!creatingThread)
-                return sendSticker(session, channelId, stickerId)
+                return sendSticker(session, channelId, sticker, flightId)
             let sent = false
             const created = await startThread(sender, async threadId => {
-                sent = await sendSticker(session, threadId, stickerId)
+                sent = await sendSticker(session, threadId, sticker)
             })
             // Not created: the screen says why.
             return !created || sent
         },
 
         // handleSelectGIF: the link goes on its own with the channel's reply, or as a new thread's first message.
-        sendGif: async (url: string) => {
+        sendGif: async (gif: PendingGif, flightId?: string) => {
             if (sender.attached.current) return false
             if (creatingThread) {
                 let sent = false
                 const created = await startThread(sender, async threadId => {
                     sent = await send(session, threadId, {
-                        content: url,
+                        content: gif.url,
                         silent: false,
                     })
                 })
@@ -187,11 +197,26 @@ export function createSender(sender: Sender) {
             const reply = session.get(composerStore).getState().replies[
                 channelId
             ]
+            const size = previewSize(gif)
+            const previewEmbeds = [
+                {
+                    type: 'image',
+                    url: gif.url,
+                    image: {
+                        url: gif.src,
+                        proxy_url: gif.src,
+                        width: size.width,
+                        height: size.height,
+                    },
+                },
+            ]
             if (
                 !(await send(session, channelId, {
-                    content: url,
+                    content: gif.url,
                     silent: false,
                     reply,
+                    previewEmbeds,
+                    flightId,
                 }))
             )
                 return false

@@ -474,6 +474,13 @@ System rows live in `src/features/chat/system/`: `index.ts` dispatches by messag
 - [x] Swipe to reply/edit snapped the list down while the row was held: `SwipeToReply` took only sideways moves (`horizontalDrag`), so once the finger held still, a move with no sideways part reached the list unconsumed and it scrolled by all the vertical drift since the touch went down, at once (traced on a phone 2026-11-16: 15–145 px in one frame). It now takes every move of the claimed pointer (`drag`).
 - [x] The reply or edit bar growing the composer no longer moves the messages while you read older ones: `ChatList` (`keepStillUnderComposer`) undoes the composer's part of the resize in the same measure pass (composer view found by `composerNativeId`, its height read while the list is measured); at the newest message the list follows so the newest stays in view. The keyboard and panels still push the list. `ChatView` sizes its Compose list just before drawing instead of during React Native's mount, which set the chat view's frame before the composer's. Our own behaviour; the reference was not checked for it. Not checked: attachments strip, rotation and split screen with the pre-draw sizing.
 
+### Cleanup (2026-11-27), built, untested on device
+
+- [x] Picker-to-chat expression flight (`expressions/ExpressionFlight.kt`) and the pulsing "sending" opacity on pending rows (`chat/rows/MessageRow.kt`): our own, the reference has neither. The flight lands on the pulse's top opacity (`SENDING_ALPHA_MAX`) and only the row it lands on recomposes.
+- [x] Pending sticker and GIF messages: a GIF shows a local embed until the server's unfurl replaces it. If none arrives, the local embed is dropped 10 s after the confirm, and it is never cached.
+- [x] After sending a sticker or GIF, the system keyboard opens, as in `ExpressionPickerKeyboard` (`onPressSticker`, `onPressGIF`).
+- [x] Klipy's pending GIF preview uses the size Klipy returns. Checked with curl: every `media_format` and the klipy.com unfurl tags give the same size as the file (220x229).
+
 ## Chat write path (phase 5)
 
 - [ ] Composer: "Message #channel" input, `+` (attachments), gift, emoji, mic buttons as in the reference.

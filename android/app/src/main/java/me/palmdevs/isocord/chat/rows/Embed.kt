@@ -1,6 +1,7 @@
 package me.palmdevs.isocord.chat.rows
 
 import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
@@ -49,6 +53,9 @@ import me.palmdevs.isocord.chat.media.proxied
 import me.palmdevs.isocord.core.EmbedTextPart
 import me.palmdevs.isocord.core.LinkKind
 import me.palmdevs.isocord.core.Links
+import me.palmdevs.isocord.expressions.LocalChatFlightKey
+import me.palmdevs.isocord.expressions.LocalChatFlightTarget
+import me.palmdevs.isocord.expressions.flightTarget
 import me.palmdevs.isocord.notifications.notify.title
 
 private val THUMBNAIL_SIZE = 60.dp
@@ -114,7 +121,9 @@ fun EmbedView(embed: Embed, messageId: String? = null, index: Int = 0, link: Str
     if (tiles.isNotEmpty()) MediaMosaic(tiles)
     return
   }
-  EmbedCard(embed, tiles, messageId, index, link)
+  CompositionLocalProvider(LocalChatFlightTarget provides null) {
+    EmbedCard(embed, tiles, messageId, index, link)
+  }
 }
 
 /** The card of an embed: provider, author, title, description, thumbnail, fields, media and footer. */
@@ -212,11 +221,20 @@ private fun EmbedCard(embed: Embed, tiles: List<MediaTile>, messageId: String?, 
 @Composable
 fun StickerView(sticker: Sticker) {
   val actions = LocalChatActions.current
+  val flight = LocalChatFlightTarget.current
+  val flightKey = LocalChatFlightKey.current
+  // Keep the picker's snapshot until the larger chat sticker or Lottie JSON finishes loading.
+  var fallback by remember(flightKey, sticker.url) { mutableStateOf(flight?.bitmap) }
+  if (fallback == null && flight?.bitmap != null) {
+    val bitmap = flight.bitmap
+    SideEffect { fallback = bitmap }
+  }
   // A tap opens the sticker's details (handleOpenSticker). The reference's long press only toggles its animation,
   // and stickers here always animate, so a hold does nothing.
   val modifier = Modifier
     .padding(top = 4.dp)
     .size(STICKER_SIZE)
+    .flightTarget(flight)
     .chatPress(onClick = { actions.onLinkPress("${Links.SCHEME}${LinkKind.STICKER}/${Uri.encode(sticker.url)}") })
   if (sticker.lottie) {
     val result = rememberLottieComposition(LottieCompositionSpec.Url(sticker.url))
@@ -230,10 +248,26 @@ fun StickerView(sticker: Sticker) {
       return
     }
     val composition by result
-    // Off-screen rows are disposed by the list, so looping only costs while the sticker is visible.
-    LottieAnimation(composition, iterations = LottieConstants.IterateForever, modifier = modifier)
+    val snapshot = fallback
+    if (composition == null && snapshot != null) {
+      Image(
+        bitmap = snapshot,
+        contentDescription = sticker.name,
+        contentScale = ContentScale.Fit,
+        modifier = modifier,
+      )
+    } else {
+      // Off-screen rows are disposed by the list, so looping only costs while the sticker is visible.
+      LottieAnimation(composition, iterations = LottieConstants.IterateForever, modifier = modifier)
+    }
   } else {
-    AsyncImage(model = sticker.url, contentDescription = sticker.name, modifier = modifier)
+    val placeholder = remember(fallback) { fallback?.let(::BitmapPainter) }
+    AsyncImage(
+      model = sticker.url,
+      contentDescription = sticker.name,
+      placeholder = placeholder,
+      modifier = modifier,
+    )
   }
 }
 

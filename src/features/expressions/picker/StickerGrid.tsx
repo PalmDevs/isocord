@@ -31,7 +31,7 @@ export interface StickerGridProps {
     channelId: string
     query?: string
     /** Called with a sendable sticker when it is tapped. */
-    onSelect: (sticker: Sticker) => void
+    onSelect: (sticker: Sticker, flightId: string) => void
     /** Called when a sticker the user cannot send (needs Nitro or a boost) is tapped. */
     onSelectLocked?: (sticker: Sticker) => void
 }
@@ -166,11 +166,11 @@ export function StickerGrid({
                     </View>
                 ) : undefined
             }
-            onPressItem={key => {
+            onPressItem={(key, flightId) => {
                 const hit = byKey.get(key)
                 if (!hit) return
                 if (hit.locked) onSelectLocked?.(hit.sticker)
-                else onSelect(hit.sticker)
+                else onSelect(hit.sticker, flightId)
             }}
             onLongPressItem={key => {
                 const hit = byKey.get(key)

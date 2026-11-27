@@ -6,6 +6,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
 import me.palmdevs.isocord.compression.CompressionModule
+import me.palmdevs.isocord.expressions.ExpressionFlightModule
 import me.palmdevs.isocord.network.NetworkModule
 import me.palmdevs.isocord.share.ShareModule
 
@@ -19,6 +20,7 @@ class CorePackage : BaseReactPackage() {
       CompressionModule.NAME -> CompressionModule(reactContext)
       ShareModule.NAME -> ShareModule(reactContext)
       BackModule.NAME -> BackModule(reactContext)
+      ExpressionFlightModule.NAME -> ExpressionFlightModule(reactContext)
       else -> null
     }
 
@@ -30,6 +32,7 @@ class CorePackage : BaseReactPackage() {
       CompressionModule::class.java to CompressionModule.NAME,
       ShareModule::class.java to ShareModule.NAME,
       BackModule::class.java to BackModule.NAME,
+      ExpressionFlightModule::class.java to ExpressionFlightModule.NAME,
     ).entries.associate { (type, name) ->
       name to
         ReactModuleInfo(

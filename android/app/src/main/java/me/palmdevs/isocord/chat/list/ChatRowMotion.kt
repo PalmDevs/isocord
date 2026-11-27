@@ -100,6 +100,18 @@ internal class ChatRowChanges {
         confirmed += sent.key
         confirmed += row.key
       }
+      // A confirmed message's day divider changes key from day-<nonce> to day-<id>; keep its list item too.
+      if (confirmed.isNotEmpty()) {
+        for (row in removed) {
+          if (row !is ChatRow.Separator || row.unread) continue
+          val moved = added.firstOrNull {
+            it is ChatRow.Separator && it.key !in confirmed && !it.unread && it.text == row.text
+          } ?: continue
+          aliases[moved.key] = lazyKey(row.key)
+          confirmed += moved.key
+          confirmed += row.key
+        }
+      }
       // A folded group keyed by its oldest message gets a new key when that one goes or older history joins it.
       for (row in removed) {
         if (row !is ChatRow.HiddenGroup) continue
@@ -152,8 +164,8 @@ internal class ChatRowChanges {
  * Animates a row in (its height grows from nothing while it fades in) or out (it fades out while its height
  * collapses), then calls [onLeft] for one going out. Changing direction carries on from where it is.
  */
-internal data class RowMotion(val rowKey: String, val leaving: Boolean, val onLeft: () -> Unit) : ModifierNodeElement<RowMotionNode>() {
-  override fun create() = RowMotionNode(rowKey, leaving, onLeft)
+internal data class RowMotion(val rowKey: String, val leaving: Boolean, val onLeft: () -> Unit, val fade: Boolean = true) : ModifierNodeElement<RowMotionNode>() {
+  override fun create() = RowMotionNode(rowKey, leaving, onLeft, fade)
 
   override fun update(node: RowMotionNode) = node.update(this)
 }
@@ -162,11 +174,11 @@ internal data class RowMotion(val rowKey: String, val leaving: Boolean, val onLe
  * The node behind [RowMotion]. Progress is plain fields, and every frame requests a new measure and placement.
  * The animation runs on the node's scope. A node that goes away first counts as finished, so no row stays clipped.
  */
-internal class RowMotionNode(private var rowKey: String, private var leaving: Boolean, private var onLeft: () -> Unit) :
+internal class RowMotionNode(private var rowKey: String, private var leaving: Boolean, private var onLeft: () -> Unit, private var fade: Boolean) :
   Modifier.Node(), LayoutModifierNode {
   /** Shown fraction of the row's height, and its opacity. */
   private var height = if (leaving) 1f else 0f
-  private var opacity = height
+  private var opacity = if (leaving || !fade) 1f else 0f
   private var job: Job? = null
   private var left = false
 
@@ -180,13 +192,14 @@ internal class RowMotionNode(private var rowKey: String, private var leaving: Bo
 
   fun update(motion: RowMotion) {
     onLeft = motion.onLeft
+    fade = motion.fade
     if (rowKey == motion.rowKey && leaving == motion.leaving) return
     leaving = motion.leaving
     if (rowKey != motion.rowKey) {
       // LazyColumn can reuse a node that already finished animating a different row.
       rowKey = motion.rowKey
       height = if (leaving) 1f else 0f
-      opacity = height
+      opacity = if (leaving || !fade) 1f else 0f
       left = false
     }
     if (isAttached) start()

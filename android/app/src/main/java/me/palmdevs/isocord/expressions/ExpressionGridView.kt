@@ -83,7 +83,12 @@ class ExpressionGridView(context: Context) : FrameLayout(context) {
             animate = animate,
             bottomPadding = bottomPadding.dp,
             scrollRequest = scrollRequest,
-            onPress = { key -> emit("topPressItem") { putString("key", key) } },
+            onPress = { key, flightId ->
+              emit("topPressItem") {
+                putString("key", key)
+                putString("flightId", flightId)
+              }
+            },
             onLongPress = { key -> emit("topLongPressItem") { putString("key", key) } },
             onActiveSection = { index -> emit("topActiveSection") { putInt("index", index) } },
             onAtTop = { atTop -> emit("topAtTop") { putBoolean("atTop", atTop) } },

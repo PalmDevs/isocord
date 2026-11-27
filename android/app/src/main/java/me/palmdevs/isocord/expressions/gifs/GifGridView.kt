@@ -52,7 +52,12 @@ class GifGridView(context: Context) : FrameLayout(context) {
             theme = theme,
             fonts = fonts,
             bottomPadding = bottomPadding.dp,
-            onPress = { key -> emit("topPressItem") { putString("key", key) } },
+            onPress = { key, flightId ->
+              emit("topPressItem") {
+                putString("key", key)
+                putString("flightId", flightId)
+              }
+            },
             onLongPress = { key -> emit("topLongPressItem") { putString("key", key) } },
             onAtTop = { atTop -> emit("topAtTop") { putBoolean("atTop", atTop) } },
           )

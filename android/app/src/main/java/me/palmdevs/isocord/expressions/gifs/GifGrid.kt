@@ -37,13 +37,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -70,15 +74,20 @@ import me.palmdevs.isocord.chat.ChatRipple
 import me.palmdevs.isocord.chat.chatPress
 import me.palmdevs.isocord.chat.media.cachedPainter
 import me.palmdevs.isocord.chat.rows.ChatTheme
+import me.palmdevs.isocord.expressions.ExpressionFlightRegistry
 import me.palmdevs.isocord.expressions.FADE_MS
 import me.palmdevs.isocord.expressions.SIDE_PADDING
 import me.palmdevs.isocord.expressions.ScrollWatch
+import me.palmdevs.isocord.expressions.snapshotDrawable
 
 /** GIF_PICKER_GUTTER_SPACING. */
 private val GUTTER = 8.dp
 
 /** Tile corners (radii.xs). */
 private val TILE_RADIUS = 4.dp
+
+/** MediaMosaic tile corner radius in dp, matched at the end of a GIF flight. */
+private const val CHAT_MEDIA_CORNER_DP = 8f
 
 /** A category tile's height: half of GIF_PICKER_ITEM_ESIMTATED_HEIGHT, less the gutter, as in two columns. */
 private val CATEGORY_HEIGHT = 82.dp
@@ -115,7 +124,7 @@ fun GifGrid(
   theme: ChatTheme,
   fonts: ChatFonts,
   bottomPadding: Dp,
-  onPress: (String) -> Unit,
+  onPress: (String, String) -> Unit,
   onLongPress: (String) -> Unit,
   onAtTop: (Boolean) -> Unit,
 ) {
@@ -186,12 +195,13 @@ private fun Tile(
   fonts: ChatFonts,
   playing: Boolean,
   watch: ScrollWatch,
-  onPress: (String) -> Unit,
+  onPress: (String, String) -> Unit,
   onLongPress: (String) -> Unit,
 ) {
   val context = LocalContext.current
   val image = remember(tile.src) { GifImage(context, SingletonImageLoader.get(context), tile.src) }
   var size by remember { mutableStateOf(IntSize.Zero) }
+  val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
   val press by rememberUpdatedState(onPress)
   val longPress by rememberUpdatedState(onLongPress)
   val holdable = !tile.category && tile.src.isNotEmpty()
@@ -213,6 +223,7 @@ private fun Tile(
     (if (tile.category) Modifier.height(CATEGORY_HEIGHT) else Modifier.aspectRatio(aspect))
       .fillMaxWidth()
       .clip(shape)
+      .onPlaced { placed[0] = it }
       .onSizeChanged { size = it }
       .semantics {
         contentDescription = tile.label
@@ -220,7 +231,12 @@ private fun Tile(
         if (holdable) onLongClick { longPress(tile.key); true }
       }
       .chatPress(
-        onClick = { if (tile.src.isNotEmpty()) press(tile.key) },
+        onClick = {
+          if (tile.src.isNotEmpty()) {
+            val flightId = if (!tile.category) stageGifFlight(placed[0], image, tile.src) else ""
+            press(tile.key, flightId)
+          }
+        },
         onLongClick = if (holdable) ({ longPress(tile.key) }) else null,
       )
       .drawBehind { drawTileImage(image, theme.placeholder) },
@@ -228,6 +244,22 @@ private fun Tile(
     if (tile.category) CategoryLabel(tile, fonts)
     if (tile.badge.isNotEmpty()) Badge(tile.badge, fonts, theme)
   }
+}
+
+private fun stageGifFlight(coords: LayoutCoordinates?, image: GifImage, src: String): String {
+  if (coords == null || !coords.isAttached) return ""
+  val pos = coords.positionInWindow()
+  val size = coords.size
+  if (size.width <= 0 || size.height <= 0) return ""
+  val rect = Rect(pos.x, pos.y, pos.x + size.width, pos.y + size.height)
+  return ExpressionFlightRegistry.stage(
+    origin = rect,
+    originCornerDp = TILE_RADIUS.value,
+    targetCornerDp = CHAT_MEDIA_CORNER_DP,
+    crop = true,
+    bitmap = snapshotDrawable(image.drawable),
+    url = src,
+  )
 }
 
 /** The image cropped to fill the tile, fading in over the placeholder (the grids' 100ms fade). */

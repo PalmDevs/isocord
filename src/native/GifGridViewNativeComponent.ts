@@ -12,7 +12,10 @@ export interface NativeProps extends ViewProps {
     /** dp below the last row. */
     bottomPadding?: CodegenTypes.Float
     /** A tile was tapped. */
-    onPressItem?: CodegenTypes.DirectEventHandler<{ key: string }>
+    onPressItem?: CodegenTypes.DirectEventHandler<{
+        key: string
+        flightId: string
+    }>
     /** A GIF (not a category or placeholder) was held. */
     onLongPressItem?: CodegenTypes.DirectEventHandler<{ key: string }>
     /** Whether the grid is scrolled to its top (the sheet it is in drags from it then). */

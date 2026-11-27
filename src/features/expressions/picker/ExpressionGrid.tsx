@@ -40,7 +40,7 @@ export interface ExpressionGridProps {
     /** Shown instead of the grid (no results, still loading). */
     empty?: ReactNode
     bottomPadding?: number
-    onPressItem: (key: string) => void
+    onPressItem: (key: string, flightId: string) => void
     onLongPressItem?: (key: string) => void
 }
 
@@ -83,7 +83,12 @@ export function ExpressionGrid({
                         theme={themeJson}
                         animate={animate}
                         bottomPadding={bottomPadding}
-                        onPressItem={e => onPressItem(e.nativeEvent.key)}
+                        onPressItem={e =>
+                            onPressItem(
+                                e.nativeEvent.key,
+                                e.nativeEvent.flightId,
+                            )
+                        }
                         onLongPressItem={e =>
                             onLongPressItem?.(e.nativeEvent.key)
                         }

@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -38,6 +39,9 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -118,7 +122,7 @@ internal fun Cells(
   grid: GridImages,
   accessible: Boolean,
   lock: Painter,
-  onPress: (String) -> Unit,
+  onPress: (String, String) -> Unit,
   onLongPress: (String) -> Unit,
 ) {
   val images = remember(row.items, grid, animate) { RowImages(row.items, grid, animate) }
@@ -126,24 +130,59 @@ internal fun Cells(
   val source = remember { CellPressSource() }
   val highlight = animateFloatAsState(if (source.pressing) 1f else 0f, tween(FADE_MS), label = "press")
   val items by rememberUpdatedState(row.items)
-  val radius = with(LocalDensity.current) { STICKER_RADIUS.toPx() }
-  val lockSize = with(LocalDensity.current) { LOCK_SIZE.toPx() }
+  val density = LocalDensity.current.density
+  val radius = STICKER_RADIUS.value * density
+  val lockSize = LOCK_SIZE.value * density
+  val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
 
   Box(
     Modifier
       .fillMaxWidth()
       .height(kind.rowHeight)
+      .onPlaced { placed[0] = it }
       .chatPress(
-        onClick = { items.getOrNull(column(source.position.x, layout, items.size))?.let { onPress(it.key) } },
+        onClick = {
+          val index = column(source.position.x, layout, items.size)
+          val item = items.getOrNull(index) ?: return@chatPress
+          val flightId = if (kind == GridKind.Sticker && !item.locked) {
+            stageStickerFlight(placed[0], layout, index, images.images.getOrNull(index), item.url)
+          } else {
+            ""
+          }
+          onPress(item.key, flightId)
+        },
         onLongClick = { items.getOrNull(column(source.position.x, layout, items.size))?.let { onLongPress(it.key) } },
         interactionSource = source,
         indication = null,
       )
       .drawBehind { drawCells(images, row.items.size, kind, layout, theme, source, highlight.value, lock, radius, lockSize) },
   ) {
-    if (accessible) CellsAccessibility(row, layout, onPress, onLongPress)
+    if (accessible) CellsAccessibility(row, layout, { key -> onPress(key, "") }, onLongPress)
 
   }
+}
+
+private fun stageStickerFlight(
+  coords: LayoutCoordinates?,
+  layout: GridLayout,
+  index: Int,
+  image: ItemImage?,
+  url: String,
+): String {
+  if (coords == null || !coords.isAttached) return ""
+  val pos = coords.positionInWindow()
+  val left = pos.x + layout.first + index * layout.step
+  val top = pos.y + (coords.size.height - layout.image) / 2f
+  val rect = Rect(left, top, left + layout.image, top + layout.image)
+  val bitmap = image?.still ?: snapshotDrawable(image?.moving)
+  return ExpressionFlightRegistry.stage(
+    origin = rect,
+    originCornerDp = STICKER_RADIUS.value,
+    targetCornerDp = 0f,
+    crop = false,
+    bitmap = bitmap,
+    url = url,
+  )
 }
 
 /** The item under [x], or -1 between items. */

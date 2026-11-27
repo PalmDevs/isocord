@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -41,6 +43,10 @@ import me.palmdevs.isocord.chat.list.LocalChatActions
 import me.palmdevs.isocord.chat.list.LocalChatFonts
 import me.palmdevs.isocord.chat.list.LocalChatTheme
 import me.palmdevs.isocord.chat.rows.Media
+import me.palmdevs.isocord.expressions.ActiveFlight
+import me.palmdevs.isocord.expressions.LocalChatFlightKey
+import me.palmdevs.isocord.expressions.LocalChatFlightTarget
+import me.palmdevs.isocord.expressions.flightTarget
 
 private val MEDIA_GAP = 4.dp
 
@@ -137,8 +143,13 @@ fun MediaMosaic(tiles: List<MediaTile>, modifier: Modifier = Modifier) {
   val maxHeight = with(LocalDensity.current) { MEDIA_MAX_HEIGHT.roundToPx() }
   val density = LocalDensity.current.density
   val first = shown.firstOrNull()?.media
+  val flight = LocalChatFlightTarget.current
   Layout(
-    content = { shown.forEach { MediaTileView(it) } },
+    content = {
+      shown.forEachIndexed { index, tile ->
+        MediaTileView(tile, flight = if (index == 0) flight else null)
+      }
+    },
     modifier = modifier.padding(top = 4.dp).clip(RoundedCornerShape(8.dp)),
   ) { measurables, constraints ->
     // Sizes are in dp; without a known size the tile is a square.
@@ -159,7 +170,7 @@ private const val SPOILER_REVEAL_MS = 150
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MediaTileView(tile: MediaTile) {
+private fun MediaTileView(tile: MediaTile, flight: ActiveFlight? = null) {
   val theme = LocalChatTheme.current
   val actions = LocalChatActions.current
   // Survives the list recycling the row.
@@ -179,6 +190,14 @@ private fun MediaTileView(tile: MediaTile) {
   val cover by animateFloatAsState(if (hidden) 1f else 0f, tween(SPOILER_REVEAL_MS), label = "spoiler")
   val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
   val density = LocalDensity.current.density
+  val flightKey = LocalChatFlightKey.current
+  // Key by flightKey only so the snapshot stays visible when MESSAGE_UPDATE swaps gif.src for the proxied thumbnail.
+  var fallback by remember(flightKey) { mutableStateOf(flight?.bitmap) }
+  if (fallback == null && flight?.bitmap != null) {
+    val bitmap = flight.bitmap
+    SideEffect { fallback = bitmap }
+  }
+  val placeholder = remember(fallback) { fallback?.let(::BitmapPainter) }
 
   Box(
     Modifier
@@ -187,6 +206,7 @@ private fun MediaTileView(tile: MediaTile) {
       .border(0.25.dp, theme.mediaBorder)
       .then(if (tile.gifv) Modifier.trackVisible(visible) else Modifier)
       .onPlaced { placed[0] = it }
+      .flightTarget(flight)
       .chatPress(
         onLongClick = tile.onLongPress,
         onClick = {
@@ -204,6 +224,7 @@ private fun MediaTileView(tile: MediaTile) {
       AsyncImage(
         model = image,
         contentDescription = tile.description,
+        placeholder = placeholder,
         contentScale = ContentScale.Crop,
         modifier = Modifier.fillMaxSize(),
       )

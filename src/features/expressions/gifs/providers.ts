@@ -52,6 +52,9 @@ export interface Gif {
     src: string
     width: number
     height: number
+    /** Full rendition size used for the pending chat embed when the picker rendition is downscaled. */
+    embedWidth?: number
+    embedHeight?: number
 }
 
 export interface GifCategory {
@@ -124,11 +127,21 @@ function tenorGif(value: unknown, quality: GifQuality): Gif | undefined {
     const format = record(media[quality] ?? media.tinygif ?? media.gif)
     const dims = list(format.dims)
     const box = size(dims[0], dims[1])
+    const fullDims = list(record(media.gif).dims)
+    const full = size(fullDims[0], fullDims[1])
     const id = text(item.id)
     const url = text(item.itemurl)
     const src = text(format.url)
     if (!id || !url || !src || !box) return undefined
-    return { id: `tenor:${id}`, provider: 'tenor', url, src, ...box }
+    return {
+        id: `tenor:${id}`,
+        provider: 'tenor',
+        url,
+        src,
+        ...box,
+        embedWidth: full?.width,
+        embedHeight: full?.height,
+    }
 }
 
 /** A Giphy result at the quality's rendition, as animated WebP when Giphy has it (a fraction of the GIF). */
@@ -137,11 +150,21 @@ function giphyGif(value: unknown, quality: GifQuality): Gif | undefined {
     const images = record(item.images)
     const format = record(images[GIPHY_RENDITIONS[quality]] ?? images.original)
     const box = size(format.width, format.height)
+    const orig = record(images.original)
+    const full = size(orig.width, orig.height)
     const id = text(item.id)
     const url = text(item.url)
     const src = text(format.webp) || text(format.url)
     if (!id || !url || !src || !box) return undefined
-    return { id: `giphy:${id}`, provider: 'giphy', url, src, ...box }
+    return {
+        id: `giphy:${id}`,
+        provider: 'giphy',
+        url,
+        src,
+        ...box,
+        embedWidth: full?.width,
+        embedHeight: full?.height,
+    }
 }
 
 /** A Klipy result (`/gifs/search`). */

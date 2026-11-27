@@ -11,6 +11,7 @@ import { snowflakeFromTimestamp } from '../../../../core/discord/snowflake'
 import { useSessionStore } from '../../../../core/react'
 import { defineStore } from '../../../../core/session'
 import { t } from '../../../../i18n'
+import NativeIsocordExpressionFlight from '../../../../native/NativeIsocordExpressionFlight'
 import { channelsStore } from '../../../../stores/channels/channels'
 import {
     addPendingMessage,
@@ -24,7 +25,11 @@ import { usersStore } from '../../../../stores/users'
 import { clearAttachments, uploadAll, uploadsStore } from '../../../upload'
 import { toast } from '../toast'
 import type { Session } from '../../../../core/session'
-import type { Attachment } from '../../../../stores/messages/messageTypes'
+import type {
+    Attachment,
+    Embed,
+    StickerItem,
+} from '../../../../stores/messages/messageTypes'
 import type { Message } from '../../../../stores/readStates'
 import type { MessageAttachment, PendingAttachment } from '../../../upload'
 
@@ -46,6 +51,10 @@ interface Outgoing {
     files?: string
     /** Sends without the files when they fail to upload, instead of not sending. The list is cleared either way. */
     dropFailedFiles?: boolean
+    /** Local-only embeds rendered while pending (not posted to Discord). */
+    previewEmbeds?: Embed[]
+    /** Staged picker flight id bound to the pending message's nonce. */
+    flightId?: string
 }
 
 interface SendBody {
@@ -176,8 +185,16 @@ export async function send(
     work(session).bodies.set(nonce, body)
     addPendingMessage(
         session,
-        pendingMessage(session, channelId, body, attachments?.items ?? []),
+        pendingMessage(
+            session,
+            channelId,
+            body,
+            attachments?.items ?? [],
+            outgoing.previewEmbeds,
+        ),
     )
+    if (outgoing.flightId)
+        NativeIsocordExpressionFlight?.bind(outgoing.flightId, nonce)
     // Sent from a jumped-to window: back to the present, where the message belongs (the pending one is kept).
     void jumpToPresent(session, channelId)
     void post(session, channelId, nonce)
@@ -214,6 +231,8 @@ function pendingMessage(
     channelId: string,
     body: SendBody,
     files: PendingAttachment[],
+    previewEmbeds?: Embed[],
+    stickers?: StickerItem[],
 ): Message {
     const author = session.get(usersStore).getState().users[session.userId]
     const reference = body.message_reference
@@ -247,7 +266,8 @@ function pendingMessage(
                 ? [referenced.author]
                 : [],
         attachments: files.map(toPreview),
-        embeds: [],
+        embeds: previewEmbeds ?? [],
+        ...(stickers?.length ? { sticker_items: stickers } : {}),
         reactions: [],
     }
 }
@@ -339,24 +359,40 @@ export async function saveEdit(
     }
 }
 
-/** Sends a sticker as its own message (no pending placeholder: the gateway delivers it). Resolves false when refused. */
+/** Sends a sticker as its own message, showing it as pending until the server confirms it. Resolves false when refused. */
 export async function sendSticker(
     session: Session,
     channelId: string,
-    stickerId: string,
+    sticker: StickerItem,
+    flightId?: string,
 ): Promise<boolean> {
+    const nonce = createNonce()
+    const body: SendBody = {
+        content: '',
+        nonce,
+        tts: false,
+    }
+    addPendingMessage(
+        session,
+        pendingMessage(session, channelId, body, [], undefined, [sticker]),
+    )
+    if (flightId) NativeIsocordExpressionFlight?.bind(flightId, nonce)
+    void jumpToPresent(session, channelId)
     try {
-        await session.rest.post(Endpoint.channelMessages(channelId), {
-            body: {
-                content: '',
-                sticker_ids: [stickerId],
-                nonce: createNonce(),
-                tts: false,
+        const message = await session.rest.post<Message>(
+            Endpoint.channelMessages(channelId),
+            {
+                body: {
+                    ...body,
+                    sticker_ids: [sticker.id],
+                },
             },
-        })
+        )
         noteSent(session, channelId)
+        confirmPendingMessage(session, channelId, message)
         return true
     } catch {
+        removePendingMessage(session, channelId, nonce)
         return false
     }
 }

@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla'
 import { defineStore } from '../../core/session'
+import { SECOND } from '../../core/time'
 import { channelsStore } from '../channels/channels'
 import {
     sameEmoji,
@@ -12,7 +13,7 @@ import type { StoreApi } from 'zustand/vanilla'
 import type { Session } from '../../core/session'
 import type { Message } from '../readStates'
 import type { User } from '../users'
-import type { MessagesState, Reaction } from './messageTypes'
+import type { Embed, MessagesState, Reaction } from './messageTypes'
 import type { DebouncedReaction, ReactionChange } from './reactionEdits'
 
 export type ReactionEvent = {
@@ -170,12 +171,51 @@ function cachedChannels(state: MessagesState): Array<[string, Message[]]> {
         if (state.channels[id]?.hasMoreAfter) return []
         const messages = state.channels[id]?.messages
         // Messages still being sent are not worth restoring: they can no longer be sent after a restart.
-        const sent = messages?.filter(message => !message.state)
+        const sent = messages
+            ?.filter(message => !message.state)
+            .map(withoutLocalEmbeds)
         return sent?.length
             ? [[id, sent.slice(0, PAGE_SIZE)] as [string, Message[]]]
             : []
     })
 }
+
+/** How long the sender's local GIF preview waits for the server's own embed before it is dropped. */
+const LOCAL_EMBED_WAIT = 10 * SECOND
+
+/** The embed lists the sender made for a GIF, kept on a confirmed message until the server's unfurl replaces them. */
+const localEmbeds = new WeakSet<Embed[]>()
+
+function withoutLocalEmbeds(message: Message): Message {
+    return message.embeds && localEmbeds.has(message.embeds)
+        ? { ...message, embeds: [] }
+        : message
+}
+
+/** Drops a confirmed message's local embeds if the server's unfurl has not replaced them by then (no Embed Links, a failed unfurl). */
+function expireLocalEmbeds(
+    session: Session,
+    channelId: string,
+    messageId: string,
+): void {
+    const embeds = session
+        .get(messagesStore)
+        .getState()
+        .channels[channelId]?.messages.find(
+            message => message.id === messageId,
+        )?.embeds
+    if (!embeds || !localEmbeds.has(embeds)) return
+    setTimeout(
+        () =>
+            editChannel(session, channelId, messages =>
+                messages.some(message => message.embeds === embeds)
+                    ? messages.map(withoutLocalEmbeds)
+                    : messages,
+            ),
+        LOCAL_EMBED_WAIT,
+    )
+}
+
 /** Adds the users a message shows: its author, its mentions and the author of the message it replies to. */
 export function addMessageUsers(message: Message, users: Set<string>): void {
     users.add(message.author.id)
@@ -194,17 +234,32 @@ function confirmPending(messages: Message[], message: Message): Message[] {
                       String(existing.nonce) === String(message.nonce),
               )
     if (pending !== -1) {
+        const existing = messages[pending]
+        // Discord unfurls link embeds asynchronously after MESSAGE_CREATE: our own preview stays until its MESSAGE_UPDATE.
+        const kept =
+            existing?.embeds?.length &&
+            !message.embeds?.length &&
+            message.content === existing.content
+                ? existing.embeds
+                : undefined
+        if (kept) localEmbeds.add(kept)
+        const resolved = kept ? { ...message, embeds: kept } : message
         // The echo may have arrived first, in which case the real message is already there.
         const rest = messages.filter(
             (existing, index) =>
                 index !== pending && existing.id !== message.id,
         )
         const at = Math.min(pending, rest.length)
-        return [...rest.slice(0, at), message, ...rest.slice(at)]
+        return [...rest.slice(0, at), resolved, ...rest.slice(at)]
     }
-    return messages.some(existing => existing.id === message.id)
-        ? messages
-        : [message, ...messages]
+    const existingIndex = messages.findIndex(
+        existing => existing.id === message.id,
+    )
+    if (existingIndex === -1) return [message, ...messages]
+    if (!message.embeds?.length) return messages
+    const next = [...messages]
+    next[existingIndex] = { ...messages[existingIndex], ...message }
+    return next
 }
 
 export const messagesStore = defineStore(
@@ -266,6 +321,7 @@ export const messagesStore = defineStore(
             receive(store, session, message.channel_id, messages =>
                 confirmPending(messages, message),
             )
+            expireLocalEmbeds(session, message.channel_id, message.id)
         })
         dispatch.on('MESSAGE_UPDATE', update =>
             editOne(update.channel_id, update.id, message => ({
@@ -544,6 +600,7 @@ export function confirmPendingMessage(
     editChannel(session, channelId, messages =>
         confirmPending(messages, message),
     )
+    expireLocalEmbeds(session, channelId, message.id)
 }
 
 export function setPendingState(

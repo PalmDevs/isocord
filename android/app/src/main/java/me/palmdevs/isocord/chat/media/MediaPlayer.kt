@@ -158,7 +158,7 @@ fun VideoSurface(player: ExoPlayer, aspect: Float, modifier: Modifier = Modifier
     val width = if (aspect > boxAspect) maxHeight * aspect else maxWidth
     val height = if (aspect > boxAspect) maxHeight else maxWidth / aspect
     AndroidView(
-      factory = { TextureView(it) },
+      factory = { TextureView(it).apply { isOpaque = false } },
       update = { view -> player.setVideoTextureView(view) },
       // Pooled players outlive the tile; do not leave them drawing into a dead view.
       onRelease = { view -> player.clearVideoTextureView(view) },

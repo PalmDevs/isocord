@@ -3,7 +3,10 @@ package me.palmdevs.isocord.chat.rows
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
@@ -14,12 +17,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.constrainHeight
@@ -37,6 +46,9 @@ import me.palmdevs.isocord.chat.media.AttachmentList
 import me.palmdevs.isocord.core.LinkKind
 import me.palmdevs.isocord.core.Links
 import me.palmdevs.isocord.core.Perf
+import me.palmdevs.isocord.expressions.LocalChatFlightKey
+import me.palmdevs.isocord.expressions.LocalChatFlightTarget
+import me.palmdevs.isocord.expressions.rememberActiveFlight
 
 internal val AVATAR_SIZE = 40.dp
 
@@ -53,24 +65,41 @@ internal val GROUP_SPACING = 16.dp
 /** How long a message takes to resize when its reactions change. Material standard, as a row's entry. Reaction chips scale in and out over the same time. */
 internal const val REACTIONS_RESIZE_MS = 200
 
+// Our own, not in the reference: a message that is still sending breathes between these two opacities.
+private const val SENDING_ALPHA_MIN = 0.35f
+
+/** The opacity a sending row starts at. The picker flight lands on it, so the hand-over doesn't jump. */
+internal const val SENDING_ALPHA_MAX = 0.65f
+
+private const val SENDING_BREATHE_MS = 1000
+
+private const val SENDING_SETTLE_MS = 500
+
 @Composable
 fun MessageRow(row: ChatRow.Message) {
   val actions = LocalChatActions.current
+  // Kept above SwipeToReply so the animatable survives when confirmation enables swiping (row.swipe: null -> replyEdit).
+  val sendingAlpha = rememberSendingAlphaModifier(row.status == "sending")
   // The group spacing sits outside the swipe, so only the message itself slides and the gutter fits it.
   Box(Modifier.padding(top = if (row.grouped) 0.dp else GROUP_SPACING)) {
     SwipeToReply(
       canEdit = row.swipe?.let { it == SwipeMode.REPLY_EDIT },
       onSwipe = { actions.onMessageSwipe(row.id, it.wire) },
-    ) { Perf.span("chat:compose-message") { MessageRowContent(row) } }
+    ) { Perf.span("chat:compose-message") { MessageRowContent(row, sendingAlpha) } }
   }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageRowContent(row: ChatRow.Message) {
+private fun MessageRowContent(row: ChatRow.Message, sendingAlpha: Modifier) {
   val theme = LocalChatTheme.current
   val actions = LocalChatActions.current
   val highlight = LocalChatHighlight.current
+  val flight = rememberActiveFlight(LocalChatFlightKey.current)
+  if (flight != null) {
+    val sending = row.status == "sending"
+    SideEffect { flight.targetSending = sending }
+  }
 
   Column(
     modifier = Modifier
@@ -98,17 +127,19 @@ private fun MessageRowContent(row: ChatRow.Message) {
     Row(Modifier.padding(start = GUTTER)) {
     if (!row.grouped) MessageAvatar(row, AVATAR_SIZE, Modifier.padding(top = 2.dp))
     val start = if (row.grouped) AVATAR_SIZE + AVATAR_GAP else AVATAR_GAP
-    Column(Modifier.weight(1f).padding(start = start, end = END_SPACING).then(if (row.status == "sending") Modifier.alpha(0.5f) else Modifier)) {
+    Column(Modifier.weight(1f).padding(start = start, end = END_SPACING).then(sendingAlpha)) {
       if (!row.grouped) Header(row)
       Perf.span("chat:compose-message-text") { MessageText(row.content, row.jumbo, row.edited) }
       row.rich?.let { RichParts(it) }
-      Perf.span("chat:compose-media") {
-        AttachmentList(row.id, row.attachments)
-        row.embeds.forEachIndexed { index, embed -> EmbedView(embed, row.id, index) }
+      CompositionLocalProvider(LocalChatFlightTarget provides flight) {
+        Perf.span("chat:compose-media") {
+          AttachmentList(row.id, row.attachments)
+          row.embeds.forEachIndexed { index, embed -> EmbedView(embed, row.id, index) }
+        }
+        // Buttons and other interactive components sit below the embeds, as in the reference.
+        row.rich?.components?.takeIf { it.isNotEmpty() }?.let { ComponentsView(it, row.id) }
+        row.stickers.forEach { StickerView(it) }
       }
-      // Buttons and other interactive components sit below the embeds, as in the reference.
-      row.rich?.components?.takeIf { it.isNotEmpty() }?.let { ComponentsView(it, row.id) }
-      row.stickers.forEach { StickerView(it) }
       MessageReactions(row)
       // ThreadEmbedMessageAccessory: after the reactions.
       row.thread?.let { ThreadEmbedCard(it, Modifier.padding(top = 4.dp, bottom = 4.dp)) }
@@ -123,6 +154,39 @@ private fun MessageRowContent(row: ChatRow.Message) {
     }
     }
   }
+}
+
+/**
+ * Returns a modifier that pulses a pending message's opacity and fades it to full opacity once
+ * sending finishes.
+ */
+@Composable
+private fun rememberSendingAlphaModifier(sending: Boolean): Modifier {
+  val alpha = remember { Animatable(if (sending) SENDING_ALPHA_MAX else 1f) }
+  var active by remember { mutableStateOf(sending) }
+  if (sending) active = true
+
+  LaunchedEffect(sending) {
+    if (sending) {
+      if (alpha.value > SENDING_ALPHA_MAX) {
+        alpha.animateTo(SENDING_ALPHA_MAX, tween(SENDING_SETTLE_MS, easing = FastOutSlowInEasing))
+      }
+      alpha.animateTo(
+        targetValue = SENDING_ALPHA_MIN,
+        animationSpec = infiniteRepeatable(
+          animation = tween(SENDING_BREATHE_MS, easing = FastOutSlowInEasing),
+          repeatMode = RepeatMode.Reverse,
+        ),
+      )
+    } else if (alpha.value < 1f) {
+      alpha.animateTo(1f, tween(SENDING_SETTLE_MS, easing = LinearEasing))
+      active = false
+    } else {
+      active = false
+    }
+  }
+
+  return if (active) Modifier.graphicsLayer { this.alpha = alpha.value } else Modifier
 }
 
 /**
