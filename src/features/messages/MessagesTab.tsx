@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native'
 import { FlashList } from '@shopify/flash-list'
 import { useEffect, useRef } from 'react'
-import { Pressable, View } from 'react-native'
+import { View } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useShallow } from 'zustand/react/shallow'
@@ -13,6 +13,8 @@ import { useSession, useSessionReady, useSessionStore } from '../../core/react'
 import { MINUTE } from '../../core/time'
 import { StatusAvatar } from '../../design/components/avatars/StatusAvatar'
 import { Badge } from '../../design/components/Badge'
+import { IconButton } from '../../design/components/buttons/IconButton'
+import { RipplePressable } from '../../design/components/buttons/RipplePressable'
 import { Ellipsis } from '../../design/components/Ellipsis'
 import { ListPlaceholders } from '../../design/components/ListPlaceholders'
 import { Skeleton, SkeletonPulse } from '../../design/components/Skeleton'
@@ -172,13 +174,12 @@ function ConversationRow({ id }: { id: string }) {
     const highlighted = showUnread || (mentions > 0 && !muted)
 
     return (
-        <Pressable
+        <RipplePressable
             accessibilityRole="button"
             accessibilityLabel={dm.name}
             onPress={() => openChat(id)}
             onLongPress={() => openChannelActionSheet(id, navigation)}
             style={styles.row}
-            android_ripple={styles.ripple}
         >
             {dm.recipient ? (
                 <StatusAvatar
@@ -242,7 +243,7 @@ function ConversationRow({ id }: { id: string }) {
                     <View style={styles.unreadDot} />
                 ) : null}
             </View>
-        </Pressable>
+        </RipplePressable>
     )
 }
 
@@ -387,37 +388,34 @@ export function MessagesTab() {
                 </Text>
                 <View style={styles.actions}>
                     {/* Not wired up yet. */}
-                    <Pressable
-                        accessibilityRole="button"
+                    <IconButton
+                        icon="UserPlusIcon"
+                        size="sm"
+                        variant="tertiary"
                         accessibilityLabel={t('messages.addFriend')}
-                        android_ripple={styles.ripple}
                         style={styles.action}
-                    >
-                        <Icon name="UserPlusIcon" size="sm" />
-                    </Pressable>
-                    <Pressable
-                        accessibilityRole="button"
+                    />
+                    <IconButton
+                        icon="ChatPlusIcon"
+                        size="sm"
+                        variant="tertiary"
                         accessibilityLabel={t('messages.newMessage')}
-                        android_ripple={styles.ripple}
                         style={styles.action}
-                    >
-                        <Icon name="ChatPlusIcon" size="sm" />
-                    </Pressable>
+                    />
                 </View>
             </View>
             {/* MainNavigator "search": opens the DMS search over the tabs. */}
-            <Pressable
+            <RipplePressable
                 accessibilityRole="search"
                 accessibilityLabel={t('messages.search')}
                 onPress={() => navigation.navigate('globalSearch')}
-                android_ripple={styles.ripple}
                 style={styles.search}
             >
                 <Icon name="MagnifyingGlassIcon" size="sm" color="TEXT_MUTED" />
                 <Text variant="text-md/medium" color="TEXT_MUTED">
                     {t('messages.search')}
                 </Text>
-            </Pressable>
+            </RipplePressable>
             <View style={styles.listContainer}>
                 <ConversationPlaceholders>
                     <AnimatedFlashList
@@ -531,7 +529,6 @@ const styles = StyleSheet.create((theme, runtime) => ({
         paddingVertical: theme.space.PX_8,
         minHeight: ROW_MIN_HEIGHT,
     },
-    ripple: { color: theme.colors.MOBILE_ANDROID_BUTTON_BACKGROUND_RIPPLE },
     label: {
         flex: 1,
         marginLeft:
