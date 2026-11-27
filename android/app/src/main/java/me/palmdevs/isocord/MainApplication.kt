@@ -16,7 +16,8 @@ import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.internal.featureflags.ReactNativeFeatureFlags
-import com.facebook.react.internal.featureflags.ReactNativeNewArchitectureFeatureFlagsDefaults
+import com.facebook.react.internal.featureflags.ReactNativeFeatureFlagsOverrides_RNOSS_Stable_Android
+import com.facebook.react.internal.featureflags.ReactNativeFeatureFlagsProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -109,7 +110,8 @@ class MainApplication : Application(), ReactApplication {
  * 
  * enablePropsUpdateReconciliationAndroid is omitted: it drops FlashList cell container opacity updates.
  */
-private object DiscordMountingFlags : ReactNativeNewArchitectureFeatureFlagsDefaults() {
+private object DiscordMountingFlags :
+  ReactNativeFeatureFlagsProvider by ReactNativeFeatureFlagsOverrides_RNOSS_Stable_Android() {
   override fun enableAccumulatedUpdatesInRawPropsAndroid() = true
 
   // The reference's usePullModelOnAndroid is a fork flag. React Native's own pull model.

@@ -1,0 +1,14 @@
+diff --git a/Common/cpp/reanimated/Fabric/updates/AnimatedPropsRegistry.cpp b/Common/cpp/reanimated/Fabric/updates/AnimatedPropsRegistry.cpp
+index ef1b65a408a37661b00d97170b6054bd071adabd..9854520fd86c2391075cffc02f8b95f991b11705 100644
+--- a/Common/cpp/reanimated/Fabric/updates/AnimatedPropsRegistry.cpp
++++ b/Common/cpp/reanimated/Fabric/updates/AnimatedPropsRegistry.cpp
+@@ -30,7 +30,8 @@ static inline std::shared_ptr<const ShadowNode> shadowNodeFromValue(
+   }
+ }
+ 
+-static void roundTextMetrics(folly::dynamic &updates) {
++// Rounds in place. Used only when USE_ANIMATION_BACKEND is false, where props use folly::dynamic.
++[[maybe_unused]] static void roundTextMetrics(folly::dynamic &updates) {
+   for (const auto *propName : TEXT_METRIC_PROP_NAMES) {
+     auto *value = updates.get_ptr(propName);
+     if (value != nullptr && value->isNumber()) {
