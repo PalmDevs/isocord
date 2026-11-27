@@ -9,7 +9,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  import com.swmansion.rnscreens.core.containers.stack.screen.StackScreenFragment
  
  internal enum class StackTransitionKind {
-@@ -17,4 +19,6 @@
+@@ -17,4 +19,6 @@ internal class StackTransitionContext(
      internal val outgoing: StackScreenFragment,
      /** The top after the operation. */
      internal val incoming: StackScreenFragment,
@@ -19,7 +19,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
 diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionResolver.kt b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionResolver.kt
 --- a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionResolver.kt
 +++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/StackTransitionResolver.kt
-@@ -32,7 +32,13 @@
+@@ -32,7 +32,13 @@ internal fun resolveStackTransition(
      }
      val timeline = timelineOf(context)
      val screenTimeline = if (slot.isAppearing) timeline.enter else timeline.exit
@@ -365,7 +365,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  import android.view.View
  import android.view.ViewGroup
  import androidx.transition.TransitionValues
-@@ -15,8 +16,10 @@
+@@ -15,8 +16,10 @@ import com.swmansion.rnscreens.core.containers.stack.animation.timeline.ZOrder
   */
  internal class ScreenTransition(
      internal val timeline: ScreenTimeline,
@@ -377,7 +377,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  ) : Visibility() {
      init {
          mode = if (isAppearing) MODE_IN else MODE_OUT
-@@ -63,7 +66,28 @@
+@@ -63,7 +66,28 @@ internal class ScreenTransition(
      private fun animate(
          view: View,
          sceneRoot: ViewGroup,
@@ -410,7 +410,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
 diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/TimelineAnimator.kt b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/TimelineAnimator.kt
 --- a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/TimelineAnimator.kt
 +++ b/android/src/main/java/com/swmansion/rnscreens/core/containers/stack/animation/engine/TimelineAnimator.kt
-@@ -4,11 +4,14 @@
+@@ -4,11 +4,14 @@ import android.animation.Animator
  import android.animation.AnimatorListenerAdapter
  import android.animation.ValueAnimator
  import android.view.View
@@ -425,7 +425,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  
  /**
   * One linear master animator per screen; every track is a pure function of the master time,
-@@ -20,9 +23,21 @@
+@@ -20,9 +23,21 @@ internal fun createTimelineAnimator(
      view: View,
      timeline: ScreenTimeline,
      metrics: LayoutMetrics,
@@ -459,7 +459,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  import android.annotation.SuppressLint
  import android.content.Context
  import android.content.res.Configuration
-@@ -7,6 +9,7 @@
+@@ -7,6 +9,7 @@ import android.util.Log
  import android.view.View
  import android.view.ViewGroup
  import android.widget.FrameLayout
@@ -467,7 +467,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  import androidx.fragment.app.Fragment
  import androidx.fragment.app.FragmentManager
  import androidx.transition.Transition
-@@ -20,8 +23,10 @@
+@@ -20,8 +23,10 @@ import com.swmansion.rnscreens.core.containers.common.ParentContainerItemRegistr
  import com.swmansion.rnscreens.core.containers.stack.animation.ScreenTransitionProviding
  import com.swmansion.rnscreens.core.containers.stack.animation.StackTransitionContext
  import com.swmansion.rnscreens.core.containers.stack.animation.StackTransitionKind
@@ -478,7 +478,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  import com.swmansion.rnscreens.core.containers.stack.animation.resolveStackTransition
  import com.swmansion.rnscreens.core.containers.stack.header.StackHeaderBackPressHandler
  import com.swmansion.rnscreens.core.containers.stack.screen.StackContainerItem
-@@ -66,6 +71,7 @@
+@@ -66,6 +71,7 @@ internal class StackContainer(
      private val stackModel: MutableList<StackScreenFragment> = arrayListOf()
  
      private val pendingPopOperations: MutableList<PopOperation> = arrayListOf()
@@ -486,7 +486,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
      private val pendingPushOperations: MutableList<PushOperation> = arrayListOf()
      private val hasPendingOperations: Boolean
          get() = pendingPushOperations.isNotEmpty() || pendingPopOperations.isNotEmpty()
-@@ -129,6 +135,9 @@
+@@ -129,6 +135,9 @@ internal class StackContainer(
          super.onDetachedFromWindow()
          requireFragmentManager().removeOnBackStackChangedListener(this)
          transitionContext = null
@@ -496,9 +496,9 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
          fragmentManager = null
          parentContainerRegistry.detach(this)
          colorSchemeCoordinator.teardown()
-@@ -188,14 +197,24 @@
+@@ -188,14 +197,24 @@ internal class StackContainer(
      }
-
+ 
      internal fun enqueuePushOperation(item: StackContainerItem) {
 -        pendingPushOperations.add(PushOperation(item))
 +        pendingPopOperations.removeAll { it.item === item }
@@ -506,7 +506,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
 +            pendingPushOperations.add(PushOperation(item))
 +        }
      }
-
+ 
      internal fun enqueuePopOperation(item: StackContainerItem) {
 -        pendingPopOperations.add(PopOperation(item))
 +        pendingPushOperations.removeAll { it.item === item }
@@ -523,7 +523,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
          applyOperationsAndComputeFragmentManagerOperations()
          fragmentOpExecutor.executeOperations(fragmentManager, fragmentOps, flushSync = false)
  
-@@ -285,6 +304,8 @@
+@@ -285,6 +304,8 @@ internal class StackContainer(
       * too: neither the commit nor the cancel (the record re-executed forward) resolves a transition.
       */
      private var transitionContext: StackTransitionContext? = null
@@ -532,7 +532,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
  
      /**
       * A batch computed while an earlier one is still pending in FragmentManager executes together
-@@ -307,7 +328,31 @@
+@@ -307,7 +328,31 @@ internal class StackContainer(
                  modelBeforeBatch.contains(incoming) -> StackTransitionKind.POP
                  else -> StackTransitionKind.REPLACE
              }
@@ -565,7 +565,20 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
      }
  
      override fun transitionFor(
-@@ -409,13 +454,26 @@
+@@ -356,7 +401,11 @@ internal class StackContainer(
+         // Covered fragments are detached, so FragmentManager's added list holds only the top
+         // fragment - the model is the only place all of them can be resigned from.
+         check(stackModel.isNotEmpty()) { "[RNScreens] Empty stack model while attempting to update top fragment" }
+-        stackModel.forEach { it.onResignTopFragment() }
++        // Resign all except the new top first, then enable the new top.
++        // Resigning all first creates a window where no navigation callback is enabled,
++        // causing mBackPressedCallback in ReactActivity to take over at the system level
++        // and block predictive back animations on Android 16.
++        stackModel.dropLast(1).forEach { it.onResignTopFragment() }
+         stackModel.last().onBecomeTopFragment()
+ 
+         // This assumes that the updateTopFragment is called already after primary nav frag. is updated.
+@@ -409,15 +458,28 @@ internal class StackContainer(
          // A JS push and pop executed together also gets here without a context, but FragmentManager
          // starts no transition for it, so this context is never read.
          if (pop && transitionContext == null && stackModel.size > 1) {
@@ -581,8 +594,8 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
 +                    backPreview = backPreview,
                  )
          }
-+    }
-+
+     }
+ 
 +    override fun onBackStackChangeProgressed(backEventCompat: BackEventCompat) {
 +        backPreview?.update(backEventCompat)
 +    }
@@ -590,10 +603,12 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
 +    override fun onBackStackChangeCancelled() {
 +        backPreview?.cancel()
 +        backPreview = null
-     }
- 
++    }
++
      // This is called before the special effects (animations) are dispatched, however mid transaction!
-@@ -436,6 +494,10 @@
+     // Therefore make sure to not execute any action that might cause synchronous transaction synchronously
+     // from this callback.
+@@ -436,6 +498,10 @@ internal class StackContainer(
          // I avoid using `pop` parameter here, because transaction might not be classified as `pop`
          // and still include fragment removal operations.
          if (fragment.isRemoving) {
@@ -604,7 +619,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
              delegate.get()?.onItemDismissCommitted(fragment.item)
              if (stackModel.contains(fragment)) {
                  onNativeFragmentPop(fragment)
-@@ -519,6 +581,7 @@
+@@ -519,6 +585,7 @@ internal class StackContainer(
          // popBackStackImmediate. The synchronous pop makes the top-screen guard above
          // reliable against double taps: onBackStackChangeCommitted -> onNativeFragmentPop
          // updates stackModel before this call returns.
@@ -615,7 +630,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/core/containers/stack
 diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/screen/StackScreen.kt b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/screen/StackScreen.kt
 --- a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/screen/StackScreen.kt
 +++ b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/screen/StackScreen.kt
-@@ -70,8 +70,9 @@
+@@ -70,8 +70,9 @@ internal class StackScreen(
  
      var screenKey: String? = null
          set(value) {
@@ -629,9 +644,9 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stac
 diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackHost.kt b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackHost.kt
 --- a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackHost.kt
 +++ b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackHost.kt
-@@ -93,6 +93,10 @@
+@@ -93,6 +93,10 @@ internal class StackHost(
      }
-
+ 
      internal fun stackScreenChangedActivityMode(stackScreen: StackScreen) {
 +        // A late React update can follow FragmentManager's native dismiss.
 +        if (stackScreen.isNativelyDismissed) {
@@ -643,34 +658,34 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stac
 diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackContainerUpdateCoordinator.kt b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackContainerUpdateCoordinator.kt
 --- a/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackContainerUpdateCoordinator.kt
 +++ b/android/src/main/java/com/swmansion/rnscreens/react/containers/stack/host/StackContainerUpdateCoordinator.kt
-@@ -3,20 +3,20 @@
+@@ -3,20 +3,20 @@ package com.swmansion.rnscreens.react.containers.stack.host
  import com.swmansion.rnscreens.core.containers.stack.host.PopOperation
  import com.swmansion.rnscreens.core.containers.stack.host.PushOperation
  import com.swmansion.rnscreens.core.containers.stack.host.StackContainer
 +import com.swmansion.rnscreens.core.containers.stack.host.StackOperation
  import com.swmansion.rnscreens.core.containers.stack.screen.StackContainerItem
-
+ 
  internal class StackContainerUpdateCoordinator {
 -    private val pendingPushOperations: MutableList<PushOperation> = arrayListOf()
 -    private val pendingPopOperations: MutableList<PopOperation> = arrayListOf()
 -    private val hasPendingOperations: Boolean
 -        get() = pendingPushOperations.isNotEmpty() || pendingPopOperations.isNotEmpty()
 +    private val pendingOperations = linkedMapOf<StackContainerItem, StackOperation>()
-
+ 
      internal fun addPushOperation(item: StackContainerItem) {
 -        pendingPushOperations.add(PushOperation(item))
 +        pendingOperations.remove(item)
 +        pendingOperations[item] = PushOperation(item)
      }
-
+ 
      internal fun addPopOperation(item: StackContainerItem) {
 -        pendingPopOperations.add(PopOperation(item))
 +        pendingOperations.remove(item)
 +        pendingOperations[item] = PopOperation(item)
      }
-
+ 
      /**
-@@ -27,22 +27,24 @@
+@@ -27,22 +27,24 @@ internal class StackContainerUpdateCoordinator {
          container: StackContainer,
          renderedItems: List<StackContainerItem>,
      ) {
@@ -678,7 +693,7 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stac
 +        if (pendingOperations.isEmpty()) {
              return
          }
-
+ 
 -        pendingPopOperations
 +        // Use each item's final attachment state in the Fabric batch.
 +        pendingOperations.values
@@ -687,14 +702,14 @@ diff --git a/android/src/main/java/com/swmansion/rnscreens/react/containers/stac
              .sortedBy { it.first }
              .asReversed()
              .forEach { (_, operation) -> container.enqueuePopOperation(operation.item) }
-
+ 
 -        pendingPushOperations
 +        pendingOperations.values
 +            .filterIsInstance<PushOperation>()
              .map { Pair(renderedItems.indexOf(it.item), it) }
              .sortedBy { it.first }
              .forEach { (_, operation) -> container.enqueuePushOperation(operation.item) }
-
+ 
 -        pendingPopOperations.clear()
 -        pendingPushOperations.clear()
 +        pendingOperations.clear()
