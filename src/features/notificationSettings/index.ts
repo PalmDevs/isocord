@@ -2,6 +2,11 @@
 
 export { setChannelFavorite as setPinned } from '../../stores/settings/notificationActions'
 export { muteChannel, unmuteChannel } from './muteActions'
-export { openMuteSheet, openNotificationSettings } from './openSheets'
+export {
+    openGuildMuteSheet,
+    openGuildNotificationSettings,
+    openMuteSheet,
+    openNotificationSettings,
+} from './openSheets'
 export { isPinned, useIsPinned } from './pinned'
 export { useIsThreadJoined } from './useNotificationState'

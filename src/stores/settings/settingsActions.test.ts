@@ -6,6 +6,7 @@ await stubNativeModules()
 const { ApiError } = await import('../../core/api/rest')
 const { setCategoryCollapsed } = await import('./settingsActions')
 const { settingsStore } = await import('./settingsStore')
+const { updateGuildSettings } = await import('./notificationActions')
 
 type Listener = (payload: unknown) => void
 
@@ -128,5 +129,28 @@ describe('setCategoryCollapsed', () => {
 
         expect(calls).toBe(2)
         expect(store.getState().pendingCollapsedCategories?.g1).toEqual({})
+    })
+})
+
+describe('updateGuildSettings', () => {
+    it('keeps a pending change over a stale update until the save settles', async () => {
+        let settle = () => {}
+        const { session, emit } = createTestSession(
+            () => new Promise(resolve => (settle = () => resolve({}))),
+        )
+        const store = session.get(settingsStore)
+
+        updateGuildSettings(session, 'g1', { suppress_roles: true })
+        emit('USER_GUILD_SETTINGS_UPDATE', {
+            guild_id: 'g1',
+            suppress_roles: false,
+        })
+
+        expect(store.getState().guildSettings.g1?.suppressRoles).toBe(true)
+
+        settle()
+        await new Promise(resolve => setTimeout(resolve, 0))
+
+        expect(store.getState().pendingGuildSettings?.g1).toEqual({})
     })
 })

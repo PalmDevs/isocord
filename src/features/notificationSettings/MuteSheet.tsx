@@ -1,5 +1,4 @@
 import { ChannelType } from '../../core/discord/channelType'
-import { MuteUntilSeconds } from '../../core/discord/notificationSettings'
 import { useSession } from '../../core/react'
 import {
     ActionSheet,
@@ -14,22 +13,10 @@ import { t } from '../../i18n'
 import { isPrivate, isThread } from '../../stores/channels/channels'
 import { MuteSettingsHint } from './MuteHint'
 import { muteChannel, unmuteChannel, unmuteKey } from './muteActions'
+import { MUTE_OPTIONS } from './muteOptions'
 import { levelText, useNotificationState } from './useNotificationState'
 import type { MessageKey } from '../../i18n'
 import type { Channel } from '../../stores/channels/channels'
-
-/** MuteSettingsUtils.getMuteOptions. */
-const MUTE_OPTIONS = [
-    {
-        label: 'muteSettings.for15Minutes',
-        seconds: MuteUntilSeconds.MINUTES_15,
-    },
-    { label: 'muteSettings.for1Hour', seconds: MuteUntilSeconds.HOURS_1 },
-    { label: 'muteSettings.for3Hours', seconds: MuteUntilSeconds.HOURS_3 },
-    { label: 'muteSettings.for8Hours', seconds: MuteUntilSeconds.HOURS_8 },
-    { label: 'muteSettings.for24Hours', seconds: MuteUntilSeconds.HOURS_24 },
-    { label: 'muteSettings.untilTurnedOn', seconds: MuteUntilSeconds.ALWAYS },
-] as const satisfies readonly { label: MessageKey; seconds: number }[]
 
 /** MuteSettingsUtils.getMuteSettingLabel. */
 function titleKey(channel: Channel, forumPost: boolean): MessageKey {

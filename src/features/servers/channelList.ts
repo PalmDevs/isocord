@@ -135,6 +135,23 @@ export function readFlags(
     return flags
 }
 
+/** ChannelListState's `mutedChannelIds` check: the channel's own mute or its category's, not the server's. */
+function isMutedOrInMutedCategory(
+    policy: Parameters<typeof isChannelMuted>[0],
+    channel: Channel,
+    now: number,
+): boolean {
+    return (
+        isChannelMuted(policy, channel, now) ||
+        (channel.parent_id != null &&
+            isChannelMuted(
+                policy,
+                { id: channel.parent_id, guild_id: channel.guild_id },
+                now,
+            ))
+    )
+}
+
 /**
  * Flattens a guild's channels into list rows.
  * Order: pinned channels, uncategorised channels, then each category (text before voice), joined threads under their parent.
@@ -160,13 +177,21 @@ export function buildChannelRows(
             : undefined
     const policy = { guildSettings: settings ? { [guild.id]: settings } : {} }
     const optIn = isOptInEnabledForGuild(policy, guild)
+    const now = Date.now()
+    const hideMuted = settings?.hideMutedChannels === true
     // ChannelListState's renderLevel. The reference moves the unpicked ones it shows into a Recents category.
-    const listed = (channel: Channel) =>
-        !optIn ||
-        isChannelOrParentOptedIn(policy, channel) ||
-        channel.id === selectedChannelId ||
-        selectedThread?.parent_id === channel.id ||
-        hasFlag(reads, channel.id, ReadFlag.MENTION)
+    const listed = (channel: Channel) => {
+        if (
+            channel.id === selectedChannelId ||
+            selectedThread?.parent_id === channel.id ||
+            hasFlag(reads, channel.id, ReadFlag.MENTION)
+        )
+            return true
+        if (optIn && !isChannelOrParentOptedIn(policy, channel)) return false
+        if (hideMuted && isMutedOrInMutedCategory(policy, channel, now))
+            return false
+        return true
+    }
 
     const categories: Channel[] = []
     const pinned: Channel[] = []
@@ -177,6 +202,13 @@ export function buildChannelRows(
         if (!channel) continue
         if (isThread(channel)) {
             if (!hasFlag(reads, id, ReadFlag.RELEVANT_THREAD)) continue
+            if (
+                hideMuted &&
+                isThreadMuted(channel.member, now) &&
+                channel.id !== selectedChannelId &&
+                !hasFlag(reads, id, ReadFlag.MENTION)
+            )
+                continue
             const list = threads.get(channel.parent_id ?? '')
             if (list) list.push(channel)
             else threads.set(channel.parent_id ?? '', [channel])

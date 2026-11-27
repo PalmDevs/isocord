@@ -12,14 +12,18 @@ import {
     TEXT_AND_IMAGES,
     USER_SETTINGS,
 } from './settingsProto'
-import { parseGuildSettings } from './userGuildSettings'
+import { parseGuildSettings, withGuildChange } from './userGuildSettings'
 import type { StoreApi } from 'zustand/vanilla'
 import type {
     GuildFolder,
     TextAndImagesSettings,
     UserSettings,
 } from './settingsProto'
-import type { GuildSettings, RawGuildSettings } from './userGuildSettings'
+import type {
+    GuildSettings,
+    GuildSettingsChange,
+    RawGuildSettings,
+} from './userGuildSettings'
 
 const log = logger('UserSettings')
 
@@ -87,6 +91,11 @@ export interface SettingsState extends UserSettings {
      * Kept over incoming updates until the save settles.
      */
     pendingCollapsedCategories?: Record<string, Record<string, boolean>>
+    /**
+     * Server notification setting changes not saved yet, by guild.
+     * Kept over incoming updates until the save settles.
+     */
+    pendingGuildSettings?: Record<string, GuildSettingsChange>
 }
 
 /** Applies a base64 PreloadedUserSettings message, whole or partial, to the store. */
@@ -135,13 +144,14 @@ function sameFolders(a: GuildFolder[], b: GuildFolder[]): boolean {
     )
 }
 
-/** Lays unsaved opt-in and collapse changes over freshly received settings. */
+/** Lays unsaved opt-in, collapse and server setting changes over freshly received settings. */
 function withPendingSettings(
     settings: GuildSettings,
     pendingFlags: Record<string, number> | undefined,
     pendingCollapsed: Record<string, boolean> | undefined,
+    pendingGuild: GuildSettingsChange | undefined,
 ): GuildSettings {
-    if (!pendingFlags && !pendingCollapsed) return settings
+    if (!pendingFlags && !pendingCollapsed && !pendingGuild) return settings
     let collapsedCategories = settings.collapsedCategories
     if (pendingCollapsed) {
         collapsedCategories = { ...collapsedCategories }
@@ -150,13 +160,21 @@ function withPendingSettings(
             else delete collapsedCategories[id]
         }
     }
-    return {
-        ...settings,
-        ...(pendingFlags
-            ? { channelFlags: { ...settings.channelFlags, ...pendingFlags } }
-            : {}),
-        collapsedCategories,
-    }
+    return withGuildChange(
+        {
+            ...settings,
+            ...(pendingFlags
+                ? {
+                      channelFlags: {
+                          ...settings.channelFlags,
+                          ...pendingFlags,
+                      },
+                  }
+                : {}),
+            collapsedCategories,
+        },
+        pendingGuild ?? {},
+    )
 }
 
 /** Reads the account notification flags into their store fields. */
@@ -226,14 +244,18 @@ export const settingsStore = defineStore(
             // A partial list holds only the entries changed since the version held: merge it onto those.
             const guildSettings: Record<string, GuildSettings> =
                 versioned?.partial ? { ...store.getState().guildSettings } : {}
-            const { pendingChannelFlags, pendingCollapsedCategories } =
-                store.getState()
+            const {
+                pendingChannelFlags,
+                pendingCollapsedCategories,
+                pendingGuildSettings,
+            } = store.getState()
             for (const entry of versioned?.entries ?? []) {
                 const key = entry.guild_id ?? '@me'
                 guildSettings[key] = withPendingSettings(
                     parseGuildSettings(entry),
                     pendingChannelFlags?.[key],
                     pendingCollapsedCategories?.[key],
+                    pendingGuildSettings?.[key],
                 )
             }
             if (versioned?.partial) {
@@ -270,6 +292,7 @@ export const settingsStore = defineStore(
                             parseGuildSettings(entry),
                             state.pendingChannelFlags?.[key],
                             state.pendingCollapsedCategories?.[key],
+                            state.pendingGuildSettings?.[key],
                         ),
                     },
                     // A version only moves on top of one held.

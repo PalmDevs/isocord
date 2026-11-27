@@ -1100,5 +1100,18 @@
   "userProfile.clearAfter.tomorrowAt": "tomorrow at {time}",
   "userProfile.clearAfter.tomorrowAtTitle": "Tomorrow at {time}",
   "userProfile.clearAfter.dontClear": "Don't clear",
-  "userProfile.save": "Save"
+  "userProfile.save": "Save",
+  "guildSettings.muteName": "Mute {$b:{name}}",
+  "guildSettings.unmuteName": "Unmute {$b:{name}}",
+  "guildNotificationSettings.serverSettings": "Server Notification Settings",
+  "guildNotificationSettings.largeServerPush": "Due to this server's size, you won't get mobile push notifications for non-@mention messages.",
+  "guildNotificationSettings.suppressEveryone": "Suppress {$b:@everyone} and {$b:@here}",
+  "guildNotificationSettings.suppressRoles": "Suppress All Role @mentions",
+  "guildNotificationSettings.suppressHighlights": "Suppress Highlights",
+  "guildNotificationSettings.highlightsDescription": "Highlights provide occasional updates when your friends are chatting in busy servers, and more.",
+  "guildNotificationSettings.muteEvents": "Mute New Events",
+  "guildNotificationSettings.mobilePush": "Mobile Push Notifications",
+  "guildNotificationSettings.overrides": "Notification Overrides",
+  "guildNotificationSettings.muted": "Muted",
+  "guildNotificationSettings.muteHelper": "Muting a server prevents unread indicators and notifications from appearing unless you are mentioned."
 }

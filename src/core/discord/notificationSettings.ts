@@ -54,3 +54,10 @@ export const MuteUntilSeconds = {
 
 /** Constants MAX_MEMBERS_NOTIFY_ALL_MESSAGES: servers this big send push notifications for mentions only. */
 export const MAX_MEMBERS_NOTIFY_ALL_MESSAGES = 2500
+
+/** Constants HighlightSettings: `notify_highlights` on a guild's user settings. */
+export const HighlightSettings = {
+    NULL: 0,
+    DISABLED: 1,
+    ENABLED: 2,
+} as const

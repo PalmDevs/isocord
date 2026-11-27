@@ -3,6 +3,7 @@
 import { Endpoint } from '../../core/api/paths'
 import {
     ChannelNotificationSettingsFlags,
+    GuildNotificationSettingsFlags,
     UnreadSetting,
     UserNotificationSettings,
 } from '../../core/discord/notificationSettings'
@@ -15,9 +16,10 @@ import {
     muteOf,
     PRIVATE_SETTINGS_KEY,
     parseGuildSettings,
+    withGuildChange,
 } from './userGuildSettings'
 import type { Session } from '../../core/session'
-import type { GuildSettings } from './userGuildSettings'
+import type { GuildSettings, GuildSettingsChange } from './userGuildSettings'
 
 const log = logger('NotificationSettings')
 
@@ -182,4 +184,118 @@ export function setChannelUnreadSetting(
         undefined,
     )
     saveChannelFlags(session, channel.guild_id)
+}
+
+/**
+ * Applies a guild notification setting change optimistically, then PATCHes `/users/@me/guilds/{id}/settings`.
+ * The change stays pending over incoming updates until the save settles, like channel flags and collapse.
+ */
+export function updateGuildSettings(
+    session: Session,
+    guildId: string,
+    change: GuildSettingsChange,
+): void {
+    const store = session.get(settingsStore)
+    store.setState(state => ({
+        guildSettings: {
+            ...state.guildSettings,
+            [guildId]: withGuildChange(
+                state.guildSettings[guildId] ??
+                    parseGuildSettings({ guild_id: guildId }),
+                change,
+            ),
+        },
+        pendingGuildSettings: {
+            ...state.pendingGuildSettings,
+            [guildId]: { ...state.pendingGuildSettings?.[guildId], ...change },
+        },
+    }))
+    session.rest
+        .patch(Endpoint.myGuildSettings(guildId), { body: change })
+        .catch(error => log.warn('Could not save the server settings', error))
+        .finally(() =>
+            store.setState(state => {
+                const pending = { ...state.pendingGuildSettings?.[guildId] }
+                for (const [key, value] of Object.entries(change))
+                    if (pending[key as keyof GuildSettingsChange] === value)
+                        delete pending[key as keyof GuildSettingsChange]
+                return {
+                    pendingGuildSettings: {
+                        ...state.pendingGuildSettings,
+                        [guildId]: pending,
+                    },
+                }
+            }),
+        )
+}
+
+/** Mutes a server for `seconds` (or until turned off for `MuteUntilSeconds.ALWAYS`). */
+export function muteGuild(
+    session: Session,
+    guildId: string,
+    seconds: number,
+): void {
+    updateGuildSettings(session, guildId, muteSettings(seconds))
+}
+
+/** Unmutes a server. */
+export function unmuteGuild(session: Session, guildId: string): void {
+    updateGuildSettings(session, guildId, { muted: false, mute_config: null })
+}
+
+/** Sets the server-wide message notification level (All Messages, Only @mentions, Nothing). */
+export function setGuildMessageNotifications(
+    session: Session,
+    guildId: string,
+    level: number,
+): void {
+    const state = session.get(settingsStore).getState()
+    const current = state.guildSettings[guildId]
+    const change: GuildSettingsChange = { message_notifications: level }
+    // Align with NotificationSettingsMessageNotificationGuildActionSheet: switching to ALL_MESSAGES sets UNREADS_ALL_MESSAGES.
+    if (
+        level === UserNotificationSettings.ALL_MESSAGES &&
+        current?.unreadSetting !== UnreadSetting.ALL_MESSAGES
+    ) {
+        const flags = current?.flags ?? 0
+        const cleared =
+            flags &
+            ~(
+                GuildNotificationSettingsFlags.UNREADS_ALL_MESSAGES |
+                GuildNotificationSettingsFlags.UNREADS_ONLY_MENTIONS
+            )
+        change.flags =
+            cleared | GuildNotificationSettingsFlags.UNREADS_ALL_MESSAGES
+    }
+    updateGuildSettings(session, guildId, change)
+}
+
+/** Sets the server-wide unread badge setting (ALL_MESSAGES or ONLY_MENTIONS). */
+export function setGuildUnreadSetting(
+    session: Session,
+    guildId: string,
+    setting: UnreadSetting,
+): void {
+    const { UNREADS_ALL_MESSAGES, UNREADS_ONLY_MENTIONS } =
+        GuildNotificationSettingsFlags
+    const current =
+        session.get(settingsStore).getState().guildSettings[guildId]?.flags ?? 0
+    const cleared = current & ~(UNREADS_ALL_MESSAGES | UNREADS_ONLY_MENTIONS)
+    const flags =
+        cleared |
+        (setting === UnreadSetting.ALL_MESSAGES
+            ? UNREADS_ALL_MESSAGES
+            : UNREADS_ONLY_MENTIONS)
+    updateGuildSettings(session, guildId, { flags })
+}
+
+/** ChannelCollapseActionCreators.toggleCollapseGuild: toggles Hide Muted Channels in a server. */
+export function toggleHideMutedChannels(
+    session: Session,
+    guildId: string,
+): void {
+    const hidden =
+        session.get(settingsStore).getState().guildSettings[guildId]
+            ?.hideMutedChannels === true
+    updateGuildSettings(session, guildId, { hide_muted_channels: !hidden })
 }

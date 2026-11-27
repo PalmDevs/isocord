@@ -32,6 +32,10 @@ export interface RawGuildSettings {
     mute_config?: MuteConfig | null
     suppress_everyone?: boolean
     suppress_roles?: boolean
+    mobile_push?: boolean
+    mute_scheduled_events?: boolean
+    notify_highlights?: number
+    hide_muted_channels?: boolean
     message_notifications?: number
     flags?: number
     channel_overrides?:
@@ -47,6 +51,11 @@ export interface GuildSettings {
     muted: Mute | false
     suppressEveryone: boolean
     suppressRoles: boolean
+    /** Mobile push notifications for this guild; defaults to true. */
+    mobilePush?: boolean
+    muteScheduledEvents?: boolean
+    notifyHighlights?: number
+    hideMutedChannels?: boolean
     /** Muted channels and categories. */
     mutedChannels: Record<string, Mute>
     collapsedCategories: Record<string, true>
@@ -91,6 +100,10 @@ export function parseGuildSettings(raw: RawGuildSettings): GuildSettings {
         muted: muteOf(raw.muted, raw.mute_config) ?? false,
         suppressEveryone: Boolean(raw.suppress_everyone),
         suppressRoles: Boolean(raw.suppress_roles),
+        mobilePush: raw.mobile_push ?? true,
+        muteScheduledEvents: Boolean(raw.mute_scheduled_events),
+        notifyHighlights: raw.notify_highlights,
+        hideMutedChannels: Boolean(raw.hide_muted_channels),
         mutedChannels: {},
         collapsedCategories: {},
         messageNotifications: raw.message_notifications,
@@ -143,4 +156,53 @@ export function isFavorite(
         (settings?.channelFlags?.[channelId] ?? 0) &
             ChannelNotificationSettingsFlags.FAVORITED,
     )
+}
+
+/** The fields of a guild's `user_guild_settings` that `updateGuildSettings` patches. */
+export interface GuildSettingsChange {
+    muted?: boolean
+    mute_config?: {
+        selected_time_window: number
+        end_time: string | null
+    } | null
+    message_notifications?: number
+    flags?: number
+    suppress_everyone?: boolean
+    suppress_roles?: boolean
+    mobile_push?: boolean
+    mute_scheduled_events?: boolean
+    notify_highlights?: number
+    hide_muted_channels?: boolean
+}
+
+/** Puts a change into a guild's settings, as USER_GUILD_SETTINGS_UPDATE would. */
+export function withGuildChange(
+    current: GuildSettings,
+    change: GuildSettingsChange,
+): GuildSettings {
+    const next = { ...current }
+    if (change.muted !== undefined)
+        next.muted = muteOf(change.muted, change.mute_config) ?? false
+    if (change.message_notifications !== undefined)
+        next.messageNotifications = change.message_notifications
+    if (change.flags !== undefined) {
+        next.flags = change.flags
+        next.unreadSetting = unreadSettingOf(
+            change.flags,
+            GuildNotificationSettingsFlags.UNREADS_ALL_MESSAGES,
+            GuildNotificationSettingsFlags.UNREADS_ONLY_MENTIONS,
+        )
+    }
+    if (change.suppress_everyone !== undefined)
+        next.suppressEveryone = change.suppress_everyone
+    if (change.suppress_roles !== undefined)
+        next.suppressRoles = change.suppress_roles
+    if (change.mobile_push !== undefined) next.mobilePush = change.mobile_push
+    if (change.mute_scheduled_events !== undefined)
+        next.muteScheduledEvents = change.mute_scheduled_events
+    if (change.notify_highlights !== undefined)
+        next.notifyHighlights = change.notify_highlights
+    if (change.hide_muted_channels !== undefined)
+        next.hideMutedChannels = change.hide_muted_channels
+    return next
 }
