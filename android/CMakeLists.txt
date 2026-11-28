@@ -29,6 +29,10 @@ set_source_files_properties(${NITRO_SOURCES} PROPERTIES
   COMPILE_OPTIONS "-w"
 )
 
+# Voice: libisocord_dave.so (DAVE end-to-end encryption) and libisocord_audio.so (RNNoise).
+add_subdirectory(${CMAKE_SOURCE_DIR}/app/src/main/cpp/dave ${CMAKE_CURRENT_BINARY_DIR}/dave)
+add_subdirectory(${CMAKE_SOURCE_DIR}/app/src/main/cpp/audio ${CMAKE_CURRENT_BINARY_DIR}/audio)
+
 find_library(LOG_LIB log)
 
 target_link_libraries(

@@ -17,6 +17,7 @@ import {
     toggleRevealed,
 } from '../../../stores/messages/messages'
 import { chatGesturesStore } from '../../../stores/settings/chatGestures'
+import { handleTapCall } from '../../calls/tapCall'
 import { openMediaViewer } from '../../mediaViewer/store'
 import { retryMessage } from '../composer/outbox/outbox'
 import { toast } from '../composer/toast'
@@ -222,6 +223,9 @@ export function handleChatLink(url: string, context: LinkContext): void {
             }
             // There are no guild home and linked roles screens yet.
             toast(t('chat.mention.unavailable'), 'unavailable')
+            return
+        case 'callMessage':
+            handleTapCall(session, link.channelId, link.messageId)
             return
         case 'pins':
             // openPinnedMessages: the channel details on Pinned Messages.

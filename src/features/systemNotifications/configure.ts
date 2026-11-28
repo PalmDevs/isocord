@@ -41,6 +41,8 @@ export function configure(session: Session): void {
                 incomingCall: t('systemNotifications.incomingCall'),
                 decline: t('systemNotifications.decline'),
                 accept: t('systemNotifications.accept'),
+                answerCall: t('systemNotifications.answerCall'),
+                declineCall: t('systemNotifications.declineCall'),
                 ignore: t('systemNotifications.ignore'),
                 // Templates: the service fills in {username} and {emoji}.
                 friendRequest: t('systemNotifications.friendRequest'),

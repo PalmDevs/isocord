@@ -3,6 +3,20 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Camera capture, and the recent media strip. Android 13+ splits media access; 14+ allows a partial selection. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Voice calls: audio, and the call service's types (voice/telecom/CallService.kt). core-telecom adds MANAGE_OWN_CALLS too. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Push to talk haptics (HybridIsocordHaptics). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <!-- The incoming call screen over the lock screen (voice/telecom/RingNotification.kt). Android 14 asks the user unless the app is a calling app. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- The call bubble over other apps (voice/overlay/VoiceOverlay.kt), granted by the user in system settings. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
@@ -93,5 +107,22 @@
         android:grantUriPermissions="true">
         <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/notification_images" />
       </provider>
+      <!-- A call's foreground service. Types are added only while they run (voice/telecom/CallService.kt). -->
+      <service
+        android:name=".voice.telecom.CallService"
+        android:exported="false"
+        android:foregroundServiceType="phoneCall|microphone|camera|mediaProjection" />
+      <receiver android:name=".voice.telecom.CallActionReceiver" android:exported="false" />
+      <!-- The incoming call screen, over the lock screen and out of recents (voice/callscreen/CallActivity.kt). -->
+      <activity
+        android:name=".voice.callscreen.CallActivity"
+        android:exported="false"
+        android:theme="@style/AppTheme"
+        android:launchMode="singleTask"
+        android:taskAffinity=""
+        android:excludeFromRecents="true"
+        android:showWhenLocked="true"
+        android:turnScreenOn="true" />
+      <receiver android:name=".voice.telecom.RingActionReceiver" android:exported="false" />
     </application>
 </manifest>

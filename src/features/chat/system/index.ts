@@ -86,6 +86,8 @@ const PLAIN_ENV: SystemEnv = {
     user: () => undefined,
     avatarUrl,
     spans: text => [{ text }],
+    callParticipants: () => [],
+    inDmCall: () => false,
 }
 
 /** Returns a system message as one line of text (SystemMessageUtils.stringify), or undefined without a handler. */

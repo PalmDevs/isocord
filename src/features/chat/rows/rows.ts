@@ -446,10 +446,14 @@ export interface CallRow {
     missed: boolean
     /** PhoneCallIcon in the connected colour, and no description. */
     active: boolean
-    /** "{duration} — {time}", or the time. */
+    /** "{duration} — {time}", or the time. While active, "— Tap to join" after the timer, or nothing. */
     description?: string
     /** OverlappingCirclesView: the caller, or the people in an ongoing call. */
     avatarUrls: string[]
+    /** While active, when the call started (`rawMilliseconds`, epoch ms): native ticks the elapsed time. */
+    startedAt?: number
+    /** What a tap opens (`chatLink.callMessage`). */
+    url: string
 }
 
 /** The flagged message under an AutoMod action (FlaggedMessageEmbedAccessory). */

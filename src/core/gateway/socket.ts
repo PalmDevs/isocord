@@ -172,6 +172,8 @@ export class GatewaySocket {
      * notifications are on, as their own session (GatewayService.kt) takes over then, so only one connection is open.
      */
     pauseInBackground = false
+    /** In a voice call, which Discord drops once its session's socket is closed for long. */
+    private inCall = false
 
     /** `getClientState` is asked for the cache state at every IDENTIFY, so it always describes the stores as they are then. */
     constructor(
@@ -183,6 +185,11 @@ export class GatewaySocket {
         /** Runs one drain slice. GatewaySocketDispatcher `dispatchMultiple` batches store changes here. */
         private readonly runSlice: (slice: () => void) => void,
     ) {}
+
+    /** Whether a voice call holds this socket open (`setInCall`). */
+    get holdsCall(): boolean {
+        return this.inCall
+    }
 
     /** READY's session id (AuthenticationStore.getSessionId), sent with interactions. Null before READY. */
     get currentSessionId(): string | null {
@@ -206,6 +213,13 @@ export class GatewaySocket {
         this.teardown(1000)
         this.sessionId = null
         this.setState('disconnected')
+    }
+
+    /** Keeps the socket open in the background during a call. VoiceCallService and a headless task keep JS running. */
+    setInCall(inCall: boolean): void {
+        this.inCall = inCall
+        if (!inCall && AppState.currentState === 'background')
+            this.becameInactive()
     }
 
     /** Returns false when the socket is not open and the payload was dropped. */
@@ -516,12 +530,23 @@ export class GatewaySocket {
      */
     private becameActive(): void {
         if (this.closed) return
-        this.backoffMs = MIN_BACKOFF_MS
         if (this.paused) {
+            this.backoffMs = MIN_BACKOFF_MS
             this.paused = false
             this.open()
             return
         }
+        this.networkChanged()
+    }
+
+    /**
+     * Checks the socket after a network change, as GatewaySocketSingleton's online callback does
+     * (`networkStateChange`, 5000 ms): a waiting reconnect runs now, an open socket gets an expedited heartbeat.
+     * A voice call reports changes (NetworkWatcher.kt). Without one the regular heartbeat finds a dead socket.
+     */
+    networkChanged(): void {
+        if (this.closed || this.paused) return
+        this.backoffMs = MIN_BACKOFF_MS
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer)
             this.reconnectTimer = null
@@ -543,7 +568,7 @@ export class GatewaySocket {
     /** Pauses for the background session, which resumes its own session when told the app has left (AppVisibility). */
     private becameInactive(): void {
         if (this.closed || this.paused) return
-        if (!this.pauseInBackground) {
+        if (!this.pauseInBackground || this.inCall) {
             // Android suspends timers while the activity is paused.
             this.cancelDrainTimer()
             if (this.head < this.queue.length) this.scheduleDrain()

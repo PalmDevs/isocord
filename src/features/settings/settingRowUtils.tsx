@@ -5,6 +5,7 @@ import { themeStore } from '../../design/tokens'
 import { chatGesturesStore } from '../../stores/settings/chatGestures'
 import { settingsStore } from '../../stores/settings/settingsStore'
 import { systemNotificationsStore } from '../systemNotifications'
+import { voiceSettingsStore } from '../voice/settings/voiceSettings'
 import { useSettingSearchStore } from './search'
 import type { SettingContext } from './config'
 
@@ -17,12 +18,14 @@ export function useSettingContext(): SettingContext {
     const themeState = useStore(themeStore)
     const systemNotifications = useStore(systemNotificationsStore)
     const chatGestures = useStore(chatGesturesStore)
+    const voice = useStore(voiceSettingsStore)
     return {
         session,
         settings,
         themeState,
         systemNotifications,
         chatGestures,
+        voice,
     }
 }
 

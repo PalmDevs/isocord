@@ -5,6 +5,7 @@ import { StyleSheet, UnistylesRuntime } from 'react-native-unistyles'
 import { guildIconUrl } from '../../core/discord/cdn'
 import { useSession, useSessionStore } from '../../core/react'
 import { guildAcronym } from '../../design/components/avatars/guildAcronym'
+import { useOverlayInset } from '../../design/components/layout/overlayInsets'
 import { Text } from '../../design/components/Text'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
@@ -30,6 +31,8 @@ import type { SearchRow } from '../search/messages/resultRow'
 import type { NotificationItem } from './api'
 
 /** Lines of a mention's text before it is cut. */
+/** The list's own padding under its last row, before the overlays' (`useOverlayInset`). */
+const LIST_BOTTOM_PADDING = 16
 const LINE_CLAMP = 3
 const NO_WORDS = new Set<string>()
 const LOADING_ROW = JSON.stringify({
@@ -64,6 +67,7 @@ function guildOf(
  * preview panel (hosted by MainTabs, over the tab bar), with "Jump to Message" to its chat.
  */
 export function NotificationsTab() {
+    const overlayInset = useOverlayInset()
     const session = useSession()
     const themeJson = useChatTheme('transparent')
     const focused = useIsFocused()
@@ -213,7 +217,7 @@ export function NotificationsTab() {
                         inertContent
                         maxContentHeight={RESULT_MAX_CONTENT_HEIGHT}
                         topPadding={8 - SEARCH_ROW_TAP_STATE_PADDING}
-                        bottomPadding={16}
+                        bottomPadding={LIST_BOTTOM_PADDING + overlayInset}
                         onLinkPress={onLinkPress}
                         resultLongPress
                         onResultLongPress={onResultLongPress}

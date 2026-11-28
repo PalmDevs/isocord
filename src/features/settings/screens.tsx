@@ -19,6 +19,7 @@ export function SettingsOverviewScreen() {
                 {
                     label: t('settings.appSettings'),
                     settings: [
+                        'VOICE',
                         'APPEARANCE',
                         'ACCESSIBILITY',
                         'CHAT',
@@ -244,6 +245,54 @@ export function SettingsAdvancedScreen() {
                     settings: ['DEVELOPER_MODE'],
                     subLabel: t('settings.developerMode.description'),
                 },
+            ]}
+        />
+    )
+}
+
+/**
+ * SettingsVoiceScreen's getVoiceSettings: Input, Output, Soundboard, Overlay, Noise Suppression, Voice Processing and
+ * Stream Previews. Left out: Stream volume, sidechain compression, Advanced Voice Activity and video
+ * backgrounds. Added: input volume, the mic, output and camera pickers, and Android call integration in its own section.
+ */
+export function SettingsVoiceScreen() {
+    return (
+        <SettingsScreen
+            title={t('voice.settings.title')}
+            sections={[
+                {
+                    label: t('voice.settings.input'),
+                    settings: [
+                        'AUDIO_INPUT',
+                        'INPUT_MODE',
+                        'AUTO_VOICE_SENSITIVITY',
+                        'VOICE_SENSITIVITY',
+                        'INPUT_VOLUME',
+                    ],
+                },
+                {
+                    label: t('voice.settings.output'),
+                    settings: ['AUDIO_OUTPUT', 'OUTPUT_VOLUME'],
+                },
+                { settings: ['CAMERA'] },
+                {
+                    label: t('voice.settings.soundboard'),
+                    settings: ['SOUNDBOARD_VOLUME'],
+                },
+                {
+                    label: t('voice.settings.overlay'),
+                    settings: ['ANDROID_MOBILE_OVERLAY'],
+                },
+                { settings: ['NOISE_SUPPRESSION'] },
+                {
+                    label: t('voice.settings.voiceProcessing'),
+                    settings: ['ECHO_CANCELLATION', 'AUTOMATIC_GAIN_CONTROL'],
+                },
+                {
+                    label: t('voice.settings.streamPreviews'),
+                    settings: ['DISABLE_STREAM_PREVIEWS'],
+                },
+                { settings: ['ANDROID_CALL_INTEGRATION'] },
             ]}
         />
     )

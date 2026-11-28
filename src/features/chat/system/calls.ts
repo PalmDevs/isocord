@@ -1,6 +1,7 @@
 import { MessageType } from '../../../core/discord/messages'
 import { snowflakeTimestamp } from '../../../core/discord/snowflake'
 import { t } from '../../../i18n'
+import { chatLink } from '../links/chatLink'
 import { calendarTimestamp, humanizeDuration } from '../timestamp'
 import { authorValues } from './types'
 import type { MessageKey } from '../../../i18n'
@@ -34,30 +35,36 @@ function callTitle(message: Message, env: SystemEnv): MessageKey {
         : 'chat.system.call.ended'
 }
 
-/** createCallSystemMessage: the title, the length and time, and the avatars. */
-function callParts(message: Message, env: SystemEnv): SystemParts {
-    const active = isActive(message)
+/** createCallSystemMessage's description: "— Tap to join" while active and we are in no call, else when and how long. */
+function callDescription(message: Message, env: SystemEnv): string | undefined {
+    if (isActive(message))
+        return env.inDmCall() ? undefined : t('chat.system.call.tapToJoin')
     const time = calendarTimestamp(new Date(snowflakeTimestamp(message.id)))
     const duration = callDuration(message)
-    // An ongoing call shows who is in it. The reference reads them from the call store.
+    return duration
+        ? t('chat.system.call.durationTime', { duration, timestamp: time })
+        : time
+}
+
+/** createCallSystemMessage: the title, the description, the avatars, and the start for the native timer. */
+function callParts(message: Message, env: SystemEnv): SystemParts {
+    const active = isActive(message)
+    // An ongoing call shows who is connected (ChannelRTCStore.getParticipants, without the ringing ones).
     const people = active
-        ? (message.call?.participants ?? []).flatMap(id => env.user(id) ?? [])
+        ? env
+              .callParticipants(message.channel_id)
+              .flatMap(id => env.user(id) ?? [])
         : [message.author]
     return {
         call: {
             active,
             missed: isMissed(message, env),
-            description: active
-                ? undefined
-                : duration
-                  ? t('chat.system.call.durationTime', {
-                        duration,
-                        timestamp: time,
-                    })
-                  : time,
+            description: callDescription(message, env),
             avatarUrls: people.map(user =>
                 env.avatarUrl(user, CALL_AVATAR_SIZE),
             ),
+            startedAt: active ? snowflakeTimestamp(message.id) : undefined,
+            url: chatLink.callMessage(message.channel_id, message.id),
         },
     }
 }

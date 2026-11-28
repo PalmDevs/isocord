@@ -56,6 +56,13 @@ export const Endpoint = {
     channelMessage: (channelId: string, messageId: string) =>
         `/channels/${channelId}/messages/${messageId}`,
     channelTyping: (channelId: string) => `/channels/${channelId}/typing`,
+    /** CALL (GET: who may be rung), CALL_RING and CALL_STOP_RINGING. */
+    /** REGIONS: the voice regions a server's channels can override to. */
+    guildRegions: (guildId: string) => `/guilds/${guildId}/regions`,
+    channelCall: (channelId: string) => `/channels/${channelId}/call`,
+    channelCallRing: (channelId: string) => `/channels/${channelId}/call/ring`,
+    channelCallStopRinging: (channelId: string) =>
+        `/channels/${channelId}/call/stop-ringing`,
     channelPins: (channelId: string) => `/channels/${channelId}/messages/pins`,
     channelPin: (channelId: string, messageId: string) =>
         `/channels/${channelId}/pins/${messageId}`,
@@ -123,4 +130,6 @@ export const Endpoint = {
         `/guilds/${guildId}/members/${userId}`,
     guildBan: (guildId: string, userId: string) =>
         `/guilds/${guildId}/bans/${userId}`,
+    /** STREAM_PREVIEW: the signed URL of a Go Live stream's thumbnail. */
+    streamPreview: (streamKey: string) => `/streams/${streamKey}/preview`,
 } as const

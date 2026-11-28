@@ -43,6 +43,8 @@ export const MODAL_SPRING = {
     restDisplacementThreshold: 0.001,
 } as const
 export const TOOLTIP_SPRING = MODAL_SPRING
+/** AlertModal's hidden state: faded, shrunk and lowered. MODAL_SPRING moves a card between it and shown. */
+export const MODAL_HIDDEN = { opacity: 0, scale: 0.7, translateY: 50 } as const
 /** CONTEXT_MENU_SPRING: popovers and context menus, in and out. */
 export const CONTEXT_MENU_SPRING = {
     mass: 0.3,
@@ -83,6 +85,48 @@ export const ACTION_SHEET_SPRING = {
     mass: 0.5,
     restDisplacementThreshold: 0.4,
 } as const
+/** QUEST_DOCK_MODE_CHANGE_PHYSICS_CLAMPED: the docks that expand over the tab bar, the voice panel included. */
+export const DOCK_MODE_SPRING = {
+    mass: 0.5,
+    damping: 80,
+    stiffness: 320,
+    overshootClamping: true,
+    restDisplacementThreshold: 0.001,
+    restSpeedThreshold: 0.01,
+} as const
+/** VoicePanelConstants LAYOUT_PHYSICS: a voice panel card moving to a new frame, such as a focused video. */
+export const VOICE_PANEL_LAYOUT_SPRING = {
+    mass: 0.3,
+    damping: 25,
+    stiffness: 150,
+} as const
+/** VoicePanelCard CARD_SCALE_PHYSICS: MorphablePanelConstants SCALE_PHYSICS at 150 stiffness. A card growing in or out. */
+export const VOICE_CARD_SCALE_SPRING = {
+    mass: 0.4,
+    damping: 30,
+    stiffness: 150,
+} as const
+/**
+ * A list row growing in and fading as it joins, and shrinking out as it leaves (timingStandard). The reference's
+ * channel list voice users have no animation.
+ */
+export const ROW_ENTER_EXIT_TIMING = {
+    duration: TIMING_STANDARD_MS,
+    easing: STANDARD_EASING,
+}
+/** VoicePanelCard OPACITY_TIMING: a card fading in as it joins, and out as it leaves. */
+export const VOICE_CARD_OPACITY_TIMING = { duration: 200 }
+/** VoicePanelConstants SPEAKING_PHYSICS: a voice panel avatar lighting up or dimming as its user speaks. */
+export const VOICE_SPEAKING_SPRING = {
+    mass: 0.32,
+    damping: 10,
+    stiffness: 300,
+    restDisplacementThreshold: 0.001,
+    restSpeedThreshold: 0.001,
+    overshootClamping: true,
+} as const
+/** The space pages keep under the voice dock, following the dock in and out (MODAL_SPRING, like its fade). */
+export const OVERLAY_INSET_SPRING = MODAL_SPRING
 /** ACTION_SHEET_SPRING_CONFIG_REDUCED_MOTION. */
 export const ACTION_SHEET_REDUCED_MOTION_TIMING = { duration: 250 }
 /**

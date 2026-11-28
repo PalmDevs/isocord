@@ -9,11 +9,13 @@ import { guildsStore } from '../../stores/guilds'
 import { banMember, kickMember, timeoutMember } from '../../stores/moderation'
 import { TIMEOUT_DURATIONS } from './constants'
 import { ProfileSection } from './ProfileSection'
+import { useVoiceModeration } from './useVoiceModeration'
 
 const MODERATION_ALERT_KEY = 'user-profile-moderation'
 
 /**
- * UserProfileModeratorActions: Timeout, Kick and Ban, each behind a confirmation.
+ * UserProfileModeratorActions: Move to, Timeout, the voice rows, Kick and Ban. Timeout, Kick and Ban each sit
+ * behind a confirmation, the voice rows (useVoiceModeration) run at once as the reference's do.
  * Icons as the reference: ClockWarningIcon, UserMinusIcon, HammerIcon. Shown to a member with the
  * permission, never for oneself or the server's owner.
  */
@@ -28,14 +30,23 @@ export function ProfileModeration({
 }) {
     const session = useSession()
     const guild = useSessionStore(guildsStore, state => state.guilds[guildId])
-    if (!guild || userId === session.userId || userId === guild.ownerId)
-        return null
+    const { moveRows, stateRows } = useVoiceModeration(guildId, userId)
+    if (!guild) return null
+    // Timeout, Kick and Ban never target ourselves or the owner. The voice rows do.
+    const isOther = userId !== session.userId && userId !== guild.ownerId
     const permissions = computePermissions(guild, undefined, session.userId)
     const can = (bit: bigint) => (permissions & bit) === bit
-    const canTimeout = can(Permission.MODERATE_MEMBERS)
-    const canKick = can(Permission.KICK_MEMBERS)
-    const canBan = can(Permission.BAN_MEMBERS)
-    if (!canTimeout && !canKick && !canBan) return null
+    const canTimeout = isOther && can(Permission.MODERATE_MEMBERS)
+    const canKick = isOther && can(Permission.KICK_MEMBERS)
+    const canBan = isOther && can(Permission.BAN_MEMBERS)
+    if (
+        !canTimeout &&
+        !canKick &&
+        !canBan &&
+        moveRows.length === 0 &&
+        stateRows.length === 0
+    )
+        return null
 
     const confirm = (
         title: string,
@@ -53,6 +64,7 @@ export function ProfileModeration({
     return (
         <ProfileSection title={t('userProfile.moderatorActions')}>
             <TableRowGroup hasIcons>
+                {moveRows}
                 {canTimeout && (
                     <ContextMenu
                         triggerOnLongPress={false}
@@ -87,6 +99,7 @@ export function ProfileModeration({
                         )}
                     </ContextMenu>
                 )}
+                {stateRows}
                 {canKick && (
                     <TableRow
                         variant="danger"

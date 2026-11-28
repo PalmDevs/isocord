@@ -48,6 +48,18 @@ export const LIMITED_CHANNEL_NAME_TYPES = types(
     ChannelType.GUILD_MEDIA,
 )
 
+/** ChannelTypes.CALLABLE: the channels a call can be made in. */
+export const CALLABLE_CHANNEL_TYPES = types(
+    ChannelType.DM,
+    ChannelType.GROUP_DM,
+)
+
+/** ChannelTypes.GUILD_VOCAL (ChannelRecord.isGuildVocal): voice and stage channels. */
+export const VOCAL_CHANNEL_TYPES = types(
+    ChannelType.GUILD_VOICE,
+    ChannelType.GUILD_STAGE_VOICE,
+)
+
 /** ChannelTypes.GUILD_THREADS_ONLY: channels that hold posts instead of messages. */
 export const THREADS_ONLY_CHANNEL_TYPES = types(
     ChannelType.GUILD_FORUM,

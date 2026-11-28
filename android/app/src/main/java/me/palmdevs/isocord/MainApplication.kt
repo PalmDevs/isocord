@@ -28,6 +28,7 @@ import me.palmdevs.isocord.core.FontScale
 import me.palmdevs.isocord.core.TwemojiFonts
 import me.palmdevs.isocord.input.ChatInputPackage
 import me.palmdevs.isocord.network.IsocordNetwork
+import me.palmdevs.isocord.voice.VoicePackage
 
 private const val TAG = "IsocordStartup"
 
@@ -42,6 +43,7 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           add(ChatPackage())
           add(ChatInputPackage())
+          add(VoicePackage())
         },
       // Expo defaults to its own virtual entry, which only Expo CLI serves. This app uses plain Metro.
       jsMainModulePath = "index",

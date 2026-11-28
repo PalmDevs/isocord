@@ -3,6 +3,7 @@ import type { HybridObject } from 'react-native-nitro-modules'
 export interface LinkKindConstants {
     addReaction: string
     author: string
+    call: string
     channel: string
     componentMedia: string
     embedMedia: string

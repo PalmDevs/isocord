@@ -16,9 +16,22 @@ import me.palmdevs.isocord.core.Perf
 import me.palmdevs.isocord.notifications.Handover
 import me.palmdevs.isocord.notifications.gateway.AppVisibility
 import me.palmdevs.isocord.share.SharedContentInbox
+import me.palmdevs.isocord.voice.overlay.VoiceOverlay
 
 class MainActivity : ReactActivity() {
   internal var panelBackCallback: OnBackPressedCallback? = null
+
+  /**
+   * Back with nothing left to close: moves the task behind, as Android 12+ does for a launcher's root activity.
+   * The reference gets that default (BackPressManager turns RN's callback off when JS has no handler). React
+   * Native's own fallback finishes the activity, which unmounts the app and ended a call with it.
+   */
+  private val rootBackCallback =
+    object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        if (!moveTaskToBack(false)) finish()
+      }
+    }
 
   override fun invokeDefaultOnBackPressed() {
     val panelCallback = panelBackCallback
@@ -59,6 +72,8 @@ class MainActivity : ReactActivity() {
         else -> true
       }
     }
+    // Added first, so every other callback (React Native's, panels, screens) runs before it.
+    onBackPressedDispatcher.addCallback(rootBackCallback)
     super.onCreate(null)
     // A restored activity or one reopened from recents would share the same content again.
     if (savedInstanceState == null && !SharedContentInbox.isReplay(intent)) SharedContentInbox.receive(intent, this)
@@ -81,6 +96,18 @@ class MainActivity : ReactActivity() {
     Handover.shared.left()
     AppVisibility.set(false)
     super.onPause()
+  }
+
+  // On start and stop, not resume and pause: a system dialog over the app (a permission, screen capture consent)
+  // pauses it but leaves it on screen, and the call bubble stays away.
+  override fun onStart() {
+    super.onStart()
+    VoiceOverlay.setAppVisible(this, true)
+  }
+
+  override fun onStop() {
+    super.onStop()
+    VoiceOverlay.setAppVisible(this, false)
   }
 
   companion object {

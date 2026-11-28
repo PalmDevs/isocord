@@ -25,6 +25,20 @@ export function sessionFor(
     return active
 }
 
+/**
+ * Ends the session once the last provider unmounts, as the activity finishes. A call keeps it: the reference's call
+ * outlives its activity, and a remount picks the same session up again.
+ */
+export function releaseSession(): void {
+    if (active?.gateway.holdsCall) return
+    sessionFor(undefined, undefined)
+}
+
+/** Returns the running session, for a second React root such as the call overlay. It provides no account change. */
+export function activeSession(): Session | null {
+    return active
+}
+
 /** Starts the current account's session before React renders. */
 export function startCurrentSession(): void {
     const account = currentAccount(accountsStore.getState())

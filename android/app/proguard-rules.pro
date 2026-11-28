@@ -20,3 +20,9 @@
 -keepnames class com.facebook.react.views.scroll.ReactNestedScrollView
 # react-native-unistyles (NativePlatform.checkEdgeToEdge): Class.forName to detect react-native-edge-to-edge.
 -keepnames class com.zoontek.rnedgetoedge.EdgeToEdgePackage
+# libwebrtc (io.github.webrtc-sdk, no consumer rules): JNI_OnLoad and the native side find org.webrtc and
+# org.jni_zero classes, methods and fields by name (@CalledByNative), so none may be renamed or removed.
+-keep class org.webrtc.** { *; }
+-keep class org.jni_zero.** { *; }
+# JniZero.setJniClassLoader references JniZeroJni, which is not packaged in the AAR.
+-dontwarn org.jni_zero.JniZeroJni

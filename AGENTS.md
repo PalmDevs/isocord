@@ -40,6 +40,9 @@ uploads are native Kotlin and Jetpack Compose, in
   - use the components in `src/design/components`;
   - use `<Icon>` for icons.
 - **Taps:** every surface you can tap gets a ripple (`RipplePressable`).
+- **Sheets and panels you drag:** a list inside one drags it closed when the list is already at its top and the
+  finger moves down, and scrolls otherwise (like `ReactionsSheet`). Use `SheetDrag` with `scrollAtTop`
+  (`src/design/components/sheets/SheetDrag.tsx`), or the same rule for a custom panel. Every sheet must handle it.
 - **Font weight never changes between states.**
 - **Zustand selectors** must not return a new array or object on each call,
   or the component re-renders forever. Return primitives, or derive inside

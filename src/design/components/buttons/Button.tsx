@@ -31,6 +31,8 @@ export interface ButtonProps {
     textVariant?: TextVariant
     accessibilityLabel?: string
     onPress?: () => void
+    /** Such as a ContextMenu's `open`, for a button with more choices on hold. */
+    onLongPress?: () => void
     variant?: ButtonVariant
     size?: ButtonSize
     disabled?: boolean
@@ -87,6 +89,7 @@ const AnimatedIcon = Animated.createAnimatedComponent(Icon)
 export function Button({
     text,
     onPress,
+    onLongPress,
     icon,
     iconPosition = 'start',
     textVariant,
@@ -184,6 +187,7 @@ export function Button({
             disabled={disabled || loading}
             hitSlop={{ top: config.hitSlop, bottom: config.hitSlop }}
             onPress={onPress}
+            onLongPress={onLongPress}
             onPressIn={() => {
                 pressed.value = 1
             }}

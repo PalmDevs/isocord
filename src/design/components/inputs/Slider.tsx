@@ -30,6 +30,8 @@ export interface SliderProps {
     startIcon?: ReactNode
     /** Shown after the track. */
     endIcon?: ReactNode
+    /** Drawn in place of the track and its fill, such as VoiceSensitivity's meter. Transparent tracks in the reference. */
+    track?: ReactNode
     style?: StyleProp<ViewStyle>
 }
 
@@ -50,6 +52,7 @@ export function Slider({
     disabled = false,
     startIcon,
     endIcon,
+    track,
     style,
 }: SliderProps) {
     const range = maximumValue - minimumValue
@@ -164,10 +167,18 @@ export function Slider({
                     }
                     style={styles.slider}
                 >
-                    <View style={styles.track} />
-                    <Animated.View
-                        style={[styles.track, styles.filled, filledStyle]}
-                    />
+                    {track ?? (
+                        <>
+                            <View style={styles.track} />
+                            <Animated.View
+                                style={[
+                                    styles.track,
+                                    styles.filled,
+                                    filledStyle,
+                                ]}
+                            />
+                        </>
+                    )}
                     <Animated.View style={[styles.thumb, thumbStyle]} />
                 </View>
             </GestureDetector>

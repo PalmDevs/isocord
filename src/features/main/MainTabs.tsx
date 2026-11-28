@@ -2,9 +2,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import {
     CommonActions,
     StackActions,
+    useIsFocused,
     useNavigation,
 } from '@react-navigation/native'
-import { useEffect, useEffectEvent } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useStore } from 'zustand'
@@ -15,6 +16,7 @@ import { logger } from '../../core/log'
 import { useSession, useSessionStore } from '../../core/react'
 import { StatusAvatar } from '../../design/components/avatars/StatusAvatar'
 import { Badge } from '../../design/components/Badge'
+import { useReportBottomBar } from '../../design/components/layout/overlayInsets'
 import { showToast } from '../../design/components/overlays/toastStore'
 import { Text } from '../../design/components/Text'
 import { ThemedGradient } from '../../design/components/ThemedGradient'
@@ -205,8 +207,15 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
     useEffect(() => {
         saveLastTab(session.storage, active)
     }, [active, session])
+    // Overlays dock above the bar while its screen is the one shown (see overlayInsets).
+    const [height, setHeight] = useState(0)
+    const screenShown = useIsFocused()
+    useReportBottomBar(screenShown ? height : 0)
     return (
-        <View style={styles.bar}>
+        <View
+            style={styles.bar}
+            onLayout={event => setHeight(event.nativeEvent.layout.height)}
+        >
             {state.routes.map((route, index) => (
                 <TabButton
                     key={route.key}

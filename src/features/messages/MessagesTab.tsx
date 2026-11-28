@@ -17,6 +17,10 @@ import { IconButton } from '../../design/components/buttons/IconButton'
 import { RipplePressable } from '../../design/components/buttons/RipplePressable'
 import { Ellipsis } from '../../design/components/Ellipsis'
 import { ListPlaceholders } from '../../design/components/ListPlaceholders'
+import {
+    OverlaySpacer,
+    useAboveOverlaysStyle,
+} from '../../design/components/layout/OverlaySpacer'
 import { Skeleton, SkeletonPulse } from '../../design/components/Skeleton'
 import {
     skeletonKeys,
@@ -343,6 +347,7 @@ function ConversationPlaceholders({
 }
 
 export function MessagesTab() {
+    const aboveOverlays = useAboveOverlaysStyle()
     const focused = useTabSelected()
     const navigation = useNavigation()
     const { setTabFocused } = useMessagesPanels()
@@ -423,7 +428,8 @@ export function MessagesTab() {
                         data={ids}
                         renderItem={renderItem}
                         keyExtractor={id => id}
-                        contentContainerStyle={styles.content}
+                        contentContainerStyle={styles.listContent}
+                        ListFooterComponent={<OverlaySpacer />}
                         {...fadingEdge.scrollProps}
                         scrollEventThrottle={16}
                         renderScrollComponent={FadingEdgeScrollView}
@@ -473,7 +479,7 @@ export function MessagesTab() {
                             }),
                         )
                     }
-                    style={styles.barBottom}
+                    style={[styles.barBottom, aboveOverlays]}
                 />
             </View>
         </View>
@@ -517,6 +523,8 @@ const styles = StyleSheet.create((theme, runtime) => ({
         backgroundColor: theme.colors.BACKGROUND_MOD_SUBTLE,
     },
     content: { paddingBottom: theme.space.PX_24 },
+    // The voice dock floats over the list's bottom (OverlaySpacer).
+    listContent: { paddingBottom: theme.space.PX_24 },
     // The bars float over the list (ChannelsUnreadBars' wrapper).
     listContainer: { flex: 1 },
     barTop: { top: 0 },

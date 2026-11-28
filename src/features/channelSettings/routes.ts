@@ -6,6 +6,7 @@ export const CHANNEL_SETTINGS_ROUTES = {
     duplicateChannel: 'duplicateChannel',
     createChannel: 'createChannel',
     customizeGroup: 'customizeGroup',
+    channelRegion: 'channelRegion',
 } as const
 
 /** The params of every route here. */
@@ -50,3 +51,7 @@ export const openCreateChannel = (
 /** ChannelLongPressActionSheet's Customize Group row: showChatGDMCustomizeActionSheet. */
 export const openEditGroup = (navigation: Navigation, channelId: string) =>
     navigation.navigate(CHANNEL_SETTINGS_ROUTES.customizeGroup, { channelId })
+
+/** renderRegionOverride's row: ChannelSettingsChangeRTCRegion. */
+export const openChannelRegion = (navigation: Navigation, channelId: string) =>
+    navigation.navigate(CHANNEL_SETTINGS_ROUTES.channelRegion, { channelId })

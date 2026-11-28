@@ -31,6 +31,7 @@ const jsKind = {
     wave: 'wave',
     pins: 'pins',
     editGroup: 'edit-group',
+    callMessage: 'call-message',
     poll: 'poll',
     dismiss: 'dismiss',
     component: 'component',
@@ -149,6 +150,8 @@ export type ChatLink =
     | { kind: 'pins'; channelId: string }
     /** A group DM's settings (bindOpenGdmCustomizeActionSheet). */
     | { kind: 'editGroup'; channelId: string }
+    /** A tapped call card (MessagesHandlers.handleTapCall). */
+    | { kind: 'callMessage'; channelId: string; messageId: string }
     /** A whole search result. */
     | { kind: 'result'; channelId: string; messageId: string }
     /** The media viewer's own: a long press on the media, the alt text button, the speed picker. */
@@ -203,6 +206,9 @@ export const chatLink = {
     /** "Edit group" in a group DM's rename and icon change. */
     editGroup: (channelId: string) =>
         `${linkScheme}${jsKind.editGroup}/${channelId}`,
+    /** A DM call's card: joins the call while it is going, else offers to start one. */
+    callMessage: (channelId: string, messageId: string) =>
+        `${linkScheme}${jsKind.callMessage}/${channelId}/${messageId}`,
     /** A poll's answer (with `answerId`) or action. */
     poll: (messageId: string, action: PollLinkAction, answerId?: number) =>
         `${linkScheme}${jsKind.poll}/${messageId}/${action}${answerId === undefined ? '' : `/${answerId}`}`,
@@ -416,6 +422,11 @@ export function parseChatLink(url: string): ChatLink | undefined {
             return first ? { kind: 'pins', channelId: first } : undefined
         case jsKind.editGroup:
             return first ? { kind: 'editGroup', channelId: first } : undefined
+        case jsKind.callMessage:
+            // <channelId>/<messageId>
+            return first && second
+                ? { kind: 'callMessage', channelId: first, messageId: second }
+                : undefined
         case jsKind.poll:
             // <messageId>/<action>[/<answerId>]
             return first && isPollAction(second)

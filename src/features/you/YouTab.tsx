@@ -4,6 +4,7 @@ import { SystemBars } from 'react-native-edge-to-edge'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useSession } from '../../core/react'
 import { Button } from '../../design/components/buttons/Button'
+import { OverlaySpacer } from '../../design/components/layout/OverlaySpacer'
 import { t } from '../../i18n'
 import {
     profileBackground,
@@ -50,6 +51,8 @@ export function YouTab() {
                         />
                     }
                 />
+                {/* The voice dock floats over the profile's bottom. */}
+                <OverlaySpacer />
             </ScrollView>
         </View>
     )

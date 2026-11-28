@@ -14,6 +14,8 @@ import me.palmdevs.isocord.notifications.gateway.RawMessage
 import me.palmdevs.isocord.notifications.gateway.RawUser
 import me.palmdevs.isocord.notifications.gateway.ReactionAdd
 import me.palmdevs.isocord.notifications.gateway.ScheduledEvent
+import me.palmdevs.isocord.voice.telecom.IncomingRing
+import me.palmdevs.isocord.voice.telecom.RingStrings
 
 /** Image previews are asked of the media proxy at most this big, never the original. */
 private const val PREVIEW_MAX_PX = 720
@@ -185,7 +187,6 @@ private fun imagePreview(message: RawMessage): ImagePreview? {
 
 /** What isn't a message, by the NOTIF_SETTINGS channel it goes to and the toggle that turns it off. */
 object AlertKind {
-  const val CALL = "call"
   const val FRIEND_REQUEST = "friendRequest"
   const val FRIEND_ACCEPTED = "friendAccepted"
   const val REACTION = "reaction"
@@ -195,8 +196,6 @@ object AlertKind {
 
 /** An alert's notification tag, by what it is about. One alert per tag, replaced in place. */
 object AlertTag {
-  fun call(channelId: String) = "call:$channelId"
-
   fun friend(userId: String) = "friend:$userId"
 
   fun reaction(messageId: String) = "reaction:$messageId"
@@ -212,7 +211,7 @@ class MessageRef(val channelId: String, val messageId: String)
 /** A scheduled event, by its guild. */
 class EventRef(val guildId: String, val eventId: String)
 
-/** A notification that isn't a message: a call, friend request, reaction, forum post, starting event. */
+/** A notification that isn't a message: a friend request, reaction, forum post, starting event. */
 class Alert(
   val kind: String,
   /** [AlertTag]. */
@@ -224,8 +223,6 @@ class Alert(
   val iconUrl: String? = null,
   /** What a tap opens, an `isocord://channel/…` link; the app as it was when null. */
   val link: String? = null,
-  /** Calls: the channel whose ringing Decline stops. */
-  val channelId: String? = null,
   /** Friend requests: whose request Accept and Ignore answer. */
   val userId: String? = null,
   /** Reactions: the message whose text is fetched and put after `text`. */
@@ -234,17 +231,27 @@ class Alert(
   val interestIn: EventRef? = null,
 )
 
-/** CALL_CREATE / CALL_UPDATE ringing the account: "Incoming call" from the caller or the group. */
-fun callAlert(call: CallEvent, channel: ChannelInfo, state: NotificationState, account: AccountConfig): Alert {
-  val caller = call.voice_states.firstOrNull { it.user_id != state.selfId }?.user_id?.let { state.users[it] }
-  return Alert(
-    kind = AlertKind.CALL,
-    tag = AlertTag.call(channel.id),
-    title = title(channel, state, null, account) ?: caller?.name ?: "",
-    text = account.string("incomingCall"),
-    iconUrl = caller?.let { avatarUrl(it.id, it.avatar, it.discriminator) },
-    link = Links.channel(null, channel.id),
+/**
+ * CALL_CREATE / CALL_UPDATE ringing the account: the caller, else the only other user of a DM, and the group's name in
+ * a group DM.
+ */
+fun incomingRing(call: CallEvent, channel: ChannelInfo, state: NotificationState, account: AccountConfig): IncomingRing {
+  val callerId = call.voice_states.firstOrNull { it.user_id != state.selfId }?.user_id ?: channel.recipientIds.singleOrNull()
+  val caller = callerId?.let { state.users[it] }
+  val group = title(channel, state, null, account)
+  return IncomingRing(
     channelId = channel.id,
+    name = caller?.name ?: group ?: "",
+    group = group,
+    avatarUrl = caller?.let { avatarUrl(it.id, it.avatar, it.discriminator) },
+    strings =
+      RingStrings(
+        incoming = account.string("incomingCall"),
+        accept = account.string("accept"),
+        decline = account.string("decline"),
+        answerLabel = account.string("answerCall"),
+        declineLabel = account.string("declineCall"),
+      ),
   )
 }
 

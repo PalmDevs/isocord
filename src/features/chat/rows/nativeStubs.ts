@@ -18,6 +18,15 @@ const anything: unknown = new Proxy(function stub() {}, {
     construct: () => anything as object,
 })
 
+/** React Native's `Platform` on Android, the rest stubbed. */
+const ANDROID: unknown = new Proxy(
+    { OS: 'android' },
+    {
+        get: (target, key) =>
+            key in target ? target[key as keyof typeof target] : anything,
+    },
+)
+
 /** Packages that need the React Native runtime. Plain JS packages, such as the markdown parser, stay real. */
 const NATIVE =
     /^(react-native|expo|@react-navigation|@shopify|@hcaptcha|@tanstack)/
@@ -78,5 +87,7 @@ export async function stubNativeModules() {
             __esModule: true,
             default: anything,
             ...Object.fromEntries([...set].map(name => [name, anything])),
+            // Isocord only runs on Android: native wrappers are null elsewhere.
+            ...(pkg === 'react-native' && { Platform: ANDROID }),
         }))
 }

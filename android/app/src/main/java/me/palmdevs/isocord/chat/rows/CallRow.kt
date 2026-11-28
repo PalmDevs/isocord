@@ -15,6 +15,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,10 +53,13 @@ private val PARTICIPANT_SIZE = 24.dp
 /** OverlappingCirclesView: each circle covers this much of the one before it. */
 private val PARTICIPANT_OVERLAP = 8.dp
 
+/** How often an ongoing call's elapsed time redraws. */
+private val TIMER_TICK = 1.seconds
+
 /**
  * A DM call (CallSystemMessageView): the phone icon, the title (the row's content) and when and how long, and the
- * avatars on the end, on the embed background. Tapping joins the call in the reference; the app has no calls, so
- * only the long press does something.
+ * avatars on the end, on the embed background. An ongoing call ticks its elapsed time before its description. A tap
+ * opens the card's link (MessagesHandlers.handleTapCall), a long press the message actions.
  */
 @Composable
 fun CallRow(row: ChatRow.System, call: CallCard) {
@@ -67,7 +79,10 @@ fun CallRow(row: ChatRow.System, call: CallCard) {
       .fillMaxWidth()
       .clip(CALL_CARD_SHAPE)
       .background(theme.embedBackground, CALL_CARD_SHAPE)
-      .chatPress(onLongClick = { actions.onMessageLongPress(row.id) })
+      .chatPress(
+        onClick = { actions.onLinkPress(call.url) },
+        onLongClick = { actions.onMessageLongPress(row.id) },
+      )
       .padding(vertical = 8.dp),
   ) {
     Box(Modifier.width(CALL_ICON_COLUMN), contentAlignment = Alignment.Center) {
@@ -85,7 +100,8 @@ fun CallRow(row: ChatRow.System, call: CallCard) {
         overflow = TextOverflow.Ellipsis,
         style = TextStyle(color = theme.headingPrimary, fontFamily = fonts.sans, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 20.sp),
       )
-      call.description?.let {
+      val elapsed = call.startedAt?.let { elapsedSince(it) }
+      listOfNotNull(elapsed, call.description).joinToString(" ").takeIf { it.isNotEmpty() }?.let {
         BasicText(
           it,
           maxLines = 1,
@@ -95,6 +111,23 @@ fun CallRow(row: ChatRow.System, call: CallCard) {
     }
     Participants(call.avatarUrls, Modifier.padding(start = 8.dp, end = 12.dp))
   }
+}
+
+/** Returns the time since [startedAt] (epoch ms) as `m:ss`, or `h:mm:ss` past an hour, redrawn every second. */
+@Composable
+private fun elapsedSince(startedAt: Long): String {
+  var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+  LaunchedEffect(startedAt) {
+    while (true) {
+      now = System.currentTimeMillis()
+      delay(TIMER_TICK)
+    }
+  }
+  val seconds = ((now - startedAt) / 1.seconds.inWholeMilliseconds).coerceAtLeast(0)
+  val hours = seconds / 1.hours.inWholeSeconds
+  val minutes = seconds % 1.hours.inWholeSeconds / 1.minutes.inWholeSeconds
+  val secs = seconds % 1.minutes.inWholeSeconds
+  return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, secs) else "%d:%02d".format(minutes, secs)
 }
 
 /** OverlappingCirclesView: the avatars side by side, each over the last, ringed in the card colour. */

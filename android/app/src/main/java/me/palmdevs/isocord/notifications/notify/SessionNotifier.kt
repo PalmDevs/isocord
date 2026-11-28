@@ -13,6 +13,7 @@ import me.palmdevs.isocord.notifications.gateway.RawRelationship
 import me.palmdevs.isocord.notifications.gateway.ReactionAdd
 import me.palmdevs.isocord.notifications.gateway.ScheduledEvent
 import me.palmdevs.isocord.notifications.gateway.ScheduledEventUser
+import me.palmdevs.isocord.voice.telecom.IncomingCalls
 
 /**
  * What a session's dispatches notify, by one set of rules for both sessions: the background one (GatewayService) and
@@ -26,8 +27,8 @@ class SessionNotifier(
   /** Events already announced as starting: GUILD_SCHEDULED_EVENT_UPDATE repeats while one is active. */
   private val startedEvents = HashSet<String>()
 
-  /** This session serves the notifications now: the app's while it is in front, the background one otherwise. */
-  private val live get() = AppVisibility.foreground == inApp
+  /** This session serves the notifications now: the app's while it is in front or in a call, the background one otherwise. */
+  private val live get() = AppVisibility.appSessionLive == inApp
 
   /**
    * Notifies about a dispatch, if it calls for one. [state] already knows the dispatch's place. Events heard again by
@@ -40,7 +41,7 @@ class SessionNotifier(
       "MESSAGE_CREATE" -> return onMessage(dispatch.decode(RawMessage.serializer()), state, account)
       "THREAD_CREATE" -> onThread(dispatch.decode(RawChannel.serializer()), state, account, replayed)
       "CALL_CREATE", "CALL_UPDATE" -> onCall(dispatch.decode(CallEvent.serializer()), state, account)
-      "CALL_DELETE" -> cancel(AlertTag.call(dispatch.decode(CallEvent.serializer()).channel_id))
+      "CALL_DELETE" -> IncomingCalls.stop(context, dispatch.decode(CallEvent.serializer()).channel_id)
       "RELATIONSHIP_ADD", "RELATIONSHIP_UPDATE" ->
         onRelationship(dispatch.decode(RawRelationship.serializer()), dispatch.type == "RELATIONSHIP_ADD", state, account, replayed)
       "RELATIONSHIP_REMOVE" -> {
@@ -74,12 +75,17 @@ class SessionNotifier(
     alert(forumAlert(thread, forum, state, account))
   }
 
-  /** "Incoming call" while it rings the account; gone once it doesn't. Not held back by a replay. */
+  /**
+   * An incoming call while it rings the account ([IncomingCalls]); gone once it doesn't. Not held back by a replay.
+   * A call that rings during a call is left alone ([IncomingCalls.ring]).
+   */
   private fun onCall(call: CallEvent, state: NotificationState, account: AccountConfig) {
-    if (state.selfId !in call.ringing) return cancel(AlertTag.call(call.channel_id))
-    val channel = state.channels[call.channel_id] ?: return
+    val channelId = call.channel_id
+    if (state.selfId !in call.ringingIds()) return IncomingCalls.stop(context, channelId)
+    val channel = state.channels[channelId] ?: return
     if (!live || state.dnd || state.muted(channel)) return
-    alert(callAlert(call, channel, state, account))
+    if (!NotificationPrefs.enabled(context) || !NotificationPrefs.kindEnabled(context, NotificationKind.CALLS)) return
+    IncomingCalls.ring(context, incomingRing(call, channel, state, account))
   }
 
   /** An incoming request, or an outgoing one that became a friend. A request answered elsewhere goes. */

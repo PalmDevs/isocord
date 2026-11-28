@@ -65,6 +65,8 @@ export interface Channel {
     applied_tags?: string[]
     /** Threads: messages ever sent in it, not decremented by deletes. */
     total_message_sent?: number
+    /** Voice channels: VideoQualityMode. Absent means auto. */
+    video_quality_mode?: number
 }
 
 declare module '../../core/gateway/events' {

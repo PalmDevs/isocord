@@ -14,12 +14,14 @@ import { messagesStore } from '../../../stores/messages/messages'
 import { loadMessages } from '../../../stores/messages/messageWindows'
 import { relationshipsStore } from '../../../stores/relationships'
 import { usersStore } from '../../../stores/users'
+import { voiceStatesStore } from '../../../stores/voiceStates'
 import { useForumFirstMessage } from '../../forum/useForumPost'
 import {
     clearFailedInteractions,
     componentInteractionsStore,
 } from '../messageComponents/interactionStore'
 import { pollStateStore, refreshPollsAt } from '../polls/pollState'
+import { callParticipantIds, isInDmCall } from '../system/callInputs'
 import { chatRowsFor, prepareChatRows } from './preparedChatRows'
 
 /** Loads and watches a channel's history, and what its guild needs to show it. */
@@ -121,6 +123,13 @@ export function useChatRows({
         componentInteractionsStore,
         state => state,
     )
+    // A call row shows who is in the call and offers to join while we are in none.
+    const callParticipants = useSessionStore(voiceStatesStore, state =>
+        channel ? callParticipantIds(state, channel.id) : '',
+    )
+    const inDmCall = useSessionStore(voiceStatesStore, state =>
+        isInDmCall(state, session.userId),
+    )
     // Keeps its identity: a JSON string prop of the native view.
     // A change elsewhere in these maps rebuilds cheaply: unchanged message rows are reused (rowMemo).
     const { json, unknownChannels, pollChange } = useMemo(
@@ -143,6 +152,7 @@ export function useChatRows({
                 interactions,
                 forumPostStarter,
                 relationships,
+                call: { participants: callParticipants, inDmCall },
             }),
         [
             messages,
@@ -162,6 +172,8 @@ export function useChatRows({
             interactions,
             forumPostStarter,
             relationships,
+            callParticipants,
+            inDmCall,
         ],
     )
     useEffect(() => {

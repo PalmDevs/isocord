@@ -25,6 +25,8 @@ const CALLS = [
     'swipeActions',
     'hiddenReason',
     'loadedMessage',
+    'callParticipants',
+    'inDmCall',
 ] as const
 type Source = (typeof MAPS)[number] | (typeof CALLS)[number] | 'canView'
 
@@ -78,6 +80,10 @@ function current(context: RowContext, { source, key }: Read): unknown {
             return context.hiddenReason?.(key as string)
         case 'loadedMessage':
             return context.loadedMessage?.(key as string)
+        case 'callParticipants':
+            return context.callParticipants?.(key as string)
+        case 'inDmCall':
+            return context.inDmCall?.(key as string)
         case 'canView': {
             const channel = context.channels[key as string]
             return channel

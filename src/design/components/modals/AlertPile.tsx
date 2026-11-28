@@ -14,7 +14,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { useSurfaceColor } from '../../surfaceTint'
-import { MODAL_SPRING } from '../../tokens/motion'
+import { MODAL_HIDDEN, MODAL_SPRING } from '../../tokens/motion'
 import { dismissKeyboard } from '../keyboard'
 import { Backdrop } from '../overlays/Backdrop'
 import { ScopedThemeScope } from '../overlays/scopedTheme'
@@ -31,7 +31,13 @@ const MAX_WIDTH = 400
 /** How far each card behind the front one sits above it. */
 const CARD_OFFSETS = [0, -20, -34]
 
-const HIDDEN = { opacity: 0, transform: [{ scale: 0.7 }, { translateY: 50 }] }
+const HIDDEN = {
+    opacity: MODAL_HIDDEN.opacity,
+    transform: [
+        { scale: MODAL_HIDDEN.scale },
+        { translateY: MODAL_HIDDEN.translateY },
+    ],
+}
 const SHOWN = { opacity: 1, transform: [{ scale: 1 }, { translateY: 0 }] }
 
 // The reference springs opacity, scale and translateY between SHOWN and HIDDEN with MODAL_SPRING.
@@ -55,8 +61,13 @@ const EXITING = () => {
         animations: {
             opacity: withSpring(HIDDEN.opacity, MODAL_SPRING),
             transform: [
-                { scale: withSpring(0.7, MODAL_SPRING) },
-                { translateY: withSpring(50, MODAL_SPRING) },
+                { scale: withSpring(MODAL_HIDDEN.scale, MODAL_SPRING) },
+                {
+                    translateY: withSpring(
+                        MODAL_HIDDEN.translateY,
+                        MODAL_SPRING,
+                    ),
+                },
             ],
         },
     }

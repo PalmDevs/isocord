@@ -12,6 +12,8 @@ declare module './channels' {
         nsfw?: boolean
         bitrate?: number
         user_limit?: number
+        /** Voice channels: the region override, null for automatic. */
+        rtc_region?: string | null
         /** The application that runs a managed group DM or a guild app channel. */
         application_id?: string
         /** ChannelFlags bits. */
@@ -46,6 +48,14 @@ export interface ChannelEdit {
     applied_tags?: string[]
     /** A data URI, or null to remove the icon of a group DM. */
     icon?: string | null
+    /** Voice channels: bits per second. */
+    bitrate?: number
+    /** Voice channels: 0 for no limit. */
+    user_limit?: number
+    /** Voice channels: VideoQualityMode. */
+    video_quality_mode?: number
+    /** Voice channels: the region override, null for automatic. */
+    rtc_region?: string | null
 }
 
 /** The body of a guild channel to create (CreateChannelActionCreators.createChannel). */

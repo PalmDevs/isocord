@@ -45,6 +45,12 @@
         "implementationClassName": "HybridIsocordGateway"
       }
     },
+    "IsocordHaptics": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordHaptics"
+      }
+    },
     "IsocordNotifications": {
       "android": {
         "language": "kotlin",
@@ -67,6 +73,18 @@
       "android": {
         "language": "kotlin",
         "implementationClassName": "HybridIsocordUploader"
+      }
+    },
+    "IsocordVoice": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordVoice"
+      }
+    },
+    "IsocordVoiceOverlay": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridIsocordVoiceOverlay"
       }
     }
   },

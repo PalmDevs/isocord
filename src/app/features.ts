@@ -1,6 +1,7 @@
 import { registerFeature } from '../core/feature'
 import { accountsFeature } from '../features/accounts'
 import { alertsFeature } from '../features/alerts'
+import { callsFeature } from '../features/calls'
 import { captchaFeature } from '../features/captcha'
 import { channelBrowserFeature } from '../features/channelBrowser'
 import { channelSettingsFeature } from '../features/channelSettings'
@@ -13,6 +14,7 @@ import { mediaViewerFeature } from '../features/mediaViewer'
 import { perfFeature } from '../features/perf'
 import { globalSearchFeature } from '../features/search/global'
 import { systemNotificationsFeature } from '../features/systemNotifications'
+import { voiceFeature } from '../features/voice/feature'
 import '../features/expressions/picker'
 import '../features/upload/composerSlots'
 import { GalleryPageScreen } from '../features/gallery/GalleryPageScreen'
@@ -42,6 +44,9 @@ registerFeature(debugLogsFeature)
 registerFeature(filePreviewFeature)
 registerFeature(inviteFeature)
 registerFeature(shareFeature)
+// Before the viewer, alerts, sheets and toasts, which all draw over the voice dock and panel.
+registerFeature(voiceFeature)
+registerFeature(callsFeature)
 // Before alerts, sheets and toasts, which open over the viewer (reactions, the reaction picker).
 registerFeature(mediaViewerFeature)
 registerFeature(alertsFeature)

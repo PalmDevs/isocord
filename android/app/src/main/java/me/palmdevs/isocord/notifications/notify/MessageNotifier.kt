@@ -38,6 +38,7 @@ import me.palmdevs.isocord.R
 import me.palmdevs.isocord.core.Links
 import me.palmdevs.isocord.core.decodeOrNull
 import me.palmdevs.isocord.network.ApiPath
+import me.palmdevs.isocord.notifications.gateway.AppVisibility
 import me.palmdevs.isocord.notifications.gateway.EventInterest
 import me.palmdevs.isocord.notifications.gateway.RawMessage
 import okhttp3.Request
@@ -53,7 +54,7 @@ object MessageNotifier {
   /** NOTIF_SETTINGS (NotificationSettingsConstants) string ids, so the channels match the official app's. */
   const val CHANNEL_DIRECT = "directMessages"
   const val CHANNEL_SERVER = "messages"
-  private const val CHANNEL_CALLS = "calls"
+  const val CHANNEL_CALLS = "calls"
   private const val CHANNEL_FRIEND_REQUESTS = "friendRequests"
   private const val CHANNEL_REACTIONS = "reactions"
   private const val CHANNEL_FORUM = "forumThreadCreated"
@@ -76,8 +77,6 @@ object MessageNotifier {
   private const val NOTIFICATION_ID = 1
   /** Alerts, tagged by what they are about ("call:<channel>", "friend:<user>", ...). */
   private const val ALERT_ID = 2
-  /** A call stops ringing after this long even if the gateway never says so (CALL_UPDATE, CALL_DELETE). */
-  private const val CALL_TIMEOUT_MS = 60_000L
   /** DirectReplyAction's RemoteInput key. */
   const val REPLY_KEY = "remote_input_key"
   /** The newest messages kept per conversation. */
@@ -165,7 +164,7 @@ object MessageNotifier {
     )
   }
 
-  /** `inApp`: posted by the app while in front, on the channel that doesn't pop up. */
+  /** `inApp`: posted by the app's session. On the channel that doesn't pop up only while the app is [AppVisibility.visible]. */
   fun post(context: Context, incoming: Incoming, alertEveryMessage: Boolean, inApp: Boolean) =
     work(context) {
       val (kind, channel) =
@@ -175,7 +174,7 @@ object MessageNotifier {
           else -> NotificationKind.MESSAGES to CHANNEL_SERVER
         }
       if (!NotificationPrefs.kindEnabled(context, kind)) return@work
-      val notificationChannel = if (inApp) CHANNEL_IN_APP else channel
+      val notificationChannel = if (inApp && AppVisibility.visible) CHANNEL_IN_APP else channel
       val conversation =
         conversations.getOrPut(incoming.channelId) {
           Conversation(incoming.channelId, incoming.guildId, incoming.title, incoming.isGroup, notificationChannel)
@@ -270,7 +269,7 @@ object MessageNotifier {
   }
 
   /** Runs on [executor] with the CPU kept awake, as avatar and image downloads would otherwise stall in Doze. */
-  private fun work(context: Context, block: () -> Unit) {
+  internal fun work(context: Context, block: () -> Unit) {
     val wakeLock =
       context.getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "isocord:notify")
     wakeLock.acquire(30_000)
@@ -285,13 +284,12 @@ object MessageNotifier {
     }
   }
 
-  /** A call, friend request, reaction, forum post or event, unless its kind is turned off. `inApp` as in [post]. */
+  /** A friend request, reaction, forum post or event, unless its kind is turned off. `inApp` as in [post]. */
   fun alert(context: Context, alert: Alert, inApp: Boolean) =
     work(context) {
       val account = NotificationPrefs.account(context) ?: return@work
       val (kind, channel) =
         when (alert.kind) {
-          AlertKind.CALL -> NotificationKind.CALLS to CHANNEL_CALLS
           AlertKind.FRIEND_REQUEST, AlertKind.FRIEND_ACCEPTED -> NotificationKind.FRIEND_REQUESTS to CHANNEL_FRIEND_REQUESTS
           AlertKind.REACTION -> NotificationKind.REACTIONS to CHANNEL_REACTIONS
           AlertKind.FORUM_POST -> NotificationKind.FORUM_POSTS to CHANNEL_FORUM
@@ -314,8 +312,7 @@ object MessageNotifier {
               ?.firstOrNull { it.id == ref.messageId }
           listOfNotNull(alert.text, message?.let { previewText(it, null, null, account) }).joinToString(" ")
         } ?: alert.text
-      // Calls, unlike the rest, pop up even over the app: Isocord has no call screen of its own to ring.
-      val notificationChannel = if (inApp && alert.kind != AlertKind.CALL) CHANNEL_IN_APP else channel
+      val notificationChannel = if (inApp && AppVisibility.visible) CHANNEL_IN_APP else channel
       val builder =
         NotificationCompat.Builder(context, notificationChannel)
           .setSmallIcon(R.drawable.ic_notification)
@@ -327,19 +324,9 @@ object MessageNotifier {
           .setPriority(NotificationCompat.PRIORITY_HIGH)
           .setAutoCancel(true)
           // A replay after the hand-over posts the same tag again; it shouldn't sound twice.
-          .setOnlyAlertOnce(alert.kind != AlertKind.CALL)
+          .setOnlyAlertOnce(true)
           .setContentIntent(openIntent(context, alert.link, alert.tag.hashCode()))
       when (alert.kind) {
-        AlertKind.CALL ->
-          builder
-            .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setOngoing(true)
-            .setTimeoutAfter(CALL_TIMEOUT_MS)
-            .addAction(
-              R.drawable.ic_notification,
-              account.string("decline"),
-              NotificationActionReceiver.alertIntent(context, NotificationActionReceiver.DECLINE_CALL, alert),
-            )
         AlertKind.FRIEND_REQUEST ->
           builder
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
@@ -357,8 +344,6 @@ object MessageNotifier {
         else -> builder.setCategory(NotificationCompat.CATEGORY_SOCIAL)
       }
       val notification = builder.build()
-      // The ringtone repeats until the call is answered, declined or ends, as a phone call's does.
-      if (alert.kind == AlertKind.CALL) notification.flags = notification.flags or Notification.FLAG_INSISTENT
       try {
         NotificationManagerCompat.from(context).notify(alert.tag, ALERT_ID, notification)
       } catch (e: SecurityException) {
@@ -493,7 +478,7 @@ object MessageNotifier {
   }
 
   /** Avatars cut into a circle, as the official app's conversation notifications show them. */
-  private fun avatar(url: String): Bitmap? {
+  internal fun avatar(url: String): Bitmap? {
     avatars.get(url)?.let { return it }
     val bytes = download(url) ?: return null
     val source = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null

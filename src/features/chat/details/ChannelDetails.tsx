@@ -8,6 +8,7 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated'
 import { StyleSheet, useUnistyles } from 'react-native-unistyles'
+import { VOCAL_CHANNEL_TYPES } from '../../../core/discord/channelType'
 import { useSessionStore } from '../../../core/react'
 import {
     CHANNEL_DETAILS_SEARCH_TIMING,
@@ -37,6 +38,7 @@ import { ChannelNameHeader } from './ChannelNameHeader'
 import { ChannelTopic } from './ChannelTopic'
 import { SEARCH_BAR_HEIGHT } from './constants'
 import { NavigationBar } from './NavigationBar'
+import type { Channel } from '../../../stores/channels/channels'
 import type {
     SearchContext,
     SearchTab,
@@ -50,6 +52,20 @@ const PAGES: SearchTabPages = {
 }
 /** A channel's details add the Threads tab; a thread's (SearchTypes.THREAD) have none. */
 const CHANNEL_PAGES: SearchTabPages = { ...PAGES, threads: ThreadsPage }
+/**
+ * Isocord's own: a voice or stage channel's details drop Members and Threads. Its members are who is in the call,
+ * and it has no threads. The reference shows both tabs.
+ */
+const VOCAL_PAGES: SearchTabPages = {
+    recent: RecentPage,
+    guild_channels: ChannelsPage,
+}
+
+/** Returns the pages a channel's details offer. */
+function pagesFor(channel: Channel): SearchTabPages {
+    if (isThread(channel)) return PAGES
+    return VOCAL_CHANNEL_TYPES.has(channel.type) ? VOCAL_PAGES : CHANNEL_PAGES
+}
 
 interface ChannelDetailsProps {
     channelId: string
@@ -253,7 +269,7 @@ export function ChannelDetails({
                             />
                         </>
                     }
-                    pages={isThread(channel) ? PAGES : CHANNEL_PAGES}
+                    pages={pagesFor(channel)}
                     onDismiss={onBack}
                     header={header}
                     guildSearch={guildSearch}

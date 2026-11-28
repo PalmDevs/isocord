@@ -17,6 +17,10 @@ import { snowflakeFromTimestamp } from '../../core/discord/snowflake'
 import { useSession, useSessionStore } from '../../core/react'
 import { Badge } from '../../design/components/Badge'
 import { RipplePressable } from '../../design/components/buttons/RipplePressable'
+import {
+    OverlaySpacer,
+    useAboveOverlaysStyle,
+} from '../../design/components/layout/OverlaySpacer'
 import { Skeleton, SkeletonPulse } from '../../design/components/Skeleton'
 import {
     skeletonKeys,
@@ -25,13 +29,16 @@ import {
 import { Text } from '../../design/components/Text'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
-import { channelsStore } from '../../stores/channels/channels'
+import { channelsStore, isVoice } from '../../stores/channels/channels'
 import { guildsStore } from '../../stores/guilds'
 import { isUnread, readStatesStore } from '../../stores/readStates'
 import { setCategoryCollapsed } from '../../stores/settings/settingsActions'
 import { settingsStore } from '../../stores/settings/settingsStore'
 import { isChannelMuted, resolveUnreadSetting } from '../../stores/unreadPolicy'
 import { openChannelActionSheet } from '../channelActions'
+import { tapVoiceChannel } from '../voice/prejoin/preJoinActions'
+import { VoiceParticipants } from '../voice/rows/VoiceParticipants'
+import { ConnectedUserLimit } from '../voice/rows/VoiceUserLimit'
 import { channelIcon } from './channelIcon'
 import { buildBarRows, buildChannelRows, readFlags } from './channelList'
 import { serversUiStore } from './store'
@@ -138,10 +145,34 @@ interface ChannelRowProps {
     thread?: { first: boolean; last: boolean }
 }
 
-function ChannelItem({ guildId, id, joinedAck, thread }: ChannelRowProps) {
+/** A channel row's tap and long press, shared by the row and its voice users. */
+function useChannelPress(guildId: string, id: string) {
     const session = useSession()
     const navigation = useNavigation()
     const { openChat } = useServersPanels()
+    const onPress = () => {
+        const type = session.get(channelsStore).getState().channels[id]?.type
+        // VoiceChannel's press: the pre-join card first, then a second tap joins.
+        if (type === ChannelType.GUILD_VOICE) {
+            tapVoiceChannel(session, guildId, id)
+            return
+        }
+        // The chat panel follows the selected channel, so only channels it can show are selected.
+        if (type === undefined || !TEXT_BASED.has(type)) return
+        session.get(serversUiStore).setState(state => ({
+            selectedChannelIds: {
+                ...state.selectedChannelIds,
+                [guildId]: id,
+            },
+        }))
+        openChat()
+    }
+    const onLongPress = () => openChannelActionSheet(id, navigation)
+    return { onPress, onLongPress }
+}
+
+function ChannelItem({ guildId, id, joinedAck, thread }: ChannelRowProps) {
+    const { onPress, onLongPress } = useChannelPress(guildId, id)
     const channel = useSessionStore(channelsStore, state => state.channels[id])
     const selected = useSessionStore(
         serversUiStore,
@@ -180,64 +211,72 @@ function ChannelItem({ guildId, id, joinedAck, thread }: ChannelRowProps) {
 
     // Reference: Cozy layout paddingThread/marginThread; the spine and unread badge sit beside the pressable, not inside it.
     return (
-        <View style={styles.row}>
-            {unread && !muted && (
-                <View
-                    style={[
-                        styles.unreadPill,
-                        // Muted unless unread indicator is all messages or there are mentions.
-                        (!fullUnread || mentions > 0) && styles.lessImportant,
-                    ]}
-                />
-            )}
-            {thread && <ThreadSpine {...thread} />}
-            <RipplePressable
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() => {
-                    // The chat panel follows the selected channel, so only channels it can show are selected.
-                    if (!TEXT_BASED.has(channel.type)) return
-                    session.get(serversUiStore).setState(state => ({
-                        selectedChannelIds: {
-                            ...state.selectedChannelIds,
-                            [guildId]: id,
-                        },
-                    }))
-                    openChat()
-                }}
-                onLongPress={() => openChannelActionSheet(id, navigation)}
-                style={[
-                    styles.channel,
-                    selected && styles.channelSelected,
-                    muted && !selected && styles.muted,
-                ]}
-            >
-                {!thread && (
-                    <Icon
-                        name={channelIcon(channel.type)}
-                        size="sm"
-                        color={
-                            highlighted
-                                ? 'INTERACTIVE_ICON_ACTIVE'
-                                : 'CHANNEL_ICON'
-                        }
+        <>
+            <View style={styles.row}>
+                {unread && !muted && (
+                    <View
+                        style={[
+                            styles.unreadPill,
+                            // Muted unless unread indicator is all messages or there are mentions.
+                            (!fullUnread || mentions > 0) &&
+                                styles.lessImportant,
+                        ]}
                     />
                 )}
-                <Text
-                    variant={fullUnread ? 'text-md/semibold' : 'text-md/medium'}
-                    color={
-                        highlighted
-                            ? 'INTERACTIVE_TEXT_ACTIVE'
-                            : 'CHANNELS_DEFAULT'
-                    }
-                    lineClamp={1}
-                    style={styles.channelName}
+                {thread && <ThreadSpine {...thread} />}
+                <RipplePressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={onPress}
+                    onLongPress={onLongPress}
+                    style={[
+                        styles.channel,
+                        selected && styles.channelSelected,
+                        muted && !selected && styles.muted,
+                    ]}
                 >
-                    {channel.name}
-                </Text>
-                <Badge count={mentions} lowImportance={lowMentions} />
-            </RipplePressable>
-        </View>
+                    {!thread && (
+                        <Icon
+                            name={channelIcon(channel.type)}
+                            size="sm"
+                            color={
+                                highlighted
+                                    ? 'INTERACTIVE_ICON_ACTIVE'
+                                    : 'CHANNEL_ICON'
+                            }
+                        />
+                    )}
+                    <Text
+                        variant={
+                            fullUnread ? 'text-md/semibold' : 'text-md/medium'
+                        }
+                        color={
+                            highlighted
+                                ? 'INTERACTIVE_TEXT_ACTIVE'
+                                : 'CHANNELS_DEFAULT'
+                        }
+                        lineClamp={1}
+                        style={styles.channelName}
+                    >
+                        {channel.name}
+                    </Text>
+                    <Badge count={mentions} lowImportance={lowMentions} />
+                    {/* ChannelInfo: the mention badge takes the user limit's place. */}
+                    {isVoice(channel) && mentions === 0 && (
+                        <ConnectedUserLimit guildId={guildId} channelId={id} />
+                    )}
+                </RipplePressable>
+            </View>
+            {/* VoiceChannel: the users are children of the channel's pressable. */}
+            {isVoice(channel) && (
+                <VoiceParticipants
+                    guildId={guildId}
+                    channelId={id}
+                    onPress={onPress}
+                    onLongPress={onLongPress}
+                />
+            )}
+        </>
     )
 }
 
@@ -346,6 +385,7 @@ export function ChannelList({
     bannerHeight: number
     headerHeight: number
 }) {
+    const aboveOverlays = useAboveOverlaysStyle()
     const session = useSession()
     const ids = useSessionStore(channelsStore, state => state.byGuild[guild.id])
     const channels = useSessionStore(channelsStore, state => state.channels)
@@ -496,7 +536,9 @@ export function ChannelList({
                     )
                 }
                 style={
-                    edge === 'top' ? [styles.barTop, barTop] : styles.barBottom
+                    edge === 'top'
+                        ? [styles.barTop, barTop]
+                        : [styles.barBottom, aboveOverlays]
                 }
             />
         )
@@ -512,6 +554,7 @@ export function ChannelList({
                 getItemType={item => item.type}
                 contentContainerStyle={styles.content}
                 ListHeaderComponent={header}
+                ListFooterComponent={<OverlaySpacer />}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
                 onViewableItemsChanged={updateVisibleRange}
@@ -537,6 +580,7 @@ const styles = StyleSheet.create(theme => ({
     // ChannelsUnreadBars: overlay bounded by the list panel.
     listContainer: { flex: 1 },
     barTop: { top: 0 },
+    // The voice dock floats over the list's bottom (OverlaySpacer).
     barBottom: { bottom: 0 },
     empty: { padding: theme.space.PX_16, textAlign: 'center' },
     spacer: { height: theme.space.PX_8 },

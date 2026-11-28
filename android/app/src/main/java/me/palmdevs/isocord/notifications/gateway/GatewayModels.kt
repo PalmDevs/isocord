@@ -4,6 +4,7 @@ package me.palmdevs.isocord.notifications.gateway
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 
 // The parts of the gateway's payloads the notifications need. Everything else is skipped while decoding, so READY
@@ -206,9 +207,20 @@ class MemberUpdate(val guild_id: String, val user: RawUser, val roles: List<Stri
 @Serializable
 class RawVoiceState(val user_id: String)
 
-/** CALL_CREATE and CALL_UPDATE: a DM or group DM call, and whom it is ringing. */
+/**
+ * CALL_CREATE and CALL_UPDATE: a DM or group DM call, and whom it is ringing. The reference reads the users from the
+ * keys of `ongoing_rings` (dispatchSocketMessage), docs.discord.food lists `ringing`.
+ */
 @Serializable
-class CallEvent(val channel_id: String, val ringing: List<String> = emptyList(), val voice_states: List<RawVoiceState> = emptyList())
+class CallEvent(
+  val channel_id: String,
+  val ringing: List<String> = emptyList(),
+  val ongoing_rings: Map<String, JsonElement> = emptyMap(),
+  val voice_states: List<RawVoiceState> = emptyList(),
+) {
+  /** The users the call rings, from either field. An `ongoing_rings` entry with no value is not ringing (TelecomManager.processIncomingRing). */
+  fun ringingIds(): Set<String> = ringing.toSet() + ongoing_rings.filterValues { it !is JsonNull }.keys
+}
 
 @Serializable
 class RawEmoji(val id: String? = null, val name: String? = null)

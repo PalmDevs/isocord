@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from 'zustand'
 import { accountsStore, currentAccount } from './accounts'
-import { SessionContext, sessionFor } from './react'
+import { releaseSession, SessionContext, sessionFor } from './react'
 import type { ReactNode } from 'react'
 
 /** Mounted SessionProviders. A recreated activity mounts its new one before the old one unmounts. */
@@ -19,12 +19,12 @@ export function SessionProvider({
     // A session is tied to the account's identity and token, not its profile fields.
     const session = sessionFor(account?.id, account?.token)
 
-    // Unmounting the last provider (not an account switch, which sessionFor handles) ends the session.
+    // Unmounting the last provider (not an account switch, which sessionFor handles) ends the session, unless in a call.
     useEffect(() => {
         providers++
         return () => {
             providers--
-            if (providers === 0) sessionFor(undefined, undefined)
+            if (providers === 0) releaseSession()
         }
     }, [])
 

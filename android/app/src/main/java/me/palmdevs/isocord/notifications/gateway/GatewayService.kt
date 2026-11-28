@@ -33,13 +33,31 @@ private const val TAG = "IsocordGatewayService"
  * ([me.palmdevs.isocord.notifications.notify.AppSession]) and [GatewayService] pauses its session.
  */
 object AppVisibility {
-  @Volatile var foreground = false
+  /** The activity is resumed: the user sees the app. */
+  @Volatile var visible = false
     private set
-  @Volatile var listener: ((foreground: Boolean) -> Unit)? = null
+  /** In front, or in a call: the app's own connection is the live one and serves the notifications. */
+  @Volatile var appSessionLive = false
+    private set
+  @Volatile var listener: ((appSessionLive: Boolean) -> Unit)? = null
+  private var inCall = false
 
+  @Synchronized
   fun set(foreground: Boolean) {
-    this.foreground = foreground
-    listener?.invoke(foreground)
+    visible = foreground
+    update()
+  }
+
+  /** Keeps the app's connection during a call in the background: it owns the voice state. */
+  @Synchronized
+  fun setCall(active: Boolean) {
+    inCall = active
+    update()
+  }
+
+  private fun update() {
+    appSessionLive = visible || inCall
+    listener?.invoke(appSessionLive)
   }
 }
 
@@ -69,8 +87,8 @@ class GatewayService : Service(), GatewayListener {
   override fun onCreate() {
     super.onCreate()
     getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(network)
-    AppVisibility.listener = { foreground ->
-      gateway?.setPaused(foreground)
+    AppVisibility.listener = { appSessionLive ->
+      gateway?.setPaused(appSessionLive)
       // Paused, the app's own connection serves the notifications.
       onConnected(connected)
     }
@@ -106,7 +124,7 @@ class GatewayService : Service(), GatewayListener {
       current?.close()
       state = NotificationState()
       notifier = SessionNotifier(this, inApp = false)
-      gateway = NotificationGateway(next, this).also { it.connect(paused = AppVisibility.foreground) }
+      gateway = NotificationGateway(next, this).also { it.connect(paused = AppVisibility.appSessionLive) }
     }
     // Restarted by the system after it kills the process for memory.
     return START_STICKY
@@ -199,7 +217,7 @@ class GatewayService : Service(), GatewayListener {
   private fun statusNotification(account: AccountConfig?, connected: Boolean) =
     NotificationCompat.Builder(this, MessageNotifier.CHANNEL_CONNECTION)
       .setSmallIcon(R.drawable.ic_notification)
-      .setContentTitle(account?.string(if (connected || AppVisibility.foreground) "connected" else "connecting"))
+      .setContentTitle(account?.string(if (connected || AppVisibility.appSessionLive) "connected" else "connecting"))
       .setPriority(NotificationCompat.PRIORITY_MIN)
       .setOngoing(true)
       .setShowWhen(false)

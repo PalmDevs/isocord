@@ -12,6 +12,8 @@ export const GuildFeature = {
     NEWS: 'NEWS',
     MEMBER_VERIFICATION_MANUAL_APPROVAL: 'MEMBER_VERIFICATION_MANUAL_APPROVAL',
     MEMBER_VERIFICATION_GATE_ENABLED: 'MEMBER_VERIFICATION_GATE_ENABLED',
+    /** Voice at the top boost tier's bitrate, whatever the tier. */
+    VIP_REGIONS: 'VIP_REGIONS',
 } as const
 
 /** guild_member/GuildMemberConstants GuildMemberFlags. */

@@ -2,6 +2,7 @@ import { CreateChannelScreen } from './CreateChannelScreen'
 import { CustomizeGroupScreen } from './CustomizeGroupScreen'
 import { DuplicateChannelScreen } from './DuplicateChannelScreen'
 import { EditChannelScreen } from './EditChannelScreen'
+import { RegionScreen } from './RegionScreen'
 import { CHANNEL_SETTINGS_ROUTES } from './routes'
 import type { Feature } from '../../core/feature'
 
@@ -39,5 +40,6 @@ export const channelSettingsFeature: Feature = {
         [CHANNEL_SETTINGS_ROUTES.duplicateChannel]: DuplicateChannelScreen,
         [CHANNEL_SETTINGS_ROUTES.createChannel]: CreateChannelScreen,
         [CHANNEL_SETTINGS_ROUTES.customizeGroup]: CustomizeGroupScreen,
+        [CHANNEL_SETTINGS_ROUTES.channelRegion]: RegionScreen,
     },
 }

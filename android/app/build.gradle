@@ -90,6 +90,7 @@ android {
             java.srcDirs += ["${rootDir}/../nitrogen/generated/android/kotlin"]
         }
     }
+    // React Native's app CMake, Nitro, libisocord_dave.so (voice end-to-end encryption) and libisocord_audio.so (RNNoise).
     externalNativeBuild {
         cmake {
             path "../CMakeLists.txt"
@@ -124,6 +125,10 @@ android {
             cmake {
                 arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             }
+        }
+        // Prebuilt native libraries (libwebrtc) ship every ABI. Package only the ones React Native is built for.
+        ndk {
+            abiFilters(*project.property("reactNativeArchitectures").split(","))
         }
     }
     signingConfigs {
@@ -181,6 +186,12 @@ dependencies {
     implementation("com.github.penfeizhou.android.animation:apng:3.0.5")
     // Inline video, GIF-style embeds, audio and voice messages.
     implementation("androidx.media3:media3-exoplayer:1.7.1")
+    // Voice and video: libwebrtc M150, community build (docs/voice.md 8.1).
+    implementation("io.github.webrtc-sdk:android:150.7871.08")
+    // Telecom calls for voice and video (me.palmdevs.isocord.voice.telecom). Its API needs 26, the app's minSdk is 24.
+    implementation("androidx.core:core-telecom:1.1.0")
+    // The call bubble's drag springs (me.palmdevs.isocord.voice.overlay), as the reference's OverlayBubbleWrap.
+    implementation("androidx.dynamicanimation:dynamicanimation:1.1.0")
     // Compresses videos that are over the upload limit (me.palmdevs.isocord.upload).
     implementation("androidx.media3:media3-transformer:1.7.1")
     implementation("androidx.media3:media3-effect:1.7.1")

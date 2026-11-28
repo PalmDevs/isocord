@@ -5,6 +5,7 @@ import { NavigatorHeader } from '../../design/components/layout/NavigatorHeader'
 import { Text } from '../../design/components/Text'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
+import { CallHeaderButton, VideoCallHeaderButton } from '../calls'
 import { HeaderSearchButton } from '../chat/details/HeaderSearchButton'
 import { GroupAvatar } from './GroupAvatar'
 import { useDm } from './useDm'
@@ -42,7 +43,13 @@ export function DMHeader({
             titleLabel={t('details.open')}
             trailing={
                 onOpenDetails && (
-                    <HeaderSearchButton onPress={() => onOpenDetails(true)} />
+                    <View style={styles.buttons}>
+                        <CallHeaderButton channelId={channelId} />
+                        <VideoCallHeaderButton channelId={channelId} />
+                        <HeaderSearchButton
+                            onPress={() => onOpenDetails(true)}
+                        />
+                    </View>
                 )
             }
         >
@@ -98,6 +105,7 @@ export function DMHeader({
 }
 
 const styles = StyleSheet.create(theme => ({
+    buttons: { flexDirection: 'row', alignItems: 'center' },
     row: { flexDirection: 'row', alignItems: 'center', gap: theme.space.PX_12 },
     label: { flex: 1 },
     nameRow: { flexDirection: 'row', alignItems: 'center' },

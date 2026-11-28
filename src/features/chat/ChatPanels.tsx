@@ -2,10 +2,15 @@ import { useIsFocused } from '@react-navigation/native'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useWindowDimensions, View } from 'react-native'
 import { GestureDetector } from 'react-native-gesture-handler'
-import Animated, { useSharedValue } from 'react-native-reanimated'
+import Animated, {
+    useAnimatedReaction,
+    useSharedValue,
+} from 'react-native-reanimated'
 import { StyleSheet } from 'react-native-unistyles'
+import { scheduleOnRN } from 'react-native-worklets'
 import { logger } from '../../core/log'
 import { useSessionStore } from '../../core/react'
+import { useCoverBottomBar } from '../../design/components/layout/overlayInsets'
 import { useModalOpen } from '../../design/components/overlays/ModalStack'
 import { usePanelBackPreview } from '../../design/components/overlays/usePanelBackPreview'
 import {
@@ -27,6 +32,9 @@ import {
 import { useStackedChat } from './panels/useStackedChat'
 import { useThreadCreation } from './panels/useThreadCreation'
 import type { Context, ReactNode } from 'react'
+
+/** How far (px) a panel moves in from its closed position before it counts as entering. */
+const PANEL_MOVED_SLOP = 1
 
 // DIAG: stuck Servers chat panel. Remove once found.
 const diag = logger('PanelsDiag')
@@ -163,6 +171,18 @@ export function ChatPanels({
         [listCovered],
     )
     const covered = chat.open || details.open
+    // A chat or details panel on its way in, however little: the voice dock leaves as soon as one moves.
+    const [entering, setEntering] = useState(false)
+    useAnimatedReaction(
+        () =>
+            chat.x.get() < width - PANEL_MOVED_SLOP ||
+            details.x.get() < width - PANEL_MOVED_SLOP,
+        (moved, previous) => {
+            if (moved !== previous) scheduleOnRN(setEntering, moved)
+        },
+    )
+    // The chat slides over the tab bar, and with it the voice dock.
+    useCoverBottomBar(covered || entering)
     // DIAG: every change of what gates opening and swiping.
     const diagState = `${selectedChannelId === undefined ? 'messages' : 'servers'} tab=${tabFocused} stack=${stackFocused} chat=${chat.channelId} has=${chat.hasChannel} open=${chat.open} x=${Math.round(chat.x.get())} built=${chat.built} drawn=${chat.drawn} details=${details.open}/${details.mounted} stacked=${stack.open} create=${create.open} width=${width}`
     useEffect(() => diag.debug(diagState), [diagState])

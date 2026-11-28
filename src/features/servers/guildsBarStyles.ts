@@ -9,6 +9,7 @@ export const styles = StyleSheet.create(theme => {
         // A ScrollView grows (flexGrow 1) along the row, so the width has to be pinned.
         bar: { width: GUILDS_BAR_WIDTH, flexGrow: 0, flexShrink: 0 },
         scroller: { flex: 1 },
+        // The voice dock floats over the list's bottom (OverlaySpacer).
         content: { width: GUILDS_BAR_WIDTH, paddingBottom: theme.space.PX_16 },
         item: {
             width: GUILDS_BAR_WIDTH,

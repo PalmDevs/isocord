@@ -22,6 +22,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles'
 import { features } from '../core/feature'
 import { logger } from '../core/log'
 import { startCurrentSession } from '../core/react'
+import { setRootNavigation } from '../core/rootNavigation'
 import { SessionProvider } from '../core/SessionProvider'
 import { ModalScreen } from '../design/components/overlays/ModalStack'
 import { usePanelBackEvents } from '../design/components/overlays/usePanelBackPreview'
@@ -112,6 +113,8 @@ export function App() {
     // One per App: a recreated activity mounts a new App before the old one unmounts and clears its ref.
     const navigation =
         useNavigationContainerRef<Record<string, object | undefined>>()
+    // Overlays, such as the voice dock, open screens through it.
+    useEffect(() => setRootNavigation(navigation), [navigation])
     const { theme } = useUnistyles()
     return (
         <GestureHandlerRootView style={styles.root}>

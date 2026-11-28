@@ -15,6 +15,7 @@ import { settingsStore } from './settings/settingsStore'
 import { typingStore } from './typing'
 import { userProfilesStore } from './userProfiles'
 import { usersStore } from './users'
+import { voiceStatesStore } from './voiceStates'
 import type { Feature } from '../core/feature'
 
 /** The account's core data. Order matters: a store's handlers run after those of the stores listed before it. */
@@ -38,5 +39,6 @@ export const storesFeature: Feature = {
         typingStore,
         relationshipsStore,
         userProfilesStore,
+        voiceStatesStore,
     ],
 }

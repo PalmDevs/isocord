@@ -19,12 +19,16 @@ object Links {
   /** `channel/<guild>/<channel>[/<message>]`: a channel, or a message in it. `guildId` is null outside a server. */
   fun channel(guildId: String?, channelId: String, messageId: String? = null) =
     "$SCHEME${LinkKind.CHANNEL}/${guildId ?: DM_GUILD}/$channelId" + (messageId?.let { "/$it" } ?: "")
+
+  /** `call/<channel>`: the user answered this ringing DM or group call. The app joins it. */
+  fun call(channelId: String) = "$SCHEME${LinkKind.CALL}/$channelId"
 }
 
 /** The first part of the path of an in-app link built natively. */
 object LinkKind {
   const val ADD_REACTION = "add-reaction"
   const val AUTHOR = "author"
+  const val CALL = "call"
   const val CHANNEL = "channel"
   /** `component-media/<message>/<component id>/<item>`: a gallery item or section thumbnail. */
   const val COMPONENT_MEDIA = "component-media"

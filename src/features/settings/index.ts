@@ -13,6 +13,7 @@ import {
     SettingsNotifSocialScreen,
     SettingsOverviewScreen,
     SettingsSwipeRightToLeftScreen,
+    SettingsVoiceScreen,
 } from './screens'
 import type { Feature } from '../../core/feature'
 
@@ -34,5 +35,6 @@ export const settingsFeature: Feature = {
         settingsNotifServer: SettingsNotifServerScreen,
         settingsNotifOther: SettingsNotifOtherScreen,
         settingsAdvanced: SettingsAdvancedScreen,
+        settingsVoice: SettingsVoiceScreen,
     },
 }

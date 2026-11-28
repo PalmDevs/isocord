@@ -27,6 +27,10 @@ export interface SystemEnv {
     avatarUrl: (user: User, size: number) => string
     /** Message markdown as spans. */
     spans: (text: string) => Span[]
+    /** The ids of the users connected to a channel's call. */
+    callParticipants: (channelId: string) => string[]
+    /** Whether the user is in a DM or group DM call. */
+    inDmCall: () => boolean
 }
 
 /** What a system row draws instead of or beside its text: a call card, an AutoMod message. */

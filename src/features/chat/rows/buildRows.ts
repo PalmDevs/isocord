@@ -112,6 +112,10 @@ export interface RowContext {
     hiddenReason?: (userId: string) => HiddenReason | undefined
     /** A message of the loaded history, by id. Set by `buildRows` from the channel's messages. */
     loadedMessage?: (messageId: string) => Message | undefined
+    /** The users connected to a channel's call, ids joined by commas (ChannelRTCStore.getParticipants). */
+    callParticipants?: (channelId: string) => string
+    /** Whether the user is in a DM or group DM call (VoiceStateStore.getUserVoiceChannelId(ME, id)). */
+    inDmCall?: (key: string) => boolean
 }
 
 export type HiddenReason = 'blocked' | 'ignored'
@@ -411,6 +415,11 @@ function makeEnv(context: RowContext, canView: RowEnv['canView']): RowEnv {
             user: id => users[id],
             avatarUrl: avatarOf,
             spans: text => toSpans(parseMarkdown(text), resolver),
+            callParticipants: id =>
+                (context.callParticipants?.(id) ?? '')
+                    .split(',')
+                    .filter(Boolean),
+            inDmCall: () => context.inDmCall?.('') ?? false,
         },
         threadSources: {
             thread: id => context.threads?.[id] ?? context.channels[id],

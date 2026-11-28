@@ -15,8 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import me.palmdevs.isocord.network.ApiPath
@@ -36,7 +34,7 @@ private const val TAG = "IsocordNotifyAction"
 class NotificationActionReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     when (intent.action) {
-      DECLINE_CALL, ACCEPT_FRIEND, IGNORE_FRIEND -> return onAlertAction(context, intent)
+      ACCEPT_FRIEND, IGNORE_FRIEND -> return onAlertAction(context, intent)
     }
     val channelId = intent.getStringExtra(EXTRA_CHANNEL) ?: return
     val messageId = intent.getStringExtra(EXTRA_MESSAGE) ?: return
@@ -78,8 +76,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
   }
 
   /**
-   *   Decline (DismissCallAction: CallActionCreators.stopRinging), Accept (RelationshipActionCreators.acceptFriendRequest)
-   *   and Ignore (cancelFriendRequest). The alert goes at once. The gateway's CALL_UPDATE or RELATIONSHIP_* event follows.
+   *   Accept (RelationshipActionCreators.acceptFriendRequest)
+   *   and Ignore (cancelFriendRequest). The alert goes at once. The gateway's RELATIONSHIP_* event follows.
    */
   private fun onAlertAction(context: Context, intent: Intent) {
     val tag = intent.getStringExtra(EXTRA_TAG) ?: return
@@ -87,16 +85,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
     MessageNotifier.cancelAlert(context, tag)
     val pending = goAsync()
     rest.launch {
-      val channelId = intent.getStringExtra(EXTRA_CHANNEL)
       val userId = intent.getStringExtra(EXTRA_USER)
       when (intent.action) {
-        DECLINE_CALL ->
-          if (channelId != null)
-            DiscordRest.post(
-              account,
-              ApiPath.stopRinging(channelId),
-              buildJsonObject { put("recipients", buildJsonArray { add(account.userId) }) },
-            )
         ACCEPT_FRIEND -> if (userId != null) DiscordRest.send(account, "PUT", ApiPath.relationship(userId), buildJsonObject {})
         IGNORE_FRIEND -> if (userId != null) DiscordRest.send(account, "DELETE", ApiPath.relationship(userId), null)
       }
@@ -106,7 +96,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
   companion object {
     const val REPLY = "me.palmdevs.isocord.notifications.REPLY"
-    const val DECLINE_CALL = "me.palmdevs.isocord.notifications.DECLINE_CALL"
     const val ACCEPT_FRIEND = "me.palmdevs.isocord.notifications.ACCEPT_FRIEND"
     const val IGNORE_FRIEND = "me.palmdevs.isocord.notifications.IGNORE_FRIEND"
     private const val EXTRA_TAG = "tag"
@@ -127,7 +116,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
       val intent =
         Intent(action, null, context, NotificationActionReceiver::class.java)
           .putExtra(EXTRA_TAG, alert.tag)
-          .putExtra(EXTRA_CHANNEL, alert.channelId)
           .putExtra(EXTRA_USER, alert.userId)
       return PendingIntent.getBroadcast(
         context,

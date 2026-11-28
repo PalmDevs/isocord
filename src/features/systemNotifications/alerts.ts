@@ -4,10 +4,6 @@ import type { Session } from '../../core/session'
 // What the app's session hears besides messages, forwarded while in front: calls, friend requests, reactions, forum
 // posts and events. The native side alerts about them as the background session would (SessionNotifier.kt).
 
-interface CallEvent {
-    channel_id: string
-    voice_states?: Array<{ user_id: string }>
-}
 interface ScheduledEvent {
     guild_id: string
 }
@@ -18,9 +14,6 @@ interface ScheduledEventUser {
 }
 declare module '../../core/gateway/events' {
     interface GatewayEvents {
-        CALL_CREATE: CallEvent
-        CALL_UPDATE: CallEvent
-        CALL_DELETE: CallEvent
         GUILD_SCHEDULED_EVENT_UPDATE: ScheduledEvent
         GUILD_SCHEDULED_EVENT_USER_ADD: ScheduledEventUser
         GUILD_SCHEDULED_EVENT_USER_REMOVE: ScheduledEventUser
@@ -55,7 +48,10 @@ export function forwardAlerts(session: Session): () => void {
             dispatch.on(type, call =>
                 forward(session, type, call, {
                     channelId: call.channel_id,
-                    userIds: call.voice_states?.map(state => state.user_id),
+                    userIds:
+                        'voice_states' in call
+                            ? call.voice_states?.map(state => state.user_id)
+                            : undefined,
                 }),
             ),
         ),

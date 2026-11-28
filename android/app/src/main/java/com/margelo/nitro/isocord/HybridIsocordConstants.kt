@@ -41,6 +41,7 @@ class HybridIsocordConstants : HybridIsocordConstantsSpec() {
     linkKind = LinkKindConstants(
       addReaction = LinkKind.ADD_REACTION,
       author = LinkKind.AUTHOR,
+      call = LinkKind.CALL,
       channel = LinkKind.CHANNEL,
       componentMedia = LinkKind.COMPONENT_MEDIA,
       embedMedia = LinkKind.EMBED_MEDIA,

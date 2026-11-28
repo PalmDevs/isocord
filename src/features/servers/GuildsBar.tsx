@@ -4,6 +4,7 @@ import { GestureDetector } from 'react-native-gesture-handler'
 import Animated from 'react-native-reanimated'
 import { useUnistyles } from 'react-native-unistyles'
 import { useSession, useSessionReady, useSessionStore } from '../../core/react'
+import { OverlaySpacer } from '../../design/components/layout/OverlaySpacer'
 import { Skeleton, SkeletonPulse } from '../../design/components/Skeleton'
 import { skeletonKeys } from '../../design/components/skeletonUtils'
 import { guildsStore } from '../../stores/guilds'
@@ -145,6 +146,7 @@ export function GuildsBar() {
                             })}
                         </View>
                     </GestureDetector>
+                    <OverlaySpacer />
                 </Animated.ScrollView>
                 <DragPreview y={previewY} />
             </View>

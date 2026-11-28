@@ -33,6 +33,8 @@ import {
 } from '../systemNotifications'
 import { themeName } from './appearance/themeNames'
 import { FONT_SCALES, fontScaleStore } from './fontScale'
+import { VOICE_SETTINGS } from './voiceConfig'
+import type { ReactNode } from 'react'
 import type { Session } from '../../core/session'
 import type { TableRowVariant } from '../../design/components/table/TableRow'
 import type { IconName } from '../../design/icons/Icon'
@@ -41,6 +43,8 @@ import type { MessageKey } from '../../i18n'
 import type { ChatGestureState } from '../../stores/settings/chatGestures'
 import type { SettingsState } from '../../stores/settings/settingsStore'
 import type { NotificationKind } from '../systemNotifications'
+import type { VoiceSettings } from '../voice/settings/voiceSettings'
+import type { VoiceSettingKey } from './voiceConfig'
 
 /** What a setting reads from. Settings are plain functions of it, so rows need no hooks of their own. */
 export interface SettingContext {
@@ -53,9 +57,12 @@ export interface SettingContext {
         kinds: Record<NotificationKind, boolean>
     }
     chatGestures: ChatGestureState
+    /** The device's voice settings. */
+    voice: VoiceSettings
 }
 
 export type SettingKey =
+    | VoiceSettingKey
     | 'APPEARANCE'
     | 'SAME_AS_DEVICE_THEME'
     | 'APPEARANCE_THEME_PICKER'
@@ -130,7 +137,7 @@ export interface SliderSettingProps {
     defaultValue?: number
 }
 
-/** SettingBuilders' node types (SettingRendererConstants.NodeType), minus the volume slider and the guild selector. */
+/** SettingBuilders' node types (SettingRendererConstants.NodeType), minus the guild selector. */
 export type SettingNode = SettingBase &
     (
         | {
@@ -163,7 +170,11 @@ export type SettingNode = SettingBase &
                   value: ThemeChoice,
               ) => void
           }
-        | { type: 'pressable'; onPress: (context: SettingContext) => void }
+        | {
+              type: 'pressable'
+              onPress: (context: SettingContext) => void
+              trailing?: (context: SettingContext) => string | undefined
+          }
         | {
               type: 'slider'
               /** A hook, like the reference's useProps. */
@@ -172,6 +183,18 @@ export type SettingNode = SettingBase &
         | {
               type: 'static'
               trailing?: (context: SettingContext) => string | undefined
+              /** A hook, like the reference's useDescription: drawn under the title. */
+              useDescription?: () => ReactNode
+          }
+        | {
+              /** createVolumeSlider: a perceptual slider that stores amplitudes. */
+              type: 'volume'
+              /** The slider's perceptual end. */
+              maximum: () => number
+              /** The amplitude at 0 dB. */
+              unity: () => number
+              value: (context: SettingContext) => number
+              onValueChange: (context: SettingContext, value: number) => void
           }
     )
 
@@ -250,6 +273,7 @@ function logOut() {
 
 /** The settings Isocord implements, keyed like the reference's MobileUserSettings. SETTING_RENDERER_CONFIG in SettingsRendererConfig. */
 export const SETTING_RENDERER_CONFIG: Record<SettingKey, SettingNode> = {
+    ...VOICE_SETTINGS,
     // AppearanceSetting
     APPEARANCE: {
         type: 'route',

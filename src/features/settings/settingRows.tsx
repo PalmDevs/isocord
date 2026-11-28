@@ -26,9 +26,11 @@ import {
 import { TableRow, TableRowIcon } from '../../design/components/table/TableRow'
 import { Icon } from '../../design/icons/Icon'
 import { t } from '../../i18n'
+import { VolumeSlider } from '../voice/settings/VolumeSlider'
 import { SETTING_RENDERER_CONFIG } from './config'
 import { useSettingSearchStore } from './search'
 import { clearSelected, trailingText } from './settingRowUtils'
+import type { ReactNode } from 'react'
 import type { IconName } from '../../design/icons/Icon'
 import type { SettingContext, SettingKey, SettingNode } from './config'
 
@@ -116,11 +118,19 @@ function SettingRow({
                 <TableRow
                     label={node.title()}
                     icon={iconOf(node)}
+                    trailing={trailingText(node.trailing?.(context))}
                     variant={node.variant}
                     onPress={() => node.onPress(context)}
                 />
             )
         case 'static':
+            if (node.useDescription)
+                return (
+                    <DescribedStaticSetting
+                        node={node}
+                        useDescription={node.useDescription}
+                    />
+                )
             return (
                 <TableRow
                     label={node.title()}
@@ -131,11 +141,48 @@ function SettingRow({
             )
         case 'slider':
             return <SliderSetting node={node} />
+        case 'volume':
+            return (
+                <TableRow
+                    label={node.title()}
+                    subLabel={
+                        <View style={styles.volume}>
+                            <VolumeSlider
+                                value={node.value(context)}
+                                max={node.maximum()}
+                                unity={node.unity()}
+                                onValueChange={value =>
+                                    node.onValueChange(context, value)
+                                }
+                            />
+                        </View>
+                    }
+                />
+            )
         case 'radio':
         case 'swatches':
             // Radios and swatches are groups of their own; SettingsList renders them.
             return null
     }
+}
+
+/** SettingRenderer's StaticSetting with a useDescription hook, drawn as the row's sub label. */
+function DescribedStaticSetting({
+    node,
+    useDescription,
+}: {
+    node: NodeOf<'static'>
+    useDescription: () => ReactNode
+}) {
+    const description = useDescription()
+    return (
+        <TableRow
+            label={node.title()}
+            icon={iconOf(node)}
+            subLabel={description}
+            variant={node.variant}
+        />
+    )
 }
 
 /**
@@ -289,4 +336,6 @@ const styles = StyleSheet.create(theme => ({
     }),
     // SettingRenderer's slider style.
     slider: { marginTop: theme.space.PX_16, marginBottom: theme.space.PX_8 },
+    // VolumeSliderSetting's slider, under the title.
+    volume: { marginTop: theme.space.PX_8 },
 }))

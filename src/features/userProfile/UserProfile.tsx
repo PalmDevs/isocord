@@ -23,6 +23,7 @@ import { ProfileMutuals } from './ProfileMutuals'
 import { ProfileNote } from './ProfileNote'
 import { ProfileRoles } from './ProfileRoles'
 import { ProfileSection } from './ProfileSection'
+import { ProfileVoiceSettings } from './ProfileVoiceSettings'
 import { ProfileThemeScope } from './profileTheme'
 import { RemediatedNotice } from './safety/RemediatedNotice'
 import { useProfileView } from './useProfileView'
@@ -110,6 +111,8 @@ function ProfileContent({
             {afterIdentity}
             <RemediatedNotice userId={user.id} />
             <ProfileActions user={user} />
+            {/* UserProfileActivity: the voice card comes before the activities. */}
+            <ProfileVoiceSettings userId={user.id} />
             <ProfileActivity userId={user.id} />
             {loading && <BioSkeleton />}
             {view.bio ? (

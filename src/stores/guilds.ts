@@ -46,6 +46,8 @@ export interface Guild {
     enhancedRoleColors?: boolean
     /** Guild features, e.g. MAX_FILE_SIZE_50_MB (upload limits). */
     features?: string[]
+    /** Server boost tier (0-3, `premium_tier`; Go Live qualities need a level) and count. */
+    premiumTier?: number
     /** The level that applies where the user's own guild setting is unset: 0 all messages, 1 only mentions. */
     defaultMessageNotifications?: number
     /** The rules channel, which cannot become an announcement channel. */
@@ -54,13 +56,15 @@ export interface Guild {
     publicUpdatesChannelId?: string | null
     /** Server description from READY/GUILD_UPDATE. */
     description?: string | null
-    /** Server boost tier (0-3) and count. */
-    premiumTier?: number
     premiumSubscriberCount?: number
     /** Vanity invite code when the server has one. */
     vanityUrlCode?: string | null
     /** Server tag profile, when the server has GUILD_TAGS. */
     profile?: { tag?: string | null; badge?: string | null } | null
+    /** Most users in a voice channel while someone has video on. */
+    maxVideoChannelUsers?: number
+    /** Most users in a stage channel while someone has video or a stream on. */
+    maxStageVideoChannelUsers?: number
     /**
      * Newest version of the guild and its roles held here, 0 when the server gave none. Kept with the
      * data it describes so the next IDENTIFY can ask for what changed since. The channels' version is
@@ -109,6 +113,8 @@ interface RawGuildProperties {
     premium_subscription_count?: number
     vanity_url_code?: string | null
     profile?: { tag?: string | null; badge?: string | null } | null
+    max_video_channel_users?: number
+    max_stage_video_channel_users?: number
 }
 
 /** Guilds arrive with their fields under `properties` in READY and GUILD_CREATE, and flat in GUILD_UPDATE. */
@@ -286,6 +292,12 @@ export const guildsStore = defineStore(
                 profile: properties
                     ? (properties.profile ?? null)
                     : previous?.profile,
+                maxVideoChannelUsers:
+                    properties?.max_video_channel_users ??
+                    previous?.maxVideoChannelUsers,
+                maxStageVideoChannelUsers:
+                    properties?.max_stage_video_channel_users ??
+                    previous?.maxStageVideoChannelUsers,
                 version,
                 pendingDeleteSync:
                     sync && mode === 'full'
@@ -387,6 +399,6 @@ export const guildsStore = defineStore(
 
         return store
     },
-    // 1: rules and public updates channel ids.
-    { cache: ['guilds'], cacheVersion: 1 },
+    // 1: rules and public updates channel ids. 2: premium tier. 3: video channel limits.
+    { cache: ['guilds'], cacheVersion: 3 },
 )

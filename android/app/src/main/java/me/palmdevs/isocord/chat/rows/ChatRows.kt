@@ -213,6 +213,10 @@ data class CallCard(
   val active: Boolean = false,
   val description: String? = null,
   val avatarUrls: List<String> = emptyList(),
+  /** While active, when the call started in epoch ms: the card ticks the elapsed time from it. */
+  val startedAt: Long? = null,
+  /** What a tap opens (`chatLink.callMessage`). */
+  val url: String = "",
 )
 
 /** The flagged message under an AutoMod action (FlaggedMessageEmbedAccessory). */

@@ -8,6 +8,7 @@ import { messagesStore, PAGE_SIZE } from '../../../stores/messages/messages'
 import { readStatesStore } from '../../../stores/readStates'
 import { relationshipsStore } from '../../../stores/relationships'
 import { usersStore } from '../../../stores/users'
+import { voiceStatesStore } from '../../../stores/voiceStates'
 import { canReact, messageSwipeActions } from '../longPress/actions'
 import { componentInteractionsStore } from '../messageComponents/interactionStore'
 import { pollStateStore } from '../polls/pollState'
@@ -18,10 +19,12 @@ import {
     hiddenReasonOf,
 } from '../rows/buildRows'
 import { encodeRows } from '../rows/rowEncoder'
+import { callParticipantIds, isInDmCall } from '../system/callInputs'
 import type { Session } from '../../../core/session'
 import type { ChannelMessages } from '../../../stores/messages/messageTypes'
 import type { Relationship } from '../../../stores/relationships'
 import type { RowContext } from '../rows/buildRows'
+import type { CallInputs } from '../system/callInputs'
 
 export interface ChatRowInputs
     extends Pick<
@@ -45,6 +48,8 @@ export interface ChatRowInputs
     /** Bumped when a poll's time-left label changes or it ends. */
     pollClock: number
     relationships: Record<string, Relationship>
+    /** The shown channel's call: who is connected, ids joined by commas, and whether we are in a DM call. */
+    call: CallInputs
 }
 
 /** Spare JS time held for input and frame work. */
@@ -54,9 +59,11 @@ function rowContext(
     inputs: ChatRowInputs,
     unknownChannels: Set<string>,
 ): RowContext {
-    const { session, channel, swipeOpensDetails, relationships } = inputs
+    const { session, channel, swipeOpensDetails, relationships, call } = inputs
     return {
         ...inputs,
+        callParticipants: id => (id === channel?.id ? call.participants : ''),
+        inDmCall: () => call.inDmCall,
         canReact: message => canReact(session, message),
         swipeActions: swipeOpensDetails
             ? undefined
@@ -118,6 +125,16 @@ function readInputs(
             channelId
         ],
         relationships: session.get(relationshipsStore).getState().byId,
+        call: {
+            participants: callParticipantIds(
+                session.get(voiceStatesStore).getState(),
+                channelId,
+            ),
+            inDmCall: isInDmCall(
+                session.get(voiceStatesStore).getState(),
+                session.userId,
+            ),
+        },
     }
 }
 

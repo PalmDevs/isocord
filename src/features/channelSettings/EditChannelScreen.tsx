@@ -13,6 +13,7 @@ import {
     SLOWMODE_CHANNEL_TYPES,
     THREADS_ONLY_CHANNEL_TYPES,
     TOGGLE_ANNOUNCEMENT_CHANNEL_TYPES,
+    VOCAL_CHANNEL_TYPES,
 } from '../../core/discord/channelType'
 import { Permission } from '../../core/discord/permissions'
 import { DEFAULT_AUTO_ARCHIVE_DURATION } from '../../core/discord/threads'
@@ -51,12 +52,14 @@ import {
 } from './ThreadSettings'
 import { isPostPinned } from './threadActions'
 import { useCanToggleAnnouncement } from './useCanToggleAnnouncement'
+import { VoiceSettings, voiceFormOf } from './VoiceSettings'
 import type { ForumTag } from '../../core/discord/forum'
 import type { MessageKey } from '../../i18n'
 import type { ChannelEdit } from '../../stores/channels/channelActions'
 import type { Channel } from '../../stores/channels/channels'
 import type { ThreadAccess } from './permissions'
 import type { ChannelRouteParams } from './routes'
+import type { VoiceForm } from './VoiceSettings'
 
 /** The fields of the form. */
 interface Form {
@@ -70,9 +73,11 @@ interface Form {
     invitable: boolean
     availableTags: ForumTag[]
     appliedTags: string[]
+    voice: VoiceForm
 }
 
 const formOf = (channel: Channel): Form => ({
+    voice: voiceFormOf(channel),
     name: channel.name ?? '',
     topic: channel.topic ?? '',
     nsfw: channel.nsfw ?? false,
@@ -116,6 +121,12 @@ function changesOf(channel: Channel, form: Form): ChannelEdit {
         !areAppliedTagsEqual(form.appliedTags, held.appliedTags)
     )
         edit.applied_tags = form.appliedTags
+    if (form.voice.bitrate !== held.voice.bitrate)
+        edit.bitrate = form.voice.bitrate
+    if (form.voice.userLimit !== held.voice.userLimit)
+        edit.user_limit = form.voice.userLimit
+    if (form.voice.videoQualityMode !== held.voice.videoQualityMode)
+        edit.video_quality_mode = form.voice.videoQualityMode
     return edit
 }
 
@@ -416,6 +427,14 @@ function EditChannelForm({ channel }: { channel: Channel }) {
                         }
                     />
                 )}
+            {/* showVoiceSettings: a server's voice or stage channel. */}
+            {channel.guild_id && VOCAL_CHANNEL_TYPES.has(channel.type) && (
+                <VoiceSettings
+                    channel={channel}
+                    form={form.voice}
+                    onChange={voice => setForm({ ...form, voice })}
+                />
+            )}
             {thread && (
                 <ThreadFields
                     channel={channel}
@@ -432,8 +451,8 @@ function EditChannelForm({ channel }: { channel: Channel }) {
 
 /**
  * ChannelSettingsOverview for a channel, a category, a thread or a forum post: what the long press sheet's Edit Channel
- * and Edit Category rows open. A channel needs MANAGE_CHANNELS, a thread useCanManageThread. Voice settings, forum
- * tags and the category are not here yet.
+ * and Edit Category rows open. A channel needs MANAGE_CHANNELS, a thread useCanManageThread. Forum tags and the
+ * category are not here yet.
  */
 export function EditChannelScreen() {
     const { channelId } = useRoute().params as ChannelRouteParams
