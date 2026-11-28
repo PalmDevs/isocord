@@ -80,6 +80,10 @@ composeCompiler {
     stabilityConfigurationFiles.add(project.layout.projectDirectory.file("compose-stability.conf"))
 }
 
+def androidStl = "c++_shared"
+def flexiblePageSizes = "ON"
+def nativeArchitectures = project.property("reactNativeArchitectures").toString().split(",").collect { it.trim() }.findAll { !it.isEmpty() }
+
 android {
     buildFeatures {
         compose true
@@ -123,12 +127,12 @@ android {
         buildConfigField "boolean", "DISCORD_MOUNTING_FLAGS", project.property("discordMountingFlags")
         externalNativeBuild {
             cmake {
-                arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                arguments "-DANDROID_STL=${androidStl}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=${flexiblePageSizes}"
             }
         }
         // Prebuilt native libraries (libwebrtc) ship every ABI. Package only the ones React Native is built for.
         ndk {
-            abiFilters(*project.property("reactNativeArchitectures").split(","))
+            abiFilters(*nativeArchitectures)
         }
     }
     signingConfigs {
@@ -209,5 +213,44 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+def daveDir = rootProject.layout.projectDirectory.dir("../vendor/dave")
+def rnnoiseDir = rootProject.layout.projectDirectory.dir("../vendor/rnnoise")
+
+def fetchRnnoise = tasks.register("fetchRnnoise", Exec) {
+    group = "build"
+    description = "Fetches pinned RNNoise source and model archive."
+    workingDir = rootProject.file("..")
+    commandLine("bash", "vendor/rnnoise/fetch.sh")
+    inputs.file(rnnoiseDir.file("fetch.sh"))
+    outputs.file(rnnoiseDir.file("src/src/rnnoise_data.c"))
+}
+
+def buildDave = tasks.register("buildDave", Exec) {
+    group = "build"
+    description = "Cross-compiles libdave and its dependencies for the target ABIs."
+    workingDir = rootProject.file("..")
+    commandLine(["bash", "vendor/dave/build.sh"] + nativeArchitectures)
+    inputs.file(daveDir.file("build.sh"))
+    inputs.property("ndkVersion", rootProject.ext.ndkVersion)
+    inputs.property("minSdkVersion", rootProject.ext.minSdkVersion)
+    inputs.property("androidStl", androidStl)
+    inputs.property("flexiblePageSizes", flexiblePageSizes)
+    inputs.property("abis", nativeArchitectures)
+    outputs.files(nativeArchitectures.collect { abi -> daveDir.file("out/${abi}/lib/libdave.a") })
+    doFirst {
+        environment("ANDROID_HOME", android.sdkDirectory.absolutePath)
+        environment("NDK", android.ndkDirectory.absolutePath)
+        environment("API", rootProject.ext.minSdkVersion.toString())
+        environment("ANDROID_STL", androidStl)
+        environment("ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES", flexiblePageSizes)
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name.startsWith("configureCMake")) {
+        task.dependsOn(buildDave, fetchRnnoise)
     }
 }

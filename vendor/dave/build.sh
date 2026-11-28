@@ -1,16 +1,59 @@
 #!/usr/bin/env bash
 # Cross-compiles BoringSSL, mlspp and libdave as static libraries for Android.
-# Usage: vendor/dave/build.sh [abi...]   (default: arm64-v8a armeabi-v7a x86_64)
+# Reads NDK, API and default ABIs from android/build.gradle and android/gradle.properties unless overridden via env/args.
+# Usage: vendor/dave/build.sh [abi...]
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 SRC="$HERE/src"
 OUT="$HERE/out"
-NDK="$ANDROID_HOME/ndk/27.1.12297006"
-CMAKE_DIR="$ANDROID_HOME/cmake/3.22.1/bin"
-API=24
-ABIS=("$@")
-[ ${#ABIS[@]} -eq 0 ] && ABIS=(arm64-v8a armeabi-v7a x86_64)
+BUILD_GRADLE="$ROOT/android/build.gradle"
+GRADLE_PROPS="$ROOT/android/gradle.properties"
+
+if [ -z "${API:-}" ]; then
+    API="$(sed -n 's/.*minSdkVersion = \([0-9][0-9]*\).*/\1/p' "$BUILD_GRADLE" | head -n1)"
+fi
+if [ -z "${NDK:-}" ]; then
+    NDK_VERSION="$(sed -n 's/.*ndkVersion = "\([^"]*\)".*/\1/p' "$BUILD_GRADLE" | head -n1)"
+    NDK="${ANDROID_HOME:?ANDROID_HOME is not set}/ndk/$NDK_VERSION"
+else
+    NDK_VERSION="$(basename "$NDK")"
+fi
+[ -d "$NDK" ] || { echo "NDK not found: $NDK" >&2; exit 1; }
+
+if [ -z "${CMAKE_DIR:-}" ] && [ -n "${ANDROID_HOME:-}" ] && [ -d "$ANDROID_HOME/cmake" ]; then
+    CMAKE_DIR="$(ls -1d "$ANDROID_HOME/cmake"/*/bin 2>/dev/null | sort -V | tail -n1 || true)"
+fi
+CMAKE_BIN="${CMAKE_DIR:+$CMAKE_DIR/}cmake"
+NINJA_BIN="${CMAKE_DIR:+$CMAKE_DIR/}ninja"
+command -v "$CMAKE_BIN" >/dev/null 2>&1 || { echo "cmake not found: $CMAKE_BIN" >&2; exit 1; }
+command -v "$NINJA_BIN" >/dev/null 2>&1 || { echo "ninja not found: $NINJA_BIN" >&2; exit 1; }
+
+ANDROID_STL="${ANDROID_STL:-c++_shared}"
+ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES="${ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES:-ON}"
+
+ABIS=()
+for arg in "$@"; do
+    IFS=',' read -ra parts <<<"$arg"
+    for part in "${parts[@]}"; do
+        [ -n "$part" ] && ABIS+=("$part")
+    done
+done
+if [ ${#ABIS[@]} -eq 0 ]; then
+    ARCH_PROP="$(sed -n 's/^reactNativeArchitectures=//p' "$GRADLE_PROPS" | head -n1)"
+    IFS=',' read -ra ABIS <<<"${ARCH_PROP:-arm64-v8a,armeabi-v7a,x86_64}"
+fi
+
+STAMP="${NDK_VERSION}|${API}|${ANDROID_STL}|${ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES}|$(sha256sum "$0" | cut -d' ' -f1)"
+PENDING_ABIS=()
+for ABI in "${ABIS[@]}"; do
+    if [ -f "$OUT/$ABI/.build-stamp" ] && [ "$(cat "$OUT/$ABI/.build-stamp")" = "$STAMP" ] && [ -f "$OUT/$ABI/lib/libdave.a" ]; then
+        continue
+    fi
+    PENDING_ABIS+=("$ABI")
+done
+[ ${#PENDING_ABIS[@]} -eq 0 ] && exit 0
 
 # Pinned sources, fetched once into src/.
 fetch() { # name url commit
@@ -19,7 +62,7 @@ fetch() { # name url commit
         git init -q "$dir"
         git -C "$dir" remote add origin "$2"
     fi
-    if [ "$(git -C "$dir" rev-parse -q --verify HEAD)" != "$3" ]; then
+    if [ "$(git -C "$dir" rev-parse -q --verify HEAD 2>/dev/null || true)" != "$3" ]; then
         git -C "$dir" fetch -q --depth 1 origin "$3"
         git -C "$dir" checkout -q --force FETCH_HEAD
     fi
@@ -36,10 +79,12 @@ build() { # name source-dir prefix extra-args...
     local name=$1 src=$2 prefix=$3
     shift 3
     local dir="$OUT/build/$ABI/$name"
-    "$CMAKE_DIR/cmake" -S "$src" -B "$dir" -G Ninja \
-        -DCMAKE_MAKE_PROGRAM="$CMAKE_DIR/ninja" \
+    "$CMAKE_BIN" -S "$src" -B "$dir" -G Ninja \
+        -DCMAKE_MAKE_PROGRAM="$NINJA_BIN" \
         -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
         -DANDROID_ABI="$ABI" -DANDROID_PLATFORM="android-$API" \
+        -DANDROID_STL="$ANDROID_STL" \
+        -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES="$ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DCMAKE_INSTALL_PREFIX="$prefix" \
@@ -47,12 +92,13 @@ build() { # name source-dir prefix extra-args...
         -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF \
         "$@" >"$dir.configure.log" 2>&1 || { tail -40 "$dir.configure.log"; return 1; }
     # libdave sets CMAKE_SKIP_INSTALL_ALL_DEPENDENCY, so build before installing.
-    { "$CMAKE_DIR/cmake" --build "$dir" && "$CMAKE_DIR/cmake" --install "$dir"; } >"$dir.build.log" 2>&1 ||
+    { "$CMAKE_BIN" --build "$dir" && "$CMAKE_BIN" --install "$dir"; } >"$dir.build.log" 2>&1 ||
         { tail -60 "$dir.build.log"; return 1; }
     echo "built $name ($ABI)"
 }
 
-for ABI in "${ABIS[@]}"; do
+for ABI in "${PENDING_ABIS[@]}"; do
+    rm -rf "$OUT/build/$ABI" "$OUT/$ABI"
     mkdir -p "$OUT/build/$ABI"
     PREFIX="$OUT/$ABI"
     build json "$SRC/json" "$PREFIX" -DJSON_BuildTests=OFF
@@ -62,4 +108,5 @@ for ABI in "${ABIS[@]}"; do
         -DOPENSSL_ROOT_DIR="$PREFIX" -DOPENSSL_USE_STATIC_LIBS=ON
     build libdave "$SRC/libdave/cpp" "$PREFIX" \
         -DREQUIRE_BORINGSSL=ON -DOPENSSL_ROOT_DIR="$PREFIX" -DOPENSSL_USE_STATIC_LIBS=ON
+    printf '%s\n' "$STAMP" >"$OUT/$ABI/.build-stamp"
 done

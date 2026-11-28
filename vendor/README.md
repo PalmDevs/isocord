@@ -11,10 +11,11 @@ Workspace dependency ranges were resolved to the corresponding upstream package 
 `dave/build.sh` fetches [libdave](https://github.com/discord/libdave) and its dependencies (mlspp, BoringSSL,
 nlohmann/json) at pinned commits into `dave/src/` and cross-compiles them as static libraries into
 `dave/out/<abi>/` with the NDK. `android/app/src/main/cpp/dave/CMakeLists.txt` links them into
-`libisocord_dave.so`. Both folders are ignored by git. Needs `ANDROID_HOME`.
+`libisocord_dave.so`. Gradle runs it automatically before CMake, and standalone runs read `ndkVersion`,
+`minSdkVersion` and `reactNativeArchitectures` from `android/`. Both folders are ignored by git. Needs `ANDROID_HOME`.
 
 # RNNoise
 
 `rnnoise/fetch.sh` fetches [RNNoise](https://github.com/xiph/rnnoise) (BSD-3) at a pinned commit into
 `rnnoise/src/`, with its model archive from media.xiph.org checked by SHA-256. `android/app/src/main/cpp/audio/CMakeLists.txt`
-compiles it into `libisocord_audio.so` for every ABI. The folder is ignored by git. Run it once before building.
+compiles it into `libisocord_audio.so` for every ABI. Gradle runs it automatically before CMake. The folder is ignored by git.
