@@ -31,13 +31,13 @@ import me.palmdevs.isocord.chat.rows.ChatRow
  * An arriving message grows while fading in. A deleted one fades out while collapsing, a little faster.
  * The reference list (DCDChatList) has no item animator. Durations are Material standard.
  */
-private const val ENTER_HEIGHT_MS = 200f
+private const val ENTER_HEIGHT_MS = 250f
 
 private const val ENTER_FADE_MS = 400f
 
-private const val EXIT_HEIGHT_MS = 200f
+private const val EXIT_HEIGHT_MS = 250f
 
-private const val EXIT_FADE_MS = 150f
+private const val EXIT_FADE_MS = 200f
 
 /**
  * Rows deleted on screen, kept until they fade and collapse.

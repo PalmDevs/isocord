@@ -73,7 +73,7 @@ internal const val SENDING_ALPHA_MAX = 0.65f
 
 private const val SENDING_BREATHE_MS = 1000
 
-private const val SENDING_SETTLE_MS = 500
+private const val SENDING_SETTLE_MS = 100
 
 @Composable
 fun MessageRow(row: ChatRow.Message) {

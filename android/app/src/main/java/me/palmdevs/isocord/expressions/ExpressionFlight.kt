@@ -61,7 +61,7 @@ import me.palmdevs.isocord.core.DisposeAfterDetach
 // Our own, not in the reference (its picker has no shared-element motion): the tapped tile flies into the pending row.
 
 /** Duration of the shared-element flight from picker tile to chat row. */
-private const val FLIGHT_MS = 280
+private const val FLIGHT_MS = 350
 
 /** Gentle ease-out without FastOutSlowIn's sharp mid-curve snap. */
 private val FLIGHT_EASING = CubicBezierEasing(0.22f, 0.68f, 0.36f, 1f)
