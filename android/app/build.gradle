@@ -28,7 +28,7 @@ react {
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
-    // nodeExecutableAndArgs = ["node"]
+    nodeExecutableAndArgs = ["bun"]
     //
     //   The command to run when bundling. By default is 'bundle'
     // bundleCommand = "ram-bundle"
@@ -218,6 +218,17 @@ dependencies {
 
 def daveDir = rootProject.layout.projectDirectory.dir("../vendor/dave")
 def rnnoiseDir = rootProject.layout.projectDirectory.dir("../vendor/rnnoise")
+def nitrogenDir = rootProject.layout.projectDirectory.dir("../nitrogen/generated")
+
+def generateNitrogen = tasks.register("generateNitrogen", Exec) {
+    group = "build"
+    description = "Generates Nitro C++ and Kotlin bindings from src/native/specs."
+    workingDir = rootProject.file("..")
+    commandLine("bun", "node_modules/nitrogen/lib/index.js")
+    inputs.file(rootProject.file("../nitro.json"))
+    inputs.dir(rootProject.file("../src/native/specs"))
+    outputs.dir(nitrogenDir)
+}
 
 def fetchRnnoise = tasks.register("fetchRnnoise", Exec) {
     group = "build"
@@ -249,8 +260,14 @@ def buildDave = tasks.register("buildDave", Exec) {
     }
 }
 
+tasks.named("preBuild") {
+    dependsOn(generateNitrogen)
+}
+
 tasks.configureEach { task ->
     if (task.name.startsWith("configureCMake")) {
-        task.dependsOn(buildDave, fetchRnnoise)
+        task.dependsOn(generateNitrogen, buildDave, fetchRnnoise)
+    } else if (task.name.startsWith("createBundle")) {
+        task.dependsOn(generateNitrogen)
     }
 }

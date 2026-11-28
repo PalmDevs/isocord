@@ -12,7 +12,7 @@
     "nitrogen": "nitrogen",
     "extract": "bun scripts/extract-tokens.ts ../discord-mobile-datamining",
     "twemoji": "bash scripts/fetch-twemoji.sh",
-    "postinstall": "test -f android/app/src/main/assets/twemoji/Twemoji.ttf || bun run twemoji || bun run nitrogen"
+    "postinstall": "(test -f android/app/src/main/assets/twemoji/Twemoji.ttf || bun run twemoji) && bun run nitrogen"
   },
   "dependencies": {
     "@callstack/liquid-glass": "^0.8.2",
